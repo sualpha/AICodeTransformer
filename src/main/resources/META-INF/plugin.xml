@@ -24,6 +24,19 @@
         <li>One-click code transformation and optimization</li>
         <li>Seamless integration with JetBrains IDEs</li>
     </ul>
+    <br>
+    <hr>
+    <br>
+    AI代码转换器让开发者能够通过简单的键盘快捷键触发自定义AI指令，智能地重构、优化、解释或生成代码。<br>
+    <br>
+    <strong>主要功能：</strong>
+    <ul>
+        <li>配置多种AI模型（OpenAI、Claude、本地模型）</li>
+        <li>创建带变量的自定义提示模板</li>
+        <li>绑定键盘快捷键到AI操作</li>
+        <li>一键代码转换和优化</li>
+        <li>与JetBrains IDE无缝集成</li>
+    </ul>
   ]]></description>
 
     <!-- Product and plugin compatibility requirements.
