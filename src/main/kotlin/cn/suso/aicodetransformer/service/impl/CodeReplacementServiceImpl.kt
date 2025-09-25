@@ -160,15 +160,6 @@ class CodeReplacementServiceImpl : CodeReplacementService {
             )
             
         } catch (e: Exception) {
-            val errorContext = ErrorContext(
-                operation = "replaceText",
-                component = "CodeReplacementService",
-                additionalInfo = mapOf(
-                    "startOffset" to startOffset.toString(),
-                    "endOffset" to endOffset.toString(),
-                    "newTextLength" to newText.length.toString()
-                )
-            )
             val handlingResult = errorHandlingService.handleCodeReplacementError(e, null, newText)
             ReplacementResult(
                 success = false,
@@ -237,14 +228,6 @@ class CodeReplacementServiceImpl : CodeReplacementService {
             )
             
         } catch (e: Exception) {
-            val errorContext = ErrorContext(
-                operation = "插入文本",
-                component = "CodeReplacementService",
-                additionalInfo = mapOf(
-                    "textLength" to text.length.toString(),
-                    "offset" to offset.toString()
-                )
-            )
             val handlingResult = errorHandlingService.handleCodeReplacementError(e, null, text)
             ReplacementResult(
                 success = false,

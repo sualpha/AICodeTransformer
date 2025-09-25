@@ -34,7 +34,7 @@ class DynamicTemplateActionGroup : ActionGroup() {
             val actions = mutableListOf<AnAction>()
             
             // 按分类分组
-            val templatesByCategory = enabledTemplates.groupBy { it.category ?: "其他" }
+            val templatesByCategory = enabledTemplates.groupBy { it.category.ifEmpty { "其他" } }
             
             templatesByCategory.forEach { (category, templates) ->
                 if (templatesByCategory.size > 1) {

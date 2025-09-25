@@ -97,7 +97,7 @@ class AIModelServiceImpl : AIModelService {
             install(HttpRequestRetry) {
                 retryOnServerErrors(maxRetries = 0)  // 禁用HTTP层重试，避免与ErrorHandlingService重试叠加
                 exponentialDelay(base = 1.5, maxDelayMs = 10000)
-                retryIf { request, response ->
+                retryIf { _, response ->
                     response.status.value in 500..599 || response.status.value == 429
                 }
             }
@@ -239,16 +239,6 @@ class AIModelServiceImpl : AIModelService {
             loggingService.logError(e, "API调用异常, requestId: $requestId, 模型: ${config.name}")
             
             // 使用ErrorHandlingService处理异常
-            val errorContext = ErrorContext(
-                operation = "AI模型调用",
-                component = "AIModelService",
-                additionalInfo = mapOf(
-                    "modelName" to config.name,
-                    "modelType" to config.modelType.name,
-                    "requestId" to requestId
-                )
-            )
-            
             val handlingResult = errorHandlingService.handleModelError(e, config.name)
             
             val errorResult = ExecutionResult.failure(
@@ -293,16 +283,6 @@ class AIModelServiceImpl : AIModelService {
             }
         } catch (e: Exception) {
             // 使用ErrorHandlingService处理异常
-            val errorContext = ErrorContext(
-                operation = "连接测试",
-                component = "AIModelService",
-                additionalInfo = mapOf(
-                    "modelName" to config.name,
-                    "modelType" to config.modelType.name,
-                    "baseUrl" to config.apiBaseUrl
-                )
-            )
-            
             val handlingResult = errorHandlingService.handleNetworkError(e, config.apiBaseUrl)
             
             ExecutionResult.failure(
@@ -335,15 +315,6 @@ class AIModelServiceImpl : AIModelService {
             }
         } catch (e: Exception) {
             // 使用ErrorHandlingService处理异常
-            val errorContext = ErrorContext(
-                operation = "获取模型信息",
-                component = "AIModelService",
-                additionalInfo = mapOf(
-                    "modelName" to config.name,
-                    "modelType" to config.modelType.name
-                )
-            )
-            
             errorHandlingService.handleModelError(e, config.name)
             null
         }
@@ -808,7 +779,7 @@ class AIModelServiceImpl : AIModelService {
      */
     private suspend fun getOpenAIModelInfo(
         modelConfig: ModelConfiguration,
-        apiKey: String?
+        @Suppress("UNUSED_PARAMETER") apiKey: String?
     ): ModelInfo {
         return ModelInfo(
             name = modelConfig.name,
@@ -824,7 +795,7 @@ class AIModelServiceImpl : AIModelService {
      */
     private suspend fun getClaudeModelInfo(
         modelConfig: ModelConfiguration,
-        apiKey: String?
+        @Suppress("UNUSED_PARAMETER") apiKey: String?
     ): ModelInfo {
         return ModelInfo(
             name = modelConfig.name,

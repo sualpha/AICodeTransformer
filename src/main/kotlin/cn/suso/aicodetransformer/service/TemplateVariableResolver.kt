@@ -55,7 +55,6 @@ class TemplateVariableResolver(private val project: Project) {
         
         // 获取选中的代码
         val selectedText = getSelectedText(editor)
-        variables["\${selectedCode}"] = selectedText
         variables["{{selectedCode}}"] = selectedText
         
         // 获取当前文件信息
@@ -63,9 +62,9 @@ class TemplateVariableResolver(private val project: Project) {
         val virtualFile = FileDocumentManager.getInstance().getFile(document)
         
         if (virtualFile != null) {
-            variables["\${fileName}"] = virtualFile.name
-            variables["\${filePath}"] = virtualFile.path
-            variables["\${language}"] = getLanguageFromFile(virtualFile)
+            variables["{{fileName}}"] = virtualFile.name
+            variables["{{filePath}}"] = virtualFile.path
+            variables["{{language}}"] = getLanguageFromFile(virtualFile)
             
             // 获取PSI信息
             val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
@@ -74,23 +73,23 @@ class TemplateVariableResolver(private val project: Project) {
                 
                 // 获取当前类名
                 val psiClass = PsiTreeUtil.getParentOfType(psiFile.findElementAt(offset), PsiClass::class.java)
-                variables["\${className}"] = psiClass?.name ?: ""
+                variables["{{className}}"] = psiClass?.name ?: ""
                 
                 // 获取当前方法名
                 val psiMethod = PsiTreeUtil.getParentOfType(psiFile.findElementAt(offset), PsiMethod::class.java)
-                variables["\${methodName}"] = psiMethod?.name ?: ""
+                variables["{{methodName}}"] = psiMethod?.name ?: ""
                 
                 // 获取包名
                 val packageName = when (psiFile) {
                     is PsiJavaFile -> psiFile.packageName
                     else -> ""
                 }
-                variables["\${packageName}"] = packageName
+                variables["{{packageName}}"] = packageName
             }
         }
         
         // 获取项目名
-        variables["\${projectName}"] = project.name
+        variables["{{projectName}}"] = project.name
         
         // 获取请求参数和返回参数信息
         try {
@@ -124,8 +123,8 @@ class TemplateVariableResolver(private val project: Project) {
                 }
             }
             
-            variables["\${requestParams}"] = if (requestParams.isNotEmpty()) requestParams.toString().trim() else "无请求参数信息"
-            variables["\${responseParams}"] = if (responseParams.isNotEmpty()) responseParams.toString().trim() else "无返回参数信息"
+            variables["{{requestParams}}"] = if (requestParams.isNotEmpty()) requestParams.toString().trim() else "无请求参数信息"
+            variables["{{responseParams}}"] = if (responseParams.isNotEmpty()) responseParams.toString().trim() else "无返回参数信息"
             
             // 获取第一个请求参数信息
             val firstRequestParam = classInfoList.firstOrNull { classInfo ->
@@ -147,14 +146,14 @@ class TemplateVariableResolver(private val project: Project) {
                     }
                     firstParamInfo.append("\n")
                 }
-                variables["\${firstRequestParam}"] = firstParamInfo.toString().trim()
+                variables["{{firstRequestParam}}"] = firstParamInfo.toString().trim()
             } else {
-                variables["\${firstRequestParam}"] = "无第一个请求参数信息"
+                variables["{{firstRequestParam}}"] = "无第一个请求参数信息"
             }
         } catch (e: Exception) {
-            variables["\${requestParams}"] = "解析请求参数失败: ${e.message}"
-            variables["\${responseParams}"] = "解析返回参数失败: ${e.message}"
-            variables["\${firstRequestParam}"] = "解析第一个请求参数失败: ${e.message}"
+            variables["{{requestParams}}"] = "变量替换失败"
+            variables["{{responseParams}}"] = "变量替换失败"
+            variables["{{firstRequestParam}}"] = "变量替换失败"
         }
         
         return variables

@@ -275,7 +275,7 @@ class TemplateServiceImpl : TemplateService, Disposable {
         if (!validationResult.isValid) {
             return TemplateRenderResult(
                 success = false,
-                error = "变量验证失败: ${validationResult.errors.joinToString(", ")}",
+                error = "变量替换失败",
                 template = template
             )
         }
@@ -295,7 +295,7 @@ class TemplateServiceImpl : TemplateService, Disposable {
             logger.error("渲染模板失败: $templateId", e)
             return TemplateRenderResult(
                 success = false,
-                error = "渲染失败: ${e.message}",
+                error = "变量替换失败",
                 template = template
             )
         }
@@ -516,7 +516,7 @@ class TemplateServiceImpl : TemplateService, Disposable {
                 description = "将选中的文本转换为驼峰命名格式",
                 category = TemplateCategory.CODE_CONVERSION,
                 tags = listOf("命名转换", "驼峰", "格式化"),
-                promptTemplate = "请将以下文本转换为驼峰命名格式，只返回转换结果：\n\n```\n\${'$'}{selectedCode}\n```",
+                promptTemplate = "请将以下文本转换为驼峰命名格式，只返回转换结果：\n\n```\n{{selectedCode}}\n```",
                 isBuiltIn = true
             ),
             
@@ -527,7 +527,7 @@ class TemplateServiceImpl : TemplateService, Disposable {
                 description = "生成Java对象之间的转换方法，基于字段分析的逐字段显式转换，支持VO/DTO/DOMAIN/ENTITY转换",
                 category = TemplateCategory.CODE_CONVERSION,
                 tags = listOf("对象转换", "VO", "DTO", "DOMAIN", "ENTITY", "hutool", "显式转换", "字段分析"),
-                promptTemplate = "请根据以下选中的代码生成对象转换代码：\n\n\${'$'}{selectedCode}\n\n方法请求参数信息：\n\${'$'}{firstRequestParam}\n\n方法返回参数信息：\n\${'$'}{responseParams}\n\n转换要求：\n1. 将 BeanUtil.copyProperties() 方法替换为逐个字段的显式转换\n2. 只需要从请求参数转换到响应参数的单向转换\n3. 对于每个字段，使用明确的 getter/setter 方法进行转换\n4. 字段转换规则：\n   - 如果源字段和目标字段都是String类型，直接复制赋值\n   - 如果类型不同，使用hutool工具进行转换\n   - 时间类型转换默认使用年月日格式（yyyy-MM-dd）\n5. 保持代码的可读性和维护性\n6. 根据上述请求参数和返回参数信息进行精确的字段映射\n7. 如果目标对象中的字段在源对象中不存在，则直接忽略该字段，不要设置为空值或默认值\n8. 只转换存在对应关系的字段\n9. 对于需要类型转换的字段，优先使用hutool的工具类\n\n注意：请直接返回纯Java代码，不要包含任何代码块标记（如```java、```等），不要包含import语句说明，不需要额外的文字说明。",
+                promptTemplate = "请根据以下选中的代码生成对象转换代码：\n\n{{selectedCode}}\n\n方法请求参数信息：\n{{firstRequestParam}}\n\n方法返回参数信息：\n{{responseParams}}\n\n转换要求：\n1. 将 BeanUtil.copyProperties() 方法替换为逐个字段的显式转换\n2. 只需要从请求参数转换到响应参数的单向转换\n3. 对于每个字段，使用明确的 getter/setter 方法进行转换\n4. 字段转换规则：\n   - 如果源字段和目标字段都是String类型，直接复制赋值\n   - 如果类型不同，使用hutool工具进行转换\n   - 时间类型转换默认使用年月日格式（yyyy-MM-dd）\n5. 保持代码的可读性和维护性\n6. 根据上述请求参数和返回参数信息进行精确的字段映射\n7. 如果目标对象中的字段在源对象中不存在，则直接忽略该字段，不要设置为空值或默认值\n8. 只转换存在对应关系的字段\n9. 对于需要类型转换的字段，优先使用hutool的工具类\n\n注意：请直接返回纯Java代码，不要包含任何代码块标记（如```java、```等），不要包含import语句说明，不需要额外的文字说明。",
                 isBuiltIn = true
             )
         )

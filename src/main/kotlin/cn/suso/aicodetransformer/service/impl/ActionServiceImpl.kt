@@ -264,7 +264,7 @@ class ActionServiceImpl : ActionService, TemplateChangeListener {
         if (parts.isEmpty()) return null
         
         var modifiers = 0
-        var keyCode = 0
+        var keyCode: Int
         
         for (i in 0 until parts.size - 1) {
             when (parts[i]) {
@@ -367,7 +367,7 @@ class ActionServiceImpl : ActionService, TemplateChangeListener {
                 notifyListeners { it.onActionExecuted("$ACTION_ID_PREFIX${template.id}", template, selectedText) }
                 
                 // 异步执行模板处理，避免阻塞UI线程
-                executionService.executeTemplateAsync(template, selectedText, project, editor) { result ->
+                executionService.executeTemplateAsync(template, selectedText, project, editor) { _ ->
                     // 执行结果已在ExecutionService内部处理
                 }
                 

@@ -171,12 +171,19 @@ class AICodeTransformerProjectActivity : ProjectActivity {
             
             // 设置配置变更监听器
             configurationService.addConfigurationChangeListener(object : ConfigurationChangeListener {
-                fun onConfigurationChanged(configuration: ModelConfiguration) {
-                    // 配置变更时可能需要重新初始化AI服务
-                    logger.info("模型配置已更新: ${configuration.name}")
+                override fun onConfigurationAdded(config: ModelConfiguration) {
+                    logger.info("模型配置已添加: ${config.name}")
                 }
                 
-                override fun onDefaultConfigurationChanged(configuration: ModelConfiguration?) {
+                override fun onConfigurationUpdated(oldConfig: ModelConfiguration, newConfig: ModelConfiguration) {
+                    logger.info("模型配置已更新: ${newConfig.name}")
+                }
+                
+                override fun onConfigurationDeleted(config: ModelConfiguration) {
+                    logger.info("模型配置已删除: ${config.name}")
+                }
+                
+                override fun onDefaultConfigurationChanged(config: ModelConfiguration?) {
                     logger.info("默认模型配置已更改")
                 }
             })

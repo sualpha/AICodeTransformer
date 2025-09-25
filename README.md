@@ -25,7 +25,7 @@ AICodeTransformer 是一个功能强大的 IntelliJ IDEA 插件，通过集成�
   - 📝 **驼峰命名转换**: 一键转换变量命名格式，支持任意字符长串的格式
   - 📋 **JSON格式化**: 智能JSON格式化工具：自动处理特殊字符、补全缺失符号、修复语法错误并美化格式
 - **自定义模板**: 支持创建个性化 AI 指令模板
-- **变量系统**: 内置 `${selectedCode}`、`${fileName}`、`${language}` 等变量
+- **变量系统**: 内置 `{{selectedCode}}`、`{{fileName}}`、`{{language}}` 等变量
 - **分类管理**: 按功能分类，便于查找和使用
 
 ### ⚡ 高效操作体验
@@ -113,14 +113,14 @@ Max Tokens: 4096
 
 | 变量 | 描述 | 示例 |
 |------|------|------|
-| `${selectedCode}` | 当前选中的代码 | `public class Test {}` |
-| `${fileName}` | 当前文件名 | `UserService.java` |
-| `${language}` | 编程语言 | `Java` |
-| `${projectName}` | 项目名称 | `MyProject` |
-| `${filePath}` | 文件路径 | `src/main/java/User.java` |
-| `${className}` | 当前类名 | `UserService` |
-| `${methodName}` | 当前方法名 | `getUserById` |
-| `${packageName}` | 包名 | `com.example.service` |
+| `{{selectedCode}}` | 当前选中的代码 | `public class Test {}` |
+| `{{fileName}}` | 当前文件名 | `UserService.java` |
+| `{{language}}` | 编程语言 | `Java` |
+| `{{projectName}}` | 项目名称 | `MyProject` |
+| `{{filePath}}` | 文件路径 | `src/main/java/User.java` |
+| `{{className}}` | 当前类名 | `UserService` |
+| `{{methodName}}` | 当前方法名 | `getUserById` |
+| `{{packageName}}` | 包名 | `com.example.service` |
 
 ## 🎯 使用方法
 
@@ -135,19 +135,19 @@ Max Tokens: 4096
 ### 自定义模板示例
 
 ```
-请将以下 ${language} 代码转换为更优雅的形式：
+请将以下 {{language}} 代码转换为更优雅的形式：
 
-\`\`\`${language}
-${selectedCode}
+\`\`\`{{language}}
+{{selectedCode}}
 \`\`\`
 
 要求：
 1. 优化代码结构和可读性
-2. 遵循 ${language} 最佳实践
+2. 遵循 {{language}} 最佳实践
 3. 添加必要的注释
 4. 保持原有功能不变
 
-文件：${fileName}
+文件：{{fileName}}
 ```
 
 ## 🛠️ 技术架构
@@ -220,7 +220,7 @@ src/main/kotlin/cn/suso/aicodetransformer/
 <summary><strong>Q: 如何提高代码转换质量？</strong></summary>
 
 建议：
-- 选择合适的 AI 模型（GPT-4 通常效果更好）
+- 选择合适的 AI 模型（亲测longcat 效果更好）
 - 调整 Temperature 参数（0.3-0.7 之间通常效果较好）
 - 提供清晰的转换要求和上下文
 - 使用自定义 Prompt 模板优化提示词

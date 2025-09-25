@@ -237,7 +237,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
             // 获取当前项目
             val project = ProjectManager.getInstance().openProjects.firstOrNull()
             if (project != null) {
-                variables["\${projectName}"] = project.name
+                variables["{{projectName}}"] = project.name
                 
                 // 获取当前编辑器和文件信息
                 val fileEditorManager = FileEditorManager.getInstance(project)
@@ -247,22 +247,22 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                     // 获取选中的代码
                     val selectionModel = selectedEditor.selectionModel
                     val selectedText = selectionModel.selectedText ?: ""
-                    variables["\${selectedCode}"] = selectedText
+                    variables["{{selectedCode}}"] = selectedText
                     
                     // 获取当前文件信息
                     val virtualFile = fileEditorManager.selectedFiles.firstOrNull()
                     if (virtualFile != null) {
-                        variables["\${fileName}"] = virtualFile.name
-                        variables["\${language}"] = getLanguageFromFile(virtualFile)
+                        variables["{{fileName}}"] = virtualFile.name
+                        variables["{{language}}"] = getLanguageFromFile(virtualFile)
                     }
                 }
             }
         } catch (e: Exception) {
             // 如果获取上下文失败，使用默认值
-            variables.putIfAbsent("\${selectedCode}", "")
-            variables.putIfAbsent("\${fileName}", "")
-            variables.putIfAbsent("\${language}", "")
-            variables.putIfAbsent("\${projectName}", "")
+            variables.putIfAbsent("{{selectedCode}}", "")
+            variables.putIfAbsent("{{fileName}}", "")
+            variables.putIfAbsent("{{language}}", "")
+            variables.putIfAbsent("{{projectName}}", "")
         }
         
         return variables
@@ -712,37 +712,30 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 variableNames.add(variableName)
             }
             
-            // 优化大括号计数，使用更高效的方式
-            var openBraces = 0
-            var closeBraces = 0
+            // 检查双大括号变量的匹配性
+            var doubleBraceOpen = 0
+            var doubleBraceClose = 0
             var hasNestedBraces = false
             var inVariable = false
-            var braceDepth = 0
             
-            for (i in content.indices) {
-                when (content[i]) {
-                    '{' -> {
-                        openBraces++
-                        if (i < content.length - 1 && content[i + 1] == '{') {
-                            if (inVariable) {
-                                hasNestedBraces = true
-                                break
-                            }
-                            inVariable = true
-                            braceDepth = 2
-                        } else if (inVariable) {
-                            braceDepth++
-                        }
+            var i = 0
+            while (i < content.length) {
+                if (i < content.length - 1 && content[i] == '{' && content[i + 1] == '{') {
+                    doubleBraceOpen++
+                    if (inVariable) {
+                        hasNestedBraces = true
+                        break
                     }
-                    '}' -> {
-                        closeBraces++
-                        if (inVariable) {
-                            braceDepth--
-                            if (braceDepth == 0) {
-                                inVariable = false
-                            }
-                        }
+                    inVariable = true
+                    i += 2 // 跳过下一个字符
+                } else if (i < content.length - 1 && content[i] == '}' && content[i + 1] == '}') {
+                    doubleBraceClose++
+                    if (inVariable) {
+                        inVariable = false
                     }
+                    i += 2 // 跳过下一个字符
+                } else {
+                    i++
                 }
                 
                 // 每处理1000个字符检查一次，避免长时间阻塞
@@ -751,8 +744,8 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 }
             }
             
-            if (openBraces != closeBraces) {
-                return "模板中存在未匹配的大括号"
+            if (doubleBraceOpen != doubleBraceClose) {
+                return "模板中存在未匹配的双大括号变量"
             }
             
             if (hasNestedBraces) {

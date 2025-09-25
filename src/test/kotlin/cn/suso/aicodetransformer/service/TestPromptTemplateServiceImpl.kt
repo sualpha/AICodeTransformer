@@ -23,7 +23,7 @@ class TestPromptTemplateServiceImpl : PromptTemplateService {
             PromptTemplate(
                 id = "builtin-code-conversion",
                 name = "代码转换",
-                content = "将以下\${sourceLanguage}代码转换为\${targetLanguage}：\n\${code}",
+                content = "将以下{{sourceLanguage}}代码转换为{{targetLanguage}}：\n{{code}}",
                 category = "代码转换",
                 isBuiltIn = true,
                 enabled = true
@@ -31,7 +31,7 @@ class TestPromptTemplateServiceImpl : PromptTemplateService {
             PromptTemplate(
                 id = "builtin-testing",
                 name = "测试生成",
-                content = "为以下\${language}代码生成单元测试：\n\${code}",
+                content = "为以下{{language}}代码生成单元测试：\n{{code}}",
                 category = "测试",
                 isBuiltIn = true,
                 enabled = true
@@ -39,7 +39,7 @@ class TestPromptTemplateServiceImpl : PromptTemplateService {
             PromptTemplate(
                 id = "builtin-documentation",
                 name = "文档生成",
-                content = "为以下\${language}代码生成文档：\n\${code}",
+                content = "为以下{{language}}代码生成文档：\n{{code}}",
                 category = "文档",
                 isBuiltIn = true,
                 enabled = true
@@ -92,10 +92,10 @@ class TestPromptTemplateServiceImpl : PromptTemplateService {
     
     override fun getContextVariables(): Map<String, String> {
         return mapOf(
-            "\${selectedCode}" to "",
-            "\${fileName}" to "",
-            "\${language}" to "",
-            "\${projectName}" to ""
+            "{{selectedCode}}" to "",
+            "{{fileName}}" to "",
+            "{{language}}" to "",
+            "{{projectName}}" to ""
         )
     }
     
@@ -170,7 +170,7 @@ class TestPromptTemplateServiceImpl : PromptTemplateService {
             PromptTemplate(
                 id = "default-optimize",
                 name = "代码优化",
-                content = "请优化以下代码：\n\${selectedCode}",
+                content = "请优化以下代码：\n{{selectedCode}}",
                 category = "代码优化",
                 isBuiltIn = true,
                 enabled = true
@@ -178,7 +178,7 @@ class TestPromptTemplateServiceImpl : PromptTemplateService {
             PromptTemplate(
                 id = "default-explain",
                 name = "代码解释",
-                content = "请解释以下代码的功能：\n\${selectedCode}",
+                content = "请解释以下代码的功能：\n{{selectedCode}}",
                 category = "代码解释",
                 isBuiltIn = true,
                 enabled = true
@@ -186,7 +186,7 @@ class TestPromptTemplateServiceImpl : PromptTemplateService {
             PromptTemplate(
                 id = "default-test",
                 name = "生成测试",
-                content = "为以下代码生成单元测试：\n\${selectedCode}",
+                content = "为以下代码生成单元测试：\n{{selectedCode}}",
                 category = "测试生成",
                 isBuiltIn = true,
                 enabled = true

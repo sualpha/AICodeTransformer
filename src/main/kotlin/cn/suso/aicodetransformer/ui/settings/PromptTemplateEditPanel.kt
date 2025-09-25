@@ -234,17 +234,17 @@ class PromptTemplateEditPanel : JPanel() {
      */
     private fun showInsertVariableDialog() {
         val variables = listOf(
-            "\${selectedCode}" to "当前选中的代码",
-            "\${fileName}" to "当前文件名",
-            "\${language}" to "当前文件的编程语言",
-            "\${filePath}" to "当前文件路径",
-            "\${className}" to "当前类名",
-            "\${methodName}" to "当前方法名",
-            "\${packageName}" to "当前包名",
-            "\${projectName}" to "项目名称",
-            "\${requestParams}" to "方法请求参数信息（所有参数）",
-            "\${firstRequestParam}" to "第一个请求参数信息",
-            "\${responseParams}" to "方法返回参数信息",
+            "{{selectedCode}}" to "当前选中的代码",
+            "{{fileName}}" to "当前文件名",
+            "{{language}}" to "当前文件的编程语言",
+            "{{filePath}}" to "当前文件路径",
+            "{{className}}" to "当前类名",
+            "{{methodName}}" to "当前方法名",
+            "{{packageName}}" to "当前包名",
+            "{{projectName}}" to "项目名称",
+            "{{requestParams}}" to "方法请求参数信息（所有参数）",
+            "{{firstRequestParam}}" to "第一个请求参数信息",
+            "{{responseParams}}" to "方法返回参数信息",
 
         )
         

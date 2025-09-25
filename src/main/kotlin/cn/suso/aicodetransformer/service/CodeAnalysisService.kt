@@ -501,9 +501,9 @@ class CodeAnalysisService {
                     val isPrivate = psiField.hasModifierProperty(PsiModifier.PRIVATE)
                     
                     // 检查是否有getter和setter方法
-                    val hasGetter = psiClass.findMethodsByName("get${fieldName.capitalize()}", false).isNotEmpty() ||
-                                   psiClass.findMethodsByName("is${fieldName.capitalize()}", false).isNotEmpty()
-                    val hasSetter = psiClass.findMethodsByName("set${fieldName.capitalize()}", false).isNotEmpty()
+                    val hasGetter = psiClass.findMethodsByName("get${fieldName.replaceFirstChar { it.uppercase() }}", false).isNotEmpty() ||
+                                   psiClass.findMethodsByName("is${fieldName.replaceFirstChar { it.uppercase() }}", false).isNotEmpty()
+                    val hasSetter = psiClass.findMethodsByName("set${fieldName.replaceFirstChar { it.uppercase() }}", false).isNotEmpty()
                     
                     fields.add(FieldInfo(
                         name = fieldName,

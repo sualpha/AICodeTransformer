@@ -25,7 +25,7 @@ AICodeTransformer is a powerful IntelliJ IDEA plugin that integrates multiple AI
   - 📝 **CamelCase Conversion**: One-click variable naming format conversion, supporting arbitrary character strings
   - 📋 **JSON Formatting**: Intelligent JSON formatting tool: automatically handle special characters, complete missing symbols, fix syntax errors and beautify format
 - **Custom Templates**: Support for creating personalized AI instruction templates
-- **Variable System**: Built-in variables like `${selectedCode}`, `${fileName}`, `${language}`, etc.
+- **Variable System**: Built-in variables like `{{selectedCode}}`, `{{fileName}}`, `{{language}}`, etc.
 - **Category Management**: Organized by function for easy searching and usage
 
 ### ⚡ Efficient Operation Experience
@@ -113,14 +113,14 @@ Max Tokens: 4096
 
 | Variable | Description | Example |
 |----------|-------------|----------|
-| `${selectedCode}` | Currently selected code | `public class Test {}` |
-| `${fileName}` | Current file name | `UserService.java` |
-| `${language}` | Programming language | `Java` |
-| `${projectName}` | Project name | `MyProject` |
-| `${filePath}` | File path | `src/main/java/User.java` |
-| `${className}` | Current class name | `UserService` |
-| `${methodName}` | Current method name | `getUserById` |
-| `${packageName}` | Package name | `com.example.service` |
+| `{{selectedCode}}` | Currently selected code | `public class Test {}` |
+| `{{fileName}}` | Current file name | `UserService.java` |
+| `{{language}}` | Programming language | `Java` |
+| `{{projectName}}` | Project name | `MyProject` |
+| `{{filePath}}` | File path | `src/main/java/User.java` |
+| `{{className}}` | Current class name | `UserService` |
+| `{{methodName}}` | Current method name | `getUserById` |
+| `{{packageName}}` | Package name | `com.example.service` |
 
 ## 🎯 Usage
 
@@ -135,19 +135,19 @@ Max Tokens: 4096
 ### Custom Template Example
 
 ```
-Please convert the following ${language} code to a more elegant form:
+Please convert the following {{language}} code to a more elegant form:
 
-\`\`\`${language}
-${selectedCode}
+\`\`\`{{language}}
+{{selectedCode}}
 \`\`\`
 
 Requirements:
 1. Optimize code structure and readability
-2. Follow ${language} best practices
+2. Follow {{language}} best practices
 3. Add necessary comments
 4. Keep original functionality unchanged
 
-File: ${fileName}
+File: {{fileName}}
 ```
 
 ## 🛠️ Technical Architecture

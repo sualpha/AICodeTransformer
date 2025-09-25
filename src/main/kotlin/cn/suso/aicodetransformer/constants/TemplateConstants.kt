@@ -29,7 +29,7 @@ object TemplateConstants {
             description = "将选中的文本转换为驼峰命名格式",
             category = TemplateCategory.CODE_CONVERSION,
             tags = listOf("命名转换", "驼峰", "格式化"),
-            content = "请将以下文本转换为驼峰命名格式，只返回转换结果：\n\n```\n\${selectedCode}\n```"
+            content = "请将以下文本转换为驼峰命名格式，只返回转换结果：\n\n```\n{{selectedCode}}\n```"
         ),
         
         OBJECT_CONVERT(
@@ -38,7 +38,7 @@ object TemplateConstants {
             description = "生成Java对象之间的转换方法，基于字段分析的逐字段显式转换，支持VO/DTO/DOMAIN/ENTITY转换",
             category = TemplateCategory.CODE_CONVERSION,
             tags = listOf("对象转换", "VO", "DTO", "DOMAIN", "ENTITY", "hutool", "显式转换", "字段分析"),
-            content = "请根据以下选中的代码生成对象转换代码：\n\n\${selectedCode}\n\n方法请求参数信息：\n\${firstRequestParam}\n\n方法返回参数信息：\n\${responseParams}\n\n转换要求：\n1. 将 BeanUtil.copyProperties() 方法替换为逐个字段的显式转换\n2. 只需要从请求参数转换到响应参数的单向转换\n3. 对于每个字段，使用明确的 getter/setter 方法进行转换\n4. 字段转换规则：\n   - 如果源字段和目标字段都是String类型，直接复制赋值\n   - 如果类型不同，使用hutool工具进行转换\n   - 时间类型转换默认使用年月日格式（yyyy-MM-dd）\n5. 保持代码的可读性和维护性\n6. 根据上述请求参数和返回参数信息进行精确的字段映射\n7. 如果目标对象中的字段在源对象中不存在，则直接忽略该字段，不要设置为空值或默认值\n8. 只转换存在对应关系的字段\n9. 对于需要类型转换的字段，优先使用hutool的工具类\n\n注意：请直接返回纯Java代码，不要包含任何代码块标记（如```java、```等），不要包含import语句说明，不需要额外的文字说明。",
+            content = "请根据以下选中的代码生成对象转换代码：\n\n{{selectedCode}}\n\n方法请求参数信息：\n{{firstRequestParam}}\n\n方法返回参数信息：\n{{responseParams}}\n\n转换要求：\n1. 将 BeanUtil.copyProperties() 方法替换为逐个字段的显式转换\n2. 只需要从请求参数转换到响应参数的单向转换\n3. 对于每个字段，使用明确的 getter/setter 方法进行转换\n4. 字段转换规则：\n   - 如果源字段和目标字段都是String类型，直接复制赋值\n   - 如果类型不同，使用hutool工具进行转换\n   - 时间类型转换默认使用年月日格式（yyyy-MM-dd）\n5. 保持代码的可读性和维护性\n6. 根据上述请求参数和返回参数信息进行精确的字段映射\n7. 如果目标对象中的字段在源对象中不存在，则直接忽略该字段，不要设置为空值或默认值\n8. 只转换存在对应关系的字段\n9. 对于需要类型转换的字段，优先使用hutool的工具类\n\n注意：请直接返回纯Java代码，不要包含任何代码块标记（如```java、```等），不要包含import语句说明，不需要额外的文字说明。",
             supportedLanguages = listOf("java", "kotlin")
         ),
         
@@ -48,7 +48,7 @@ object TemplateConstants {
             description = "智能JSON格式化工具：自动处理特殊字符、补全缺失符号、修复语法错误并美化格式",
             category = TemplateCategory.CODE_OPTIMIZATION,
             tags = listOf("JSON", "格式化", "特殊字符处理", "自动补全", "语法修复", "美化"),
-            content = "请将以下文本转换为标准的JSON格式。\n\n处理要求：\n1. 自动清理特殊字符（\\n, \\r, \\t, \\/, \\\\等转义字符）\n2. 智能补全缺失的大括号 {} 和方括号 []\n3. 修正常见JSON语法错误：\n   - 为缺少引号的键名添加双引号\n   - 将单引号替换为双引号\n   - 移除尾随逗号\n   - 补全缺失的逗号\n4. 格式化为美观的缩进格式\n5. 验证JSON语法的正确性\n\n原始文本：\n```\n\${selectedCode}\n```\n\n请直接返回格式化后的标准JSON，确保语法正确且格式美观。",
+            content = "请将以下文本转换为标准的JSON格式。\n\n处理要求：\n1. 自动清理特殊字符（\\n, \\r, \\t, \\/, \\\\等转义字符）\n2. 智能补全缺失的大括号 {} 和方括号 []\n3. 修正常见JSON语法错误：\n   - 为缺少引号的键名添加双引号\n   - 将单引号替换为双引号\n   - 移除尾随逗号\n   - 补全缺失的逗号\n4. 格式化为美观的缩进格式\n5. 验证JSON语法的正确性\n\n原始文本：\n```\n{{selectedCode}}\n```\n\n请直接返回格式化后的标准JSON，确保语法正确且格式美观。",
             supportedLanguages = listOf("json", "javascript", "typescript")
         );
         
@@ -108,17 +108,17 @@ object TemplateConstants {
      * 内置变量定义
      */
     enum class BuiltInVariable(val variable: String, val description: String) {
-        SELECTED_CODE("\${selectedCode}", "当前选中的代码"),
-        FILE_NAME("\${fileName}", "当前文件名"),
-        LANGUAGE("\${language}", "当前文件的编程语言"),
-        PROJECT_NAME("\${projectName}", "项目名称"),
-        FILE_PATH("\${filePath}", "当前文件路径"),
-        CLASS_NAME("\${className}", "当前类名"),
-        METHOD_NAME("\${methodName}", "当前方法名"),
-        PACKAGE_NAME("\${packageName}", "当前包名"),
-        REQUEST_PARAMS("\${requestParams}", "方法请求参数信息"),
-        RESPONSE_PARAMS("\${responseParams}", "方法返回参数信息"),
-        FIRST_REQUEST_PARAM("\${firstRequestParam}", "第一个请求参数信息")
+        SELECTED_CODE("{{selectedCode}}", "当前选中的代码"),
+        FILE_NAME("{{fileName}}", "当前文件名"),
+        LANGUAGE("{{language}}", "当前文件的编程语言"),
+        PROJECT_NAME("{{projectName}}", "项目名称"),
+        FILE_PATH("{{filePath}}", "当前文件路径"),
+        CLASS_NAME("{{className}}", "当前类名"),
+        METHOD_NAME("{{methodName}}", "当前方法名"),
+        PACKAGE_NAME("{{packageName}}", "当前包名"),
+        REQUEST_PARAMS("{{requestParams}}", "方法请求参数信息"),
+        RESPONSE_PARAMS("{{responseParams}}", "方法返回参数信息"),
+        FIRST_REQUEST_PARAM("{{firstRequestParam}}", "第一个请求参数信息")
     }
     
     /**

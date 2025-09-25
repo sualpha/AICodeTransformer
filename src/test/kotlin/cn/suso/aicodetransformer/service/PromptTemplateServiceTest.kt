@@ -30,7 +30,7 @@ class PromptTemplateServiceTest {
         val template = PromptTemplate(
             id = "test-prompt",
             name = "测试Prompt",
-            content = "请优化以下代码：\n\${selectedCode}",
+            content = "请优化以下代码：\n{{selectedCode}}",
             description = "用于测试的代码优化Prompt",
             category = "代码优化",
             enabled = true
@@ -47,7 +47,7 @@ class PromptTemplateServiceTest {
         assertEquals("test-prompt", savedTemplate!!.id)
         assertEquals("测试Prompt", savedTemplate.name)
         assertTrue(savedTemplate.enabled)
-        assertTrue(savedTemplate.content.contains("\${selectedCode}"))
+        assertTrue(savedTemplate.content.contains("{{selectedCode}}"))
     }
     
     @Test
@@ -57,19 +57,19 @@ class PromptTemplateServiceTest {
             PromptTemplate(
                 id = "optimize-1",
                 name = "优化模板1",
-                content = "优化代码：\${selectedCode}",
+                content = "优化代码：{{selectedCode}}",
                 category = "代码优化"
             ),
             PromptTemplate(
                 id = "explain-1",
                 name = "解释模板1",
-                content = "解释代码：\${selectedCode}",
+                content = "解释代码：{{selectedCode}}",
                 category = "代码解释"
             ),
             PromptTemplate(
                 id = "test-1",
                 name = "测试模板1",
-                content = "生成测试：\${selectedCode}",
+                content = "生成测试：{{selectedCode}}",
                 category = "测试生成",
                 enabled = false // 禁用状态
             )
@@ -96,7 +96,7 @@ class PromptTemplateServiceTest {
         val template = PromptTemplate(
             id = "multi-var",
             name = "多变量模板",
-            content = "将以下\${language}代码转换为\${targetLanguage}：\n\${selectedCode}\n\n要求：\${requirements}",
+            content = "将以下{{language}}代码转换为{{targetLanguage}}：\n{{selectedCode}}\n\n要求：{{requirements}}",
             category = "代码转换"
         )
         
@@ -117,8 +117,8 @@ class PromptTemplateServiceTest {
         assertTrue(rendered.contains("将以下Java代码转换为Kotlin"))
         assertTrue(rendered.contains("public class Test { }"))
         assertTrue(rendered.contains("保持原有逻辑不变"))
-        assertFalse(rendered.contains("\${language}"))
-        assertFalse(rendered.contains("\${targetLanguage}"))
+        assertFalse(rendered.contains("{{language}}"))
+        assertFalse(rendered.contains("{{targetLanguage}}"))
     }
     
     @Test
@@ -187,7 +187,7 @@ class PromptTemplateServiceTest {
         val template = PromptTemplate(
             id = "export-test",
             name = "导出测试",
-            content = "这是一个测试模板：\${selectedCode}",
+            content = "这是一个测试模板：{{selectedCode}}",
             description = "用于测试导入导出",
             category = "测试",
             tags = listOf("测试", "导出")
@@ -215,7 +215,7 @@ class PromptTemplateServiceTest {
         val importedTemplate = promptTemplateService.getTemplate("export-test")
         assertNotNull(importedTemplate)
         assertEquals("导出测试", importedTemplate!!.name)
-        assertEquals("这是一个测试模板：\${selectedCode}", importedTemplate.content)
+        assertEquals("这是一个测试模板：{{selectedCode}}", importedTemplate.content)
     }
     
     @Test
@@ -224,7 +224,7 @@ class PromptTemplateServiceTest {
         val validTemplate = PromptTemplate(
             id = "valid-test",
             name = "有效模板",
-            content = "这是一个有效的模板：\${selectedCode}",
+            content = "这是一个有效的模板：{{selectedCode}}",
             category = "测试"
         )
         

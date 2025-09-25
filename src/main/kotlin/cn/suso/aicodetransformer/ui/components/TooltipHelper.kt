@@ -58,7 +58,7 @@ object TooltipHelper {
         
         const val TEMPLATE_NAME = "模板的显示名称，用于在列表中识别"
         const val TEMPLATE_DESCRIPTION = "模板的详细描述，说明其用途和功能"
-        const val TEMPLATE_CONTENT = "模板的具体内容，支持\${selectedCode}占位符"
+        const val TEMPLATE_CONTENT = "模板的具体内容，支持{{selectedCode}}等变量占位符"
         const val TEMPLATE_SHORTCUT = "快捷键格式：Ctrl+Alt+字母 或 Ctrl+Shift+字母"
         
         const val SEARCH_FILTER = "输入关键词过滤列表项，支持模糊匹配"
@@ -99,17 +99,17 @@ object TooltipHelper {
         const val PREVIEW_TEMPLATE = "预览模板的渲染效果"
         
         val TEMPLATE_VARIABLES = """模板内容支持以下内置变量：
-• \${'$'}{selectedCode} - 当前选中的代码
-• \${'$'}{fileName} - 当前文件名
-• \${'$'}{language} - 当前文件的编程语言
-• \${'$'}{projectName} - 项目名称
-• \${'$'}{filePath} - 当前文件路径
-• \${'$'}{className} - 当前类名
-• \${'$'}{methodName} - 当前方法名
-• \${'$'}{packageName} - 当前包名
-• \${'$'}{requestParams} - 方法请求参数信息（所有参数）
-• \${'$'}{responseParams} - 方法返回参数信息
-• \${'$'}{firstRequestParam} - 第一个请求参数信息""".trimIndent()
+• {{selectedCode}} - 当前选中的代码
+• {{fileName}} - 当前文件名
+• {{language}} - 当前文件的编程语言
+• {{projectName}} - 项目名称
+• {{filePath}} - 当前文件路径
+• {{className}} - 当前类名
+• {{methodName}} - 当前方法名
+• {{packageName}} - 当前包名
+• {{requestParams}} - 方法请求参数信息（所有参数）
+• {{responseParams}} - 方法返回参数信息
+• {{firstRequestParam}} - 第一个请求参数信息""".trimIndent()
         
         val BUILT_IN_TEMPLATES = """
             内置模板包括：

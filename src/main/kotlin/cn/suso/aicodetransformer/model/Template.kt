@@ -85,7 +85,7 @@ data class Template(
      * @param variableValues 变量值映射
      * @return 验证结果
      */
-    fun validateVariables(variableValues: Map<String, String>): TemplateValidationResult {
+    fun validateVariables(@Suppress("UNUSED_PARAMETER") variableValues: Map<String, String>): TemplateValidationResult {
         return TemplateValidationResult(
             isValid = true,
             errors = emptyList()

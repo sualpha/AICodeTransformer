@@ -670,14 +670,18 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
      * 检查模板内容是否包含需要特殊处理的内置变量
      */
     private fun requiresBuiltInVariableProcessing(template: PromptTemplate): Boolean {
+        // 驼峰命名模板不需要对象转换验证，只是简单的文本转换
+        if (template.id == "camel-case-convert") {
+            return false
+        }
+        
         val content = template.content
-        val builtInVariables = listOf(
-            "\${requestParams}", "\${responseParams}", "\${firstRequestParam}",
-            "\${fileName}", "\${language}", "\${filePath}",
-            "\${className}", "\${methodName}", "\${packageName}",
-            "\${projectName}", "\${selectedCode}"
+        // 只有包含需要复杂代码分析的变量才需要对象转换验证
+        val complexVariables = listOf(
+            "{{requestParams}}", "{{responseParams}}", "{{firstRequestParam}}",
+            "{{className}}", "{{methodName}}", "{{packageName}}"
         )
-        return builtInVariables.any { content.contains(it) }
+        return complexVariables.any { content.contains(it) }
     }
     
     /**
@@ -733,36 +737,14 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
     }
     
     /**
-     * 显示对象转换专用的错误对话框
+     * 显示简化的变量替换状态提示
      */
     private fun showObjectConversionError(project: Project, message: String) {
         ApplicationManager.getApplication().invokeLater {
-            val detailedMessage = buildString {
-                appendLine("对象转换提示：")
-                appendLine()
-                appendLine(message)
-                appendLine()
-                appendLine("建议：")
-                appendLine("1. 确保选中的代码包含完整的方法定义")
-                appendLine("2. 方法参数建议只包含一个对象")
-                appendLine("3. 如果类定义在其他文件中，AI模型会尝试推断")
-                appendLine("4. 可以包含更多上下文代码以提高转换质量")
-                appendLine()
-                appendLine("推荐格式：")
-                appendLine("public UserDTO convert(UserVO userVO) {")
-                appendLine("    // 方法体")
-                appendLine("}")
-                appendLine()
-                appendLine("或包含类定义：")
-                appendLine("class UserVO { ... }")
-                appendLine("class UserDTO { ... }")
-                appendLine("public UserDTO convert(UserVO userVO) { ... }")
-            }
-            
             com.intellij.openapi.ui.Messages.showErrorDialog(
                 project,
-                detailedMessage,
-                "对象转换提示"
+                message,
+                "变量替换提示"
             )
         }
     }

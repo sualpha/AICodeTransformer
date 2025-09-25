@@ -184,15 +184,6 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
                 }
             } catch (e: Exception) {
                 // 使用ErrorHandlingService处理异常
-                val errorContext = ErrorContext(
-                    operation = "保存模型配置",
-                    component = "ConfigurationService",
-                    additionalInfo = mapOf(
-                        "configId" to config.id,
-                        "configName" to config.name
-                    )
-                )
-                
                 errorHandlingService.handleConfigurationError(e, "ModelConfiguration", null)
                 throw e
             }
@@ -330,14 +321,6 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
             importedCount
         } catch (e: Exception) {
             // 使用ErrorHandlingService处理异常
-            val errorContext = ErrorContext(
-                operation = "导入配置",
-                component = "ConfigurationService",
-                additionalInfo = mapOf(
-                    "configJsonLength" to configJson.length.toString()
-                )
-            )
-            
             errorHandlingService.handleConfigurationError(e, "ConfigurationImport", null)
             0
         }
@@ -418,6 +401,7 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
     /**
      * 创建配置备份
      */
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     private fun createBackup() {
         GlobalScope.launch {
             try {
@@ -441,14 +425,6 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
                 }
             } catch (e: Exception) {
                 // 使用ErrorHandlingService处理异常
-                val errorContext = ErrorContext(
-                    operation = "创建配置备份",
-                    component = "ConfigurationService",
-                    additionalInfo = mapOf(
-                        "backupDir" to "${System.getProperty("user.home")}/.aicodetransformer/$BACKUP_DIR"
-                    )
-                )
-                
                 errorHandlingService.handleConfigurationError(e, "ConfigurationBackup", null)
             }
         }
@@ -558,14 +534,6 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
                 logger.info("Batch saved ${configs.size - errors.size} configurations, ${errors.size} errors")
             } catch (e: Exception) {
                 // 使用ErrorHandlingService处理异常
-                val errorContext = ErrorContext(
-                    operation = "批量保存配置",
-                    component = "ConfigurationService",
-                    additionalInfo = mapOf(
-                        "configCount" to configs.size.toString()
-                    )
-                )
-                
                 val handlingResult = errorHandlingService.handleConfigurationError(e, "BatchConfigurationSave", null)
                 errors.add("Batch operation failed: ${handlingResult.userMessage}")
             }
