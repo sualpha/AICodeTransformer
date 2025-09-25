@@ -1,0 +1,109 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <!-- Unique identifier of the plugin. It should be FQN. It cannot be changed between the plugin versions. -->
+    <id>cn.suso.AICodeTransformer</id>
+
+    <!-- Public plugin name should be written in Title Case.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-name -->
+    <name>AICodeTransformer</name>
+
+    <!-- A displayed Vendor name or Organization ID displayed on the Plugins Page. -->
+    <vendor email="support@suso.cn" url="https://github.com/suso">Suso</vendor>
+
+    <!-- Description of the plugin displayed on the Plugin Page and IDE Plugin Manager.
+         Simple HTML elements (text formatting, paragraphs, and lists) can be added inside of <![CDATA[ ]]> tag.
+         Guidelines: https://plugins.jetbrains.com/docs/marketplace/plugin-overview-page.html#plugin-description -->
+    <description><![CDATA[
+    AI Code Transformer allows developers to trigger custom AI instructions with simple keyboard shortcuts to intelligently refactor, optimize, explain, or generate code.<br>
+    <br>
+    <strong>Key Features:</strong>
+    <ul>
+        <li>Configure multiple AI models (OpenAI, Claude, local models)</li>
+        <li>Create custom prompt templates with variables</li>
+        <li>Bind keyboard shortcuts to AI actions</li>
+        <li>One-click code transformation and optimization</li>
+        <li>Seamless integration with JetBrains IDEs</li>
+    </ul>
+  ]]></description>
+
+    <!-- Product and plugin compatibility requirements.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+
+    <!-- Extension points defined by the plugin.
+         Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Application-level services -->
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.ConfigurationService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.ConfigurationServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.PromptTemplateService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.AIModelService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.AIModelServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.ActionService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.ActionServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.ExecutionService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.ExecutionServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.CodeReplacementService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.CodeReplacementServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.StatusService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.StatusServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.ShortcutRecoveryService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.ShortcutRecoveryServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.ErrorHandlingService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.ErrorHandlingServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.CacheService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.CacheServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.RateLimitService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.RateLimitServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.PerformanceMonitorService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.PerformanceMonitorServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.LoggingService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.LoggingServiceImpl"/>
+        
+        <!-- Project startup activity -->
+        <postStartupActivity implementation="cn.suso.aicodetransformer.AICodeTransformerProjectActivity"/>
+        
+        <!-- Settings page -->
+        <applicationConfigurable parentId="tools" instance="cn.suso.aicodetransformer.ui.settings.AICodeTransformerConfigurable"
+                                id="cn.suso.aicodetransformer.ui.settings.AICodeTransformerConfigurable"
+                                displayName="AI Code Transformer"/>
+        
+        <!-- Notification groups -->
+        <notificationGroup id="AICodeTransformer" displayType="BALLOON" key="notification.group.aicodetransformer"/>
+        <notificationGroup id="AICodeTransformer.Shortcuts" displayType="BALLOON" key="notification.group.shortcuts"/>
+    </extensions>
+    
+    <!-- Actions -->
+    <actions>
+        <!-- 主要转换动作 -->
+        <action id="AICodeTransformer.PerformanceOptimization" 
+                class="cn.suso.aicodetransformer.action.PerformanceOptimizationAction"
+                text="性能优化" 
+                description="打开AI代码转换器性能优化面板">
+        </action>
+
+        <action id="AICodeTransformer.DebugExecution" 
+                class="cn.suso.aicodetransformer.debug.ExecutionDebugAction"
+                text="调试执行过程" 
+                description="调试AI代码转换的执行过程">
+        </action>
+        
+        <!-- AI Code Transformer 主菜单组 -->
+        <group id="AICodeTransformer.MainGroup" text="AI代码转换器" description="AI代码转换工具" popup="true">
+            <reference ref="AICodeTransformer.PerformanceOptimization"/>
+            <reference ref="AICodeTransformer.DebugExecution"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </group>
+        
+        <!-- 动态模板菜单组 - 显示所有可用的prompt模板 -->
+        <group id="AICodeTransformer.DynamicTemplates" 
+               class="cn.suso.aicodetransformer.action.DynamicTemplateActionGroup"
+               text="AI代码转换" 
+               description="使用AI转换选中的代码" 
+               popup="true">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </group>
+    </actions>
+</idea-plugin>
