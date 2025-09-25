@@ -172,7 +172,7 @@ class ModelConfigurationDetailPanel(private val project: Project) : JPanel(Borde
         
         if (config != null) {
             nameField.text = config.name
-            descriptionField.text = config.description ?: ""
+            descriptionField.text = config.description
             typeComboBox.selectedItem = config.modelType
             enabledCheckBox.isSelected = config.enabled
             

@@ -305,21 +305,11 @@ class AICodeTransformerProjectActivity : ProjectActivity {
                 logger.info("初始化默认模板（不设置快捷键）")
             }
             
-            // 注册启用的模板为动作
-            val enabledTemplates = promptTemplateService.getEnabledTemplates()
-            enabledTemplates.forEach { template ->
-                try {
-                    val action = actionService.createActionForTemplate(template)
-                    val actionId = "AICodeTransformer.Template.${template.id}"
-                    val shortcut = template.shortcutKey
-                    actionService.registerAction(action, actionId, shortcut)
-                    logger.info("模板动作注册成功: ${template.name}" + if (shortcut != null) "，快捷键: $shortcut" else "")
-                } catch (e: Exception) {
-                    logger.warn("注册模板动作失败: ${template.name}", e)
-                }
-            }
+            // 使用 ActionService 的 refreshTemplateActions 方法来注册所有模板动作
+            // 这样可以避免重复注册，因为 ActionService 已经作为 TemplateChangeListener 监听模板变更
+            actionService.refreshTemplateActions()
             
-            logger.info("模板动作注册完成，共注册 ${enabledTemplates.size} 个启用的动作")
+            logger.info("模板动作注册完成")
             
         } catch (e: Exception) {
             logger.error("注册模板动作失败", e)
@@ -366,14 +356,8 @@ class AICodeTransformerProjectActivity : ProjectActivity {
      */
     fun refreshTemplateActions() {
         try {
-            // 注销所有现有动作
-            val registeredActions = actionService.getRegisteredActions()
-            registeredActions.filter { it.startsWith("AICodeTransformer.Template.") }.forEach { actionId ->
-                actionService.unregisterAction(actionId)
-            }
-            
-            // 重新注册动作
-            registerTemplateActions()
+            // 直接使用 ActionService 的 refreshTemplateActions 方法
+            actionService.refreshTemplateActions()
             
             logger.info("模板动作刷新完成")
             

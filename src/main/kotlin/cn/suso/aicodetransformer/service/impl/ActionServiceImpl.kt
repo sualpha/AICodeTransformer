@@ -51,6 +51,12 @@ class ActionServiceImpl : ActionService, TemplateChangeListener {
     
     override fun registerAction(action: AnAction, actionId: String, shortcut: String?): Boolean {
         return try {
+            // 检查是否已经注册过
+            if (registeredActions.containsKey(actionId)) {
+                logger.warn("Action已存在，先注销再重新注册: $actionId")
+                unregisterAction(actionId)
+            }
+            
             // 注册Action到ActionManager
             actionManager.registerAction(actionId, action)
             registeredActions[actionId] = action

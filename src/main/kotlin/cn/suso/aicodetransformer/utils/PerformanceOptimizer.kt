@@ -171,8 +171,7 @@ class PerformanceOptimizer(private val project: Project) {
         cacheStats: CacheStats,
         performanceStats: PerformanceStats
     ): Int {
-        var health = 100
-        
+
         // 缓存健康度 (40%)
         val cacheHealth = when {
             cacheStats.hitRate > 0.8 -> 40

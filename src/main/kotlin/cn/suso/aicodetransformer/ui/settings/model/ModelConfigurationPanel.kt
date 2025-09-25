@@ -60,8 +60,7 @@ class ModelConfigurationPanel(
             .setEditAction { editConfiguration() }
             .setMoveUpAction { moveUp() }
             .setMoveDownAction { moveDown() }
-            .addExtraAction(createImportAction())
-            .addExtraAction(createExportAction())
+            .addExtraActions(createImportAction(), createExportAction())
             .createPanel()
         
         // 为工具栏按钮添加提示

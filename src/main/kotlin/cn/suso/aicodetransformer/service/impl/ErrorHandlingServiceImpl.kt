@@ -32,7 +32,6 @@ class ErrorHandlingServiceImpl : ErrorHandlingService {
         context: ErrorContext,
         project: Project?
     ): ErrorHandlingResult {
-        val errorType = classifyError(exception)
         val userMessage = getUserFriendlyMessage(exception, context)
         val suggestions = getSuggestions(exception, context)
         

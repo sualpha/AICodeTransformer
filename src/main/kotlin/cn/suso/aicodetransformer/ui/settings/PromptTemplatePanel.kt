@@ -466,7 +466,7 @@ class PromptTemplatePanel(
     }
     
     private fun exportTemplates() {
-        val selectedTemplates = if (templateList.selectedIndices.isNotEmpty()) {
+        if (templateList.selectedIndices.isNotEmpty()) {
             templateList.selectedValuesList.map { it.id }
         } else {
             emptyList()

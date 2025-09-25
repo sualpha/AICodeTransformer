@@ -225,8 +225,6 @@ class PerformanceOptimizationServiceImpl : PerformanceOptimizationService {
         cacheStats: CacheStats,
         performanceStats: PerformanceStats
     ): Int {
-        var score = 100
-        
         // 缓存命中率评分 (40%权重)
         val cacheScore = (cacheStats.hitRate * 40).toInt()
         

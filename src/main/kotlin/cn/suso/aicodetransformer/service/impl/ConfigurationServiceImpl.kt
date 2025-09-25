@@ -391,7 +391,7 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
      */
     private fun isValidUrl(url: String): Boolean {
         return try {
-            java.net.URL(url)
+            java.net.URI(url).toURL()
             true
         } catch (e: Exception) {
             false
@@ -488,15 +488,6 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
                 logger.warn("Found invalid configurations: $invalidConfigs")
             }
         } catch (e: Exception) {
-            // 使用ErrorHandlingService处理异常
-            val errorContext = ErrorContext(
-                operation = "验证配置完整性",
-                component = "ConfigurationService",
-                additionalInfo = mapOf(
-                    "configCount" to state.modelConfigurations.size.toString()
-                )
-            )
-            
             errorHandlingService.handleConfigurationError(e, "ConfigurationValidation", null)
         }
     }

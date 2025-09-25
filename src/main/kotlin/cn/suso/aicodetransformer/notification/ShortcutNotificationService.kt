@@ -17,12 +17,15 @@ class ShortcutNotificationService {
     
     companion object {
         private const val NOTIFICATION_GROUP_ID = "AICodeTransformer.Shortcuts"
-        
-        private val notificationGroup = NotificationGroupManager.getInstance()
-            .getNotificationGroup(NOTIFICATION_GROUP_ID)
     }
     
-    private val shortcutRecoveryService: ShortcutRecoveryService = service()
+    private val notificationGroup: NotificationGroup by lazy {
+        NotificationGroupManager.getInstance().getNotificationGroup(NOTIFICATION_GROUP_ID)
+    }
+    
+    private val shortcutRecoveryService: ShortcutRecoveryService by lazy {
+        service()
+    }
     
     /**
      * 显示快捷键恢复成功通知

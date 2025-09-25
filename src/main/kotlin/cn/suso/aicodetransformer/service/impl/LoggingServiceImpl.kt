@@ -380,7 +380,7 @@ class LoggingServiceImpl : LoggingService {
         
         // 按错误类型分组
         val errorsByType = errorLogs.groupBy { 
-            it.metadata["errorClass"] as? String ?: "Unknown" 
+            it.metadata["errorClass"] ?: "Unknown"
         }.mapValues { it.value.size }.toMap()
         
         // 按小时分组
@@ -394,7 +394,7 @@ class LoggingServiceImpl : LoggingService {
             .take(10)
             .map { (errorType, count) ->
                 val lastOccurrence = errorLogs
-                    .filter { (it.metadata["errorClass"] as? String) == errorType }
+                    .filter { it.metadata["errorClass"] == errorType }
                     .maxByOrNull { it.timestamp }?.timestamp ?: 0
                 ErrorSummary(errorType, count, lastOccurrence)
             }
@@ -414,13 +414,13 @@ class LoggingServiceImpl : LoggingService {
         val apiLogs = logEntries.filter { 
             it.type == LogType.API_CALL && it.timestamp >= cutoffTime 
         }
+
+        val responseTimes = apiLogs.mapNotNull {
+            it.metadata["responseTimeMs"]?.toDoubleOrNull()
+        }.map { it }
         
-        val responseTimes = apiLogs.mapNotNull { 
-            it.metadata["responseTimeMs"] as? Number 
-        }.map { it.toDouble() }
-        
-        val successfulRequests = apiLogs.count { 
-            it.metadata["success"] as? Boolean == true 
+        val successfulRequests = apiLogs.count {
+            it.metadata["success"]?.toBoolean() == true
         }
         
         // 按小时分组
@@ -639,7 +639,7 @@ class LoggingServiceImpl : LoggingService {
                     "timestamp" to timestamp,
                     "level" to entry.level.name,
                     "type" to entry.type.name,
-                    "message" to (entry.message ?: ""),
+                    "message" to entry.message,
                     "context" to (entry.context ?: ""),
                     "userId" to (entry.userId ?: ""),
                     "requestId" to (entry.requestId ?: ""),

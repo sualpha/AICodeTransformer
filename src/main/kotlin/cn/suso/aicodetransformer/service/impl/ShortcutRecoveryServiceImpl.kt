@@ -163,7 +163,7 @@ class ShortcutRecoveryServiceImpl : ShortcutRecoveryService {
             templates.forEach { template ->
                 if (template.shortcutKey.isNullOrBlank()) {
                     missingShortcuts.add(template.name)
-                } else if (actionService.isShortcutInUse(template.shortcutKey!!)) {
+                } else if (actionService.isShortcutInUse(template.shortcutKey)) {
                     conflictingShortcuts.add("${template.name}: ${template.shortcutKey}")
                 }
             }

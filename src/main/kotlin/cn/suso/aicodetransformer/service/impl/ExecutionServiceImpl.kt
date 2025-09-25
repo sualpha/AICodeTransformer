@@ -207,10 +207,10 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
                 }
                 
                 override fun onCancel() {
-                    val context = activeExecutions[executionId]
+                    val currentContext = activeExecutions[executionId]
                     activeExecutions.remove(executionId)
                     executionFutures.remove(executionId)
-                    notifyListeners { it.onExecutionCancelled(context?.template?.id ?: templateId) }
+                    notifyListeners { it.onExecutionCancelled(currentContext?.template?.id ?: templateId) }
                 }
             }
             
@@ -387,7 +387,7 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
             updateExecutionProgress(context, 80, "替换代码...")
             indicator?.text = "替换代码..."
             
-            val replacementResult = context.editor?.let { editor ->
+            val replacementResult = context.editor?.let { _ ->
                 // 在EDT线程中执行UI操作
                 val latch = java.util.concurrent.CountDownLatch(1)
                 var result: ReplacementResult? = null

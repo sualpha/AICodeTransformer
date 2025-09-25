@@ -29,7 +29,7 @@ class RealClassInfoTest {
     @Test
     fun `test getRealClassInfo with Java built-in class`() {
         // 测试获取Java内置类的信息（如String类）
-        val classInfo = codeAnalysisService.getRealClassInfo("java.lang.String", mockProject)
+        codeAnalysisService.getRealClassInfo("java.lang.String", mockProject)
         
         // 由于我们使用的是mock project，这个测试主要验证方法不会抛出异常
         // 在真实环境中，这应该能够找到String类

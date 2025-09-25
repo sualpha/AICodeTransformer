@@ -6,6 +6,8 @@ import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
 
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.ui.components.JBList
 import com.intellij.ui.components.*
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
@@ -146,7 +148,7 @@ class PromptTemplateEditPanel : JPanel() {
         if (template != null) {
             nameField.text = template.name
             descriptionField.text = template.description ?: ""
-            categoryField.text = template.category ?: ""
+            categoryField.text = template.category
             contentArea.text = template.content
             enabledCheckBox.isSelected = template.enabled
             
@@ -207,12 +209,12 @@ class PromptTemplateEditPanel : JPanel() {
         
         try {
             // 简化的模板验证逻辑
-            val content = template.content
+            val currentContext = template.content
             
             val message = buildString {
                 append("模板验证结果：\n\n")
                 
-                if (content.isNotBlank()) {
+                if (currentContext.isNotBlank()) {
                     append("✓ 模板验证通过！")
                 } else {
                     append("⚠ 模板内容不能为空")
@@ -249,19 +251,22 @@ class PromptTemplateEditPanel : JPanel() {
         )
         
         val variableNames = variables.map { "${it.first} - ${it.second}" }.toTypedArray()
+
+        val list = JBList(variableNames)
+        list.selectedIndex = 0
         
-        val selectedIndex = Messages.showChooseDialog(
-             "请选择要插入的变量：",
-             "插入变量",
-             variableNames,
-             variableNames[0],
-             Messages.getQuestionIcon()
-         )
-        
-        if (selectedIndex >= 0) {
-            val selectedVariable = variables[selectedIndex].first
-            insertVariableAtCursor(selectedVariable)
-        }
+        JBPopupFactory.getInstance()
+            .createListPopupBuilder(list)
+            .setTitle("插入变量")
+            .setItemChoosenCallback {
+                val selectedIndex = list.selectedIndex
+                if (selectedIndex >= 0) {
+                    val selectedVariable = variables[selectedIndex].first
+                    insertVariableAtCursor(selectedVariable)
+                }
+            }
+            .createPopup()
+            .showInCenterOf(this)
     }
     
     /**

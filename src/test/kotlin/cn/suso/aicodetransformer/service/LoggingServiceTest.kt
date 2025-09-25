@@ -171,8 +171,6 @@ class LoggingServiceTest {
     
     @Test
     fun `测试日志搜索和过滤功能`() {
-        val userId = "search-user"
-        
         // 添加多条不同类型的日志
         loggingService.logInfo("信息日志")
         loggingService.logWarning("警告日志")

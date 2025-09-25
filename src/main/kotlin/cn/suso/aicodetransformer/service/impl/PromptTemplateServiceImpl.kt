@@ -300,11 +300,11 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
             }
             
             // 验证分类名称
-            if (template.category != null && template.category.isBlank()) {
+            if (template.category.isBlank()) {
                 return "模板分类不能为空"
             }
             
-            if (template.category != null && template.category.length > 50) {
+            if (template.category.length > 50) {
                 return "模板分类长度不能超过50个字符"
             }
             
@@ -410,7 +410,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
         return try {
             val importData = json.decodeFromString<Map<String, Any>>(templateJson)
             val templatesData = importData["templates"] as? List<*> ?: throw IllegalArgumentException("无效的导入数据格式")
-            
+
             val importedTemplates = templatesData.mapNotNull { templateData ->
                 try {
                     json.decodeFromString<PromptTemplate>(json.encodeToString(templateData))
@@ -418,16 +418,16 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                     null
                 }
             }
-            
+
             if (importedTemplates.isEmpty()) {
                 throw IllegalArgumentException("导入文件中没有找到有效的模板数据")
             }
-            
+
             var importedCount = 0
-            
+
             importedTemplates.forEach { template ->
                 val existingTemplate = getTemplate(template.id)
-                
+
                 if (existingTemplate == null || overwrite) {
                     val validationError = validateTemplate(template)
                     if (validationError == null) {
@@ -443,13 +443,13 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                                 updatedAt = java.time.LocalDateTime.now().toString()
                             )
                         }
-                        
+
                         saveTemplate(finalTemplate)
                         importedCount++
                     }
                 }
             }
-            
+
             importedCount
         } catch (e: Exception) {
             val handlingResult = errorHandlingService.handleConfigurationError(e, "TemplateImport")
@@ -483,7 +483,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 it.name.lowercase().contains(lowerKeyword) ||
                 it.content.lowercase().contains(lowerKeyword) ||
                 it.description?.lowercase()?.contains(lowerKeyword) == true ||
-                it.category?.lowercase()?.contains(lowerKeyword) == true ||
+                it.category.lowercase().contains(lowerKeyword) == true ||
                 it.tags.any { tag -> tag.lowercase().contains(lowerKeyword) }
             }
         }
@@ -804,7 +804,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
      override fun importTemplatesFromFile(filePath: String, overwrite: Boolean): List<PromptTemplate> {
          return try {
              val content = java.io.File(filePath).readText()
-             val importedCount = importTemplates(content, overwrite)
+             importTemplates(content, overwrite)
              
              // 返回导入的模板列表
              val importData = json.decodeFromString<Map<String, Any>>(content)

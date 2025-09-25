@@ -212,7 +212,7 @@ class ModelConfigurationDialog(
         
         // 验证URL格式
         try {
-            java.net.URL(apiBaseUrlField.text.trim())
+            java.net.URI(apiBaseUrlField.text.trim()).toURL()
         } catch (e: Exception) {
             return ValidationInfo("API基础URL格式不正确", apiBaseUrlField)
         }

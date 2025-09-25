@@ -164,7 +164,7 @@ class PromptTemplateDetailPanel : JPanel() {
             // 详情面板只读模式 - 只有启用状态可以修改
             nameField.text = template.name
             descriptionField.text = template.description ?: ""
-            categoryField.text = template.category ?: ""
+            categoryField.text = template.category
             shortcutField.text = template.shortcutKey ?: ""
             contentArea.text = template.content
             enabledCheckBox.isSelected = template.enabled
