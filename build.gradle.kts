@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "cn.suso"
-version = "1.0.2"
+version = "1.0.3"
 
 repositories {
     //mavenCentral()
@@ -61,6 +61,11 @@ tasks {
     }
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
         kotlinOptions.jvmTarget = "17"
+    }
+    
+    // 禁用 buildSearchableOptions 任务以避免 coroutines-javaagent.jar 问题
+    named("buildSearchableOptions") {
+        enabled = false
     }
     
     test {

@@ -50,6 +50,16 @@ object TemplateConstants {
             tags = listOf("JSON", "格式化", "特殊字符处理", "自动补全", "语法修复", "美化"),
             content = "请将以下文本转换为标准的JSON格式。\n\n处理要求：\n1. 自动清理特殊字符（\\n, \\r, \\t, \\/, \\\\等转义字符）\n2. 智能补全缺失的大括号 {} 和方括号 []\n3. 修正常见JSON语法错误：\n   - 为缺少引号的键名添加双引号\n   - 将单引号替换为双引号\n   - 移除尾随逗号\n   - 补全缺失的逗号\n4. 格式化为美观的缩进格式\n5. 验证JSON语法的正确性\n\n原始文本：\n```\n{{selectedCode}}\n```\n\n请直接返回格式化后的标准JSON，确保语法正确且格式美观。",
             supportedLanguages = listOf("json", "javascript", "typescript")
+        ),
+        
+        TRANSLATION_CONVERTER(
+            id = "translation-converter",
+            displayName = "智能翻译转换",
+            description = "智能识别选中代码的语言并进行翻译转换：英文转简体中文，中文转英文，专注于计算机软件行业术语",
+            category = TemplateCategory.CODE_CONVERSION,
+            tags = listOf("翻译", "中英文转换", "文档翻译"),
+            content = "请对以下选中的代码内容进行智能翻译转换：\n\n```\n{{selectedCode}}\n```\n\n翻译要求：\n1. 智能识别语言：\n   - 如果是英文内容，翻译成简体中文\n   - 如果是中文内容，翻译成英文,并且用驼峰命名\n\n2. 翻译规则：\n   - 专业术语使用计算机软件行业标准翻译\n\n3. 输出格式：\n   - 直接返回翻译后的内容\n   - 不要添加任何解释说明\n\n请开始翻译：",
+            supportedLanguages = listOf("java", "kotlin", "javascript", "typescript", "python", "cpp", "csharp", "go", "rust", "swift")
         );
         
         companion object {

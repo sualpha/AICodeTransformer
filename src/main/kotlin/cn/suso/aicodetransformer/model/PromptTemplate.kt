@@ -141,13 +141,31 @@ data class PromptTemplate(
         }
         
         /**
+         * 创建翻译转换模板
+         */
+        private fun createTranslationConverterTemplate(): PromptTemplate {
+            val config = TemplateConstants.TemplateConfig.TRANSLATION_CONVERTER
+            return PromptTemplate(
+                id = config.id,
+                name = config.displayName,
+                content = config.content,
+                category = config.category.displayName,
+                tags = config.tags,
+                description = config.description,
+                shortcutKey = null,
+                isBuiltIn = config.isBuiltIn
+            )
+        }
+        
+        /**
          * 获取所有内置模板
          */
         fun getBuiltInTemplates(): List<PromptTemplate> {
             return listOf(
                 createCamelCaseConvertTemplate(),
                 createObjectConvertTemplate(),
-                createJsonFormatterTemplate()
+                createJsonFormatterTemplate(),
+                createTranslationConverterTemplate()
             )
         }
     }
