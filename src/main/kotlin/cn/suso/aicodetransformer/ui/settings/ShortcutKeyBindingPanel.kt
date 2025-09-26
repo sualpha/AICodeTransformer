@@ -83,11 +83,6 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         clearButton.toolTipText = "清除选中模板的快捷键设置"
         rightPanel.add(clearButton)
         
-        val helpButton = JButton("使用说明")
-        helpButton.addActionListener { showHelpDialog() }
-        helpButton.toolTipText = "查看快捷键设置的详细说明"
-        rightPanel.add(helpButton)
-        
         panel.add(leftPanel, BorderLayout.WEST)
         panel.add(centerPanel, BorderLayout.CENTER)
         panel.add(rightPanel, BorderLayout.EAST)
@@ -170,45 +165,6 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
             }
             loadData()
         }
-    }
-    
-
-    
-
-    
-
-    
-    private fun showHelpDialog() {
-        val helpText = """
-            快捷键设置使用说明：
-            
-            📌 设置快捷键：
-            • 点击快捷键列的单元格
-            • 按下您想要的快捷键组合（如 Ctrl+Alt+T）
-            • 系统会自动检测并设置快捷键
-            
-            🚫 清除快捷键：
-            • 方法1：点击快捷键单元格后按 ESC 键
-            • 方法2：选中模板行，点击"清除选中快捷键"按钮
-            • 方法3：在快捷键单元格中直接删除内容
-            
-            ⚠️ 冲突检测：
-            • 红色背景：与其他快捷键冲突
-            • 绿色背景：快捷键设置成功
-            • 灰色背景：未设置快捷键
-            
-            💡 使用技巧：
-            • 建议使用 Ctrl+Alt+字母 的组合
-            • 避免与IDE内置快捷键冲突
-            • 可以搜索模板名称快速定位
-            • 支持批量清除多个模板的快捷键
-        """.trimIndent()
-        
-        Messages.showInfoMessage(
-            this,
-            helpText,
-            "快捷键设置帮助"
-        )
     }
     
     /**

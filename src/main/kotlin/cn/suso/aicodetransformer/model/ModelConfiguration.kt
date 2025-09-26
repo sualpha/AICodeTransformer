@@ -66,7 +66,7 @@ data class ModelConfiguration(
     val streamResponse: Boolean = ModelConfigConstants.DefaultParameters.STREAM_RESPONSE,
     
     /** 自定义请求头 */
-    @Transient
+    @kotlinx.serialization.Transient
     val customHeaders: Map<String, String> = emptyMap(),
     
     /** 创建时间 */
@@ -267,8 +267,11 @@ enum class ModelType(val displayName: String, val defaultBaseUrl: String) {
 /**
  * 验证结果
  */
+@Serializable
 sealed class ValidationResult {
+    @Serializable
     object Success : ValidationResult()
+    @Serializable
     data class Error(val errors: List<String>) : ValidationResult()
     
     val isValid: Boolean

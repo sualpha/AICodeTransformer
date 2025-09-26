@@ -7,15 +7,12 @@ import com.intellij.openapi.fileChooser.FileChooser
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.ui.AnActionButton
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Font
@@ -54,14 +51,36 @@ class ModelConfigurationPanel(
         configList.border = JBUI.Borders.empty()
         
         // 创建工具栏
-        val decorator = ToolbarDecorator.createDecorator(configList)
+        val baseDecorator = ToolbarDecorator.createDecorator(configList)
             .setAddAction { addConfiguration() }
             .setRemoveAction { removeConfiguration() }
             .setEditAction { editConfiguration() }
             .setMoveUpAction { moveUp() }
             .setMoveDownAction { moveDown() }
-            .addExtraActions(createImportAction(), createExportAction())
             .createPanel()
+        
+        // 创建包含额外按钮的自定义工具栏
+        val customToolbarPanel = JPanel(BorderLayout())
+        customToolbarPanel.add(baseDecorator, BorderLayout.CENTER)
+        
+        // 创建额外按钮面板
+        val extraButtonsPanel = JPanel()
+        extraButtonsPanel.layout = BoxLayout(extraButtonsPanel, BoxLayout.X_AXIS)
+        
+        val importButton = JButton("导入")
+        importButton.addActionListener { importConfigurations() }
+        importButton.toolTipText = "从文件导入配置"
+        
+        val exportButton = JButton("导出")
+        exportButton.addActionListener { exportConfigurations() }
+        exportButton.toolTipText = "导出配置到文件"
+        
+        extraButtonsPanel.add(importButton)
+        extraButtonsPanel.add(Box.createHorizontalStrut(5))
+        extraButtonsPanel.add(exportButton)
+        
+        customToolbarPanel.add(extraButtonsPanel, BorderLayout.SOUTH)
+        val decorator = customToolbarPanel
         
         // 为工具栏按钮添加提示
         decorator.components.forEach { component ->
@@ -227,25 +246,7 @@ class ModelConfigurationPanel(
         }
     }
     
-    private fun createImportAction() = object : com.intellij.ui.AnActionButton("导入配置", "从文件导入配置", com.intellij.icons.AllIcons.Actions.Download) {
-        override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent) {
-            importConfigurations()
-        }
-        
-        override fun getActionUpdateThread(): com.intellij.openapi.actionSystem.ActionUpdateThread {
-            return com.intellij.openapi.actionSystem.ActionUpdateThread.BGT
-        }
-    }
 
-    private fun createExportAction() = object : com.intellij.ui.AnActionButton("导出配置", "导出配置到文件", com.intellij.icons.AllIcons.Actions.Upload) {
-        override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent) {
-            exportConfigurations()
-        }
-        
-        override fun getActionUpdateThread(): com.intellij.openapi.actionSystem.ActionUpdateThread {
-            return com.intellij.openapi.actionSystem.ActionUpdateThread.BGT
-        }
-    }
     
     private fun importConfigurations() {
         val descriptor = FileChooserDescriptor(true, false, false, false, false, false)

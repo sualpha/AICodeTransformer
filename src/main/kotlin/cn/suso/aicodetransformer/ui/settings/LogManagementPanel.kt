@@ -167,10 +167,6 @@ class LogManagementPanel(private val project: Project) : JPanel(BorderLayout()) 
         viewLogsButton.addActionListener { viewLogs() }
         buttonPanel.add(viewLogsButton)
         
-        val exportButton = JButton("导出")
-        exportButton.addActionListener { exportLogs() }
-        buttonPanel.add(exportButton)
-        
         val clearButton = JButton("清空")
         clearButton.addActionListener { clearLogs() }
         buttonPanel.add(clearButton)
@@ -285,22 +281,7 @@ class LogManagementPanel(private val project: Project) : JPanel(BorderLayout()) 
         }
     }
     
-    private fun exportLogs() {
-        try {
-            // 这里可以实现日志导出功能
-            Messages.showInfoMessage(
-                project,
-                "日志导出功能正在开发中",
-                "功能提示"
-            )
-        } catch (e: Exception) {
-            Messages.showErrorDialog(
-                project,
-                "导出日志失败：${e.message}",
-                "操作失败"
-            )
-        }
-    }
+
     
     private fun clearLogs() {
         val result = Messages.showYesNoDialog(

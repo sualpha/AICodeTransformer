@@ -7,7 +7,6 @@ import cn.suso.aicodetransformer.ui.components.TooltipHelper
 
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.ui.components.JBList
 import com.intellij.ui.components.*
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
@@ -252,18 +251,12 @@ class PromptTemplateEditPanel : JPanel() {
         
         val variableNames = variables.map { "${it.first} - ${it.second}" }.toTypedArray()
 
-        val list = JBList(variableNames)
-        list.selectedIndex = 0
-        
         JBPopupFactory.getInstance()
-            .createListPopupBuilder(list)
+            .createPopupChooserBuilder(variableNames.toList())
             .setTitle("插入变量")
-            .setItemChoosenCallback {
-                val selectedIndex = list.selectedIndex
-                if (selectedIndex >= 0) {
-                    val selectedVariable = variables[selectedIndex].first
-                    insertVariableAtCursor(selectedVariable)
-                }
+            .setItemChosenCallback { selectedItem ->
+                val selectedVariable = variables.find { "${it.first} - ${it.second}" == selectedItem }?.first
+                selectedVariable?.let { insertVariableAtCursor(it) }
             }
             .createPopup()
             .showInCenterOf(this)

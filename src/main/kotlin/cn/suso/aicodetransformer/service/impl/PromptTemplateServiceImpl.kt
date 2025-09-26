@@ -69,6 +69,27 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
         var usageStatisticsXml: String = ""
     )
     
+    /**
+     * 导出数据的元数据
+     */
+    @kotlinx.serialization.Serializable
+    data class ExportMetadata(
+        val totalCount: Int,
+        val categories: List<String>,
+        val exportedBy: String
+    )
+    
+    /**
+     * 模板导出数据结构
+     */
+    @kotlinx.serialization.Serializable
+    data class TemplateExportData(
+        val version: String,
+        val exportTime: String,
+        val templates: List<PromptTemplate>,
+        val metadata: ExportMetadata
+    )
+    
     override fun getState(): State {
         return lock.read {
             // 直接返回当前状态，让IntelliJ的XML序列化机制处理
@@ -391,15 +412,17 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 state.templates.filter { it.id in ids }
             }
             
-            val exportData = mapOf(
-                "version" to "1.0",
-                "exportTime" to java.time.LocalDateTime.now().toString(),
-                "templates" to templatesToExport,
-                "metadata" to mapOf(
-                    "totalCount" to templatesToExport.size,
-                    "categories" to templatesToExport.mapNotNull { it.category }.distinct(),
-                    "exportedBy" to "AICodeTransformer"
-                )
+            val metadata = ExportMetadata(
+                totalCount = templatesToExport.size,
+                categories = templatesToExport.mapNotNull { it.category }.distinct(),
+                exportedBy = "AICodeTransformer"
+            )
+            
+            val exportData = TemplateExportData(
+                version = "1.0",
+                exportTime = java.time.LocalDateTime.now().toString(),
+                templates = templatesToExport,
+                metadata = metadata
             )
             
             json.encodeToString(exportData)
@@ -408,14 +431,21 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
     
     override fun importTemplates(templateJson: String, overwrite: Boolean): Int {
         return try {
-            val importData = json.decodeFromString<Map<String, Any>>(templateJson)
-            val templatesData = importData["templates"] as? List<*> ?: throw IllegalArgumentException("无效的导入数据格式")
+            // 尝试使用新的数据结构解析
+            val importedTemplates = try {
+                val importData = json.decodeFromString<TemplateExportData>(templateJson)
+                importData.templates
+            } catch (e: Exception) {
+                // 如果新格式失败，尝试旧格式
+                val importData = json.decodeFromString<Map<String, Any>>(templateJson)
+                val templatesData = importData["templates"] as? List<*> ?: throw IllegalArgumentException("无效的导入数据格式")
 
-            val importedTemplates = templatesData.mapNotNull { templateData ->
-                try {
-                    json.decodeFromString<PromptTemplate>(json.encodeToString(templateData))
-                } catch (e: Exception) {
-                    null
+                templatesData.mapNotNull { templateData ->
+                    try {
+                        json.decodeFromString<PromptTemplate>(json.encodeToString(templateData))
+                    } catch (e: Exception) {
+                        null
+                    }
                 }
             }
 
@@ -807,14 +837,21 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
              importTemplates(content, overwrite)
              
              // 返回导入的模板列表
-             val importData = json.decodeFromString<Map<String, Any>>(content)
-             val templatesData = importData["templates"] as? List<*> ?: emptyList<Any>()
-             
-             val templates: List<PromptTemplate> = templatesData.mapNotNull { templateData ->
-                 try {
-                     json.decodeFromString<PromptTemplate>(json.encodeToString(templateData as Any))
-                 } catch (e: Exception) {
-                     null
+             val templates = try {
+                 // 尝试使用新的数据结构解析
+                 val importData = json.decodeFromString<TemplateExportData>(content)
+                 importData.templates
+             } catch (e: Exception) {
+                 // 如果新格式失败，尝试旧格式
+                 val importData = json.decodeFromString<Map<String, Any>>(content)
+                 val templatesData = importData["templates"] as? List<*> ?: emptyList<Any>()
+                 
+                 templatesData.mapNotNull { templateData ->
+                     try {
+                         json.decodeFromString<PromptTemplate>(json.encodeToString(templateData as Any))
+                     } catch (e: Exception) {
+                         null
+                     }
                  }
              }
              templates
