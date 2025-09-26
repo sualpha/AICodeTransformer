@@ -16,26 +16,28 @@
     <description><![CDATA[
     AI Code Transformer allows developers to trigger custom AI instructions with simple keyboard shortcuts to intelligently refactor, optimize, explain, or generate code.<br>
     <br>
+    <strong>🌟 Recommended Model:</strong> For the ultimate coding experience, we highly recommend using <strong>LongCat-Flash-Thinking</strong> <br>
+    <br>
     <strong>Key Features:</strong>
     <ul>
-        <li>Configure multiple AI models (OpenAI, Claude, local models)</li>
+        <li>Configure multiple AI models (OpenAI, Claude, local models, <strong>LongCat-Flash-Thinking</strong>)</li>
         <li>Create custom prompt templates with variables</li>
         <li>Bind keyboard shortcuts to AI actions</li>
         <li>One-click code transformation and optimization</li>
-        <li>Seamless integration with JetBrains IDEs</li>
     </ul>
     <br>
     <hr>
     <br>
     AI代码转换器让开发者能够通过简单的键盘快捷键触发自定义AI指令，智能地重构、优化、解释或生成代码。<br>
     <br>
+    <strong>🌟 推荐模型：</strong>为了获得极致的编码体验，我们强烈推荐使用 <strong>LongCat-Flash-Thinking</strong> <br>
+    <br>
     <strong>主要功能：</strong>
     <ul>
-        <li>配置多种AI模型（OpenAI、Claude、本地模型）</li>
+        <li>配置多种AI模型（OpenAI、Claude、本地模型、<strong>LongCat-Flash-Thinking</strong>）</li>
         <li>创建带变量的自定义提示模板</li>
         <li>绑定键盘快捷键到AI操作</li>
         <li>一键代码转换和优化</li>
-        <li>与JetBrains IDE无缝集成</li>
     </ul>
   ]]></description>
 
