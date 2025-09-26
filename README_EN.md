@@ -192,7 +192,7 @@ src/main/kotlin/cn/suso/aicodetransformer/
 ### Usage Tips
 
 **Improve Conversion Quality**
-- Choose appropriate AI model (GPT-4 usually works better)
+- Choose appropriate AI model (LongCat-Flash-Thinking usually works better)
 - Adjust Temperature parameter (0.3-0.7 range works well)
 - Provide clear code selection and context
 - Use custom templates to optimize prompts

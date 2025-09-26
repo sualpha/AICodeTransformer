@@ -192,7 +192,7 @@ src/main/kotlin/cn/suso/aicodetransformer/
 ### 使用技巧
 
 **提高转换质量**
-- 选择合适的 AI 模型（GPT-4 通常效果更好）
+- 选择合适的 AI 模型（LongCat-Flash-Thinking 通常效果更好）
 - 调整 Temperature 参数（0.3-0.7 之间效果较好）
 - 提供清晰的代码选择和上下文
 - 使用自定义模板优化 Prompt
