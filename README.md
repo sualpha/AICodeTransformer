@@ -272,7 +272,7 @@ src/main/kotlin/cn/suso/aicodetransformer/
 
 **⭐ 如果这个项目对您有帮助，请给我们一个 Star！**
 
-**🔗 [GitHub](https://github.com/sualpha/AICodeTransformer) | [JetBrains Marketplace](https://plugins.jetbrains.com/))**
+**🔗 [GitHub](https://github.com/sualpha/AICodeTransformer) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/28570-aicodetransformer))**
 
 **注意**: 使用本插件需要有效的 AI 服务 API 密钥。请确保遵守相关服务的使用条款和隐私政策。
 

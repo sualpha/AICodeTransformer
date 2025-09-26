@@ -272,7 +272,7 @@ If you encounter any issues or have suggestions during usage, please contact us 
 
 **⭐ If this project helps you, please give us a Star!**
 
-**🔗 [GitHub](https://github.com/sualpha/AICodeTransformer) | [JetBrains Marketplace](https://plugins.jetbrains.com/))**
+**🔗 [GitHub](https://github.com/sualpha/AICodeTransformer) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/28570-aicodetransformer))**
 
 **Note**: Using this plugin requires valid AI service API keys. Please ensure compliance with relevant service terms and privacy policies.
 
