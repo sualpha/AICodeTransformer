@@ -3,7 +3,6 @@ package cn.suso.aicodetransformer.service.impl
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.service.ConfigurationChangeListener
 import cn.suso.aicodetransformer.service.ConfigurationService
-import cn.suso.aicodetransformer.service.ErrorContext
 import cn.suso.aicodetransformer.service.ErrorHandlingService
 
 import com.intellij.openapi.components.PersistentStateComponent
@@ -13,7 +12,6 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.SerializationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -94,7 +92,16 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
         @com.intellij.util.xmlb.annotations.Attribute("retryAttempts")
         var retryAttempts: Int = 3,
         @com.intellij.util.xmlb.annotations.Attribute("retryDelayMs")
-        var retryDelayMs: Long = 1000
+        var retryDelayMs: Long = 1000,
+        // 更新设置
+        @com.intellij.util.xmlb.annotations.Attribute("enableAutoUpdate")
+        var enableAutoUpdate: Boolean = false,
+        @com.intellij.util.xmlb.annotations.Attribute("updateInterval")
+        var updateInterval: String = "每天一次",
+        @com.intellij.util.xmlb.annotations.Attribute("updateCheckIntervalHours")
+        var updateCheckIntervalHours: Int = 24,
+        @com.intellij.util.xmlb.annotations.Attribute("lastUpdateCheckTime")
+        var lastUpdateCheckTime: Long = 0L
     )
     
     /**
@@ -536,14 +543,14 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
     /**
      * 获取全局设置
      */
-    fun getGlobalSettings(): GlobalSettings {
+    override fun getGlobalSettings(): GlobalSettings {
         return lock.read { state.globalSettings }
     }
     
     /**
      * 更新全局设置
      */
-    fun updateGlobalSettings(settings: GlobalSettings) {
+    override fun updateGlobalSettings(settings: GlobalSettings) {
         lock.write {
             state.globalSettings = settings
             logger.info("Global settings updated")

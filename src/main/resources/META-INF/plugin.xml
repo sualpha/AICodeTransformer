@@ -76,6 +76,8 @@
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.PerformanceMonitorServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.LoggingService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.LoggingServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.AutoUpdateService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.AutoUpdateServiceImpl"/>
         
         <!-- Project startup activity -->
         <postStartupActivity implementation="cn.suso.aicodetransformer.AICodeTransformerProjectActivity"/>

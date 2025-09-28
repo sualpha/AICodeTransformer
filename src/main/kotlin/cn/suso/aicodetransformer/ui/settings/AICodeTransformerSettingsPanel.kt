@@ -3,8 +3,6 @@ package cn.suso.aicodetransformer.ui.settings
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.ui.settings.model.ModelConfigurationPanel
-import cn.suso.aicodetransformer.ui.settings.PromptTemplatePanel
-import cn.suso.aicodetransformer.ui.settings.LogManagementPanel
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBTabbedPane
@@ -16,7 +14,6 @@ import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.awt.Font
 import javax.swing.JPanel
-import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
 import javax.swing.border.EmptyBorder
 
@@ -31,7 +28,7 @@ class AICodeTransformerSettingsPanel(
     private val tabbedPane = JBTabbedPane()
     private val modelConfigPanel: ModelConfigurationPanel
     private val promptTemplatePanel: PromptTemplatePanel
-    private val logManagementPanel: LogManagementPanel
+    private val systemManagementPanel: SystemManagementPanel
     
     private var originalConfigurations: List<ModelConfiguration> = emptyList()
     
@@ -45,13 +42,13 @@ class AICodeTransformerSettingsPanel(
         // 初始化Prompt模板面板
         promptTemplatePanel = PromptTemplatePanel(project, configurationService)
         
-        // 初始化日志管理面板
-        logManagementPanel = LogManagementPanel(project)
+        // 初始化配置管理面板
+        systemManagementPanel = SystemManagementPanel(project)
         
         // 添加标签页 - 使用紧凑的标题
         tabbedPane.addTab("模型", modelConfigPanel)
         tabbedPane.addTab("模板", promptTemplatePanel)
-        tabbedPane.addTab("日志", logManagementPanel)
+        tabbedPane.addTab("系统", systemManagementPanel)
         
         // 设置tab页独立性 - 允许每个tab页有独立的高度
         tabbedPane.setTabLayoutPolicy(JBTabbedPane.SCROLL_TAB_LAYOUT)

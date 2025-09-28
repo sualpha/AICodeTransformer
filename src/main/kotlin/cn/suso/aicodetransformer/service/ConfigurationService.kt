@@ -121,6 +121,18 @@ interface ConfigurationService {
      * @param config 日志配置
      */
     fun saveLoggingConfig(config: LoggingConfigState)
+    
+    /**
+     * 获取全局设置
+     * @return 全局设置
+     */
+    fun getGlobalSettings(): cn.suso.aicodetransformer.service.impl.ConfigurationServiceImpl.GlobalSettings
+    
+    /**
+     * 更新全局设置
+     * @param settings 全局设置
+     */
+    fun updateGlobalSettings(settings: cn.suso.aicodetransformer.service.impl.ConfigurationServiceImpl.GlobalSettings)
 }
 
 /**
