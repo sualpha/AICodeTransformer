@@ -311,6 +311,114 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         }
     }
     
+    /**
+     * 自动安装更新（简化版本，无用户确认对话框）
+     */
+    private suspend fun installUpdateAutomatically(updateInfo: UpdateInfo): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                updateStatus(UpdateStatus.INSTALLING, updateInfo)
+                notifyProgress(0, "准备安装更新...")
+                
+                logger.info("开始自动安装更新: ${updateInfo.version}")
+                
+                // 1. 查找下载的更新文件
+                val downloadDir = File(System.getProperty("java.io.tmpdir"), "aicodetransformer_updates")
+                val fileName = "aicodetransformer-${updateInfo.version}.jar"
+                val downloadedFile = File(downloadDir, fileName)
+                
+                if (!downloadedFile.exists()) {
+                    throw Exception("更新文件不存在: ${downloadedFile.absolutePath}")
+                }
+                
+                notifyProgress(10, "验证更新文件...")
+                
+                // 2. 验证文件完整性
+                if (updateInfo.checksum.isNotEmpty()) {
+                    val fileChecksum = calculateChecksum(downloadedFile)
+                    if (fileChecksum != updateInfo.checksum) {
+                        throw Exception("更新文件校验失败: 期望=${updateInfo.checksum}, 实际=$fileChecksum")
+                    }
+                    logger.info("文件校验通过")
+                } else {
+                    // 基本的文件完整性检查
+                    if (downloadedFile.length() == 0L) {
+                        throw Exception("下载文件为空")
+                    }
+                    val fileName = downloadedFile.name.lowercase()
+                    if (!fileName.endsWith(".jar") && !fileName.endsWith(".zip")) {
+                        throw Exception("文件格式不正确: ${downloadedFile.name}")
+                    }
+                    logger.info("文件基本完整性检查通过")
+                }
+                
+                notifyProgress(20, "准备安装环境...")
+                
+                // 3. 获取当前插件路径
+                val currentPluginPath = getCurrentPluginPath()
+                if (currentPluginPath == null) {
+                    throw Exception("无法确定当前插件路径")
+                }
+                
+                notifyProgress(30, "备份当前插件...")
+                
+                // 4. 备份当前插件
+                val backupFile = createBackup(currentPluginPath)
+                
+                notifyProgress(50, "安装新版本...")
+                
+                try {
+                    // 5. 复制新版本到插件目录
+                    installNewVersion(downloadedFile, currentPluginPath)
+                    
+                    notifyProgress(80, "验证安装...")
+                    
+                    // 6. 验证安装是否成功
+                    if (!verifyInstallation(currentPluginPath, updateInfo)) {
+                        throw Exception("安装验证失败")
+                    }
+                    
+                    notifyProgress(90, "清理临时文件...")
+                    
+                    // 7. 清理下载的临时文件
+                    downloadedFile.delete()
+                    
+                    // 8. 记录更新历史
+                    recordUpdateHistory(updateInfo, UpdateRecordStatus.SUCCESS)
+                    
+                    updateStatus(UpdateStatus.INSTALLED, updateInfo)
+                    notifyProgress(100, "安装完成")
+                    logger.info("自动更新安装完成: ${updateInfo.version}")
+                    loggingService.logInfo("自动更新安装完成: ${updateInfo.version}", "自动更新")
+                    
+                    // 9. 显示简化的重启提醒（仅通知，无确认对话框）
+                    showAutoUpdateRestartNotification(updateInfo)
+                    
+                    true
+                    
+                } catch (installException: Exception) {
+                    // 安装失败，尝试恢复备份
+                    logger.warn("自动安装失败，尝试恢复备份", installException)
+                    try {
+                        restoreBackup(backupFile, currentPluginPath)
+                        logger.info("已恢复到原版本")
+                    } catch (restoreException: Exception) {
+                        logger.error("恢复备份失败", restoreException)
+                    }
+                    throw installException
+                }
+                
+            } catch (e: Exception) {
+                logger.error("自动安装更新失败", e)
+                loggingService.logError(e, "自动安装更新失败")
+                recordUpdateHistory(updateInfo, UpdateRecordStatus.FAILED, e.message)
+                updateStatus(UpdateStatus.ERROR)
+                notifyError("自动安装失败: ${e.message}")
+                false
+            }
+        }
+    }
+    
     override fun getCurrentVersion(): String {
         return CURRENT_VERSION
     }
@@ -344,12 +452,61 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             updateTimer?.scheduleAtFixedRate(object : TimerTask() {
                 override fun run() {
                     updateScope.launch {
-                        checkForUpdates()
+                        performFullAutoUpdate()
                     }
                 }
             }, 0, intervalMs)
             
             loggingService.logInfo("自动更新已启动，检查间隔：${settings.updateInterval}")
+        }
+    }
+    
+    /**
+     * 执行完整的自动更新流程：检查 -> 下载 -> 安装
+     */
+    private suspend fun performFullAutoUpdate() {
+        try {
+            logger.info("开始执行完整的自动更新流程")
+            
+            // 1. 检查更新
+            val updateInfo = checkForUpdates()
+            if (updateInfo == null) {
+                logger.info("没有可用更新")
+                return
+            }
+            
+            logger.info("发现新版本: ${updateInfo.version}，开始自动更新")
+            loggingService.logInfo("发现新版本: ${updateInfo.version}，开始自动更新", "自动更新")
+            
+            // 2. 下载更新
+            val downloadSuccess = downloadUpdate(updateInfo) { progress ->
+                logger.debug("下载进度: $progress%")
+            }
+            
+            if (!downloadSuccess) {
+                logger.error("下载更新失败")
+                loggingService.logError(Exception("下载更新失败"), "自动更新")
+                return
+            }
+            
+            logger.info("更新下载完成，开始安装")
+            
+            // 3. 自动安装更新（简化版本，无用户确认）
+            val installSuccess = installUpdateAutomatically(updateInfo)
+            
+            if (installSuccess) {
+                logger.info("自动更新完成: ${updateInfo.version}")
+                loggingService.logInfo("自动更新完成: ${updateInfo.version}", "自动更新")
+            } else {
+                logger.error("安装更新失败")
+                loggingService.logError(Exception("安装更新失败"), "自动更新")
+            }
+            
+        } catch (e: Exception) {
+            logger.error("自动更新流程失败", e)
+            loggingService.logError(e, "自动更新流程失败")
+            updateStatus(UpdateStatus.ERROR)
+            notifyError("自动更新失败: ${e.message}")
         }
     }
     
@@ -1411,6 +1568,39 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             }
         } catch (e: Exception) {
             logger.error("显示重启提示失败", e)
+        }
+    }
+    
+    /**
+     * 显示自动更新重启通知（简化版本，仅通知无确认对话框）
+     */
+    private fun showAutoUpdateRestartNotification(updateInfo: UpdateInfo) {
+        try {
+            // 在EDT线程中显示通知
+            com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                val notification = com.intellij.notification.Notification(
+                    "AICodeTransformer.AutoUpdate",
+                    "自动更新完成",
+                    "插件已自动更新到版本 ${updateInfo.version}。请重启 IntelliJ IDEA 以应用更改。",
+                    com.intellij.notification.NotificationType.INFORMATION
+                )
+                
+                // 添加重启动作
+                notification.addAction(object : com.intellij.notification.NotificationAction("立即重启") {
+                    override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent, notification: com.intellij.notification.Notification) {
+                        notification.expire()
+                        restartIDE()
+                    }
+                })
+                
+                // 显示通知
+                com.intellij.notification.Notifications.Bus.notify(notification)
+                
+                logger.info("已显示自动更新重启通知")
+                loggingService.logInfo("已显示自动更新重启通知: ${updateInfo.version}", "自动更新")
+            }
+        } catch (e: Exception) {
+            logger.error("显示自动更新重启通知失败", e)
         }
     }
     
