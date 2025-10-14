@@ -5,7 +5,10 @@ import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.model.PromptTemplate
 import cn.suso.aicodetransformer.service.*
 import cn.suso.aicodetransformer.service.ErrorHandlingService
-import cn.suso.aicodetransformer.service.ReplacementResult
+import cn.suso.aicodetransformer.model.ReplacementResult
+import cn.suso.aicodetransformer.model.ErrorContext
+import cn.suso.aicodetransformer.model.ExecutionContext
+import cn.suso.aicodetransformer.constants.ExecutionStatus
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -15,13 +18,11 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Future
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.runBlocking
 
 /**

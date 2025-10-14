@@ -1,10 +1,10 @@
 package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.model.ModelConfiguration
-import cn.suso.aicodetransformer.service.RateLimitConfig
+import cn.suso.aicodetransformer.model.RateLimitConfig
+import cn.suso.aicodetransformer.model.RateLimitStats
+import cn.suso.aicodetransformer.constants.WindowType
 import cn.suso.aicodetransformer.service.RateLimitService
-import cn.suso.aicodetransformer.service.RateLimitStats
-import cn.suso.aicodetransformer.service.WindowType
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.Disposable

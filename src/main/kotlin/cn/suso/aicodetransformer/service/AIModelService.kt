@@ -1,7 +1,9 @@
 package cn.suso.aicodetransformer.service
 
+import cn.suso.aicodetransformer.constants.RequestStatusConstants
 import cn.suso.aicodetransformer.model.ExecutionResult
 import cn.suso.aicodetransformer.model.ModelConfiguration
+import cn.suso.aicodetransformer.model.ModelInfo
 
 /**
  * AI模型调用服务接口
@@ -76,7 +78,7 @@ interface AIModelService {
      * @param requestId 请求ID
      * @return 请求状态
      */
-    fun getRequestStatus(requestId: String): RequestStatus?
+    fun getRequestStatus(requestId: String): RequestStatusConstants?
     
     /**
      * 添加请求监听器
@@ -91,45 +93,6 @@ interface AIModelService {
     fun removeRequestListener(listener: RequestListener)
 }
 
-/**
- * 模型信息数据类
- */
-data class ModelInfo(
-    /** 模型名称 */
-    val name: String,
-    
-    /** 模型版本 */
-    val version: String? = null,
-    
-    /** 最大上下文长度 */
-    val maxContextLength: Int? = null,
-    
-    /** 支持的功能 */
-    val capabilities: List<String> = emptyList(),
-    
-    /** 模型描述 */
-    val description: String? = null
-)
-
-/**
- * 请求状态枚举
- */
-enum class RequestStatus {
-    /** 等待中 */
-    PENDING,
-    
-    /** 执行中 */
-    RUNNING,
-    
-    /** 已完成 */
-    COMPLETED,
-    
-    /** 已取消 */
-    CANCELLED,
-    
-    /** 失败 */
-    FAILED
-}
 
 /**
  * 请求监听器接口
@@ -171,22 +134,3 @@ interface RequestListener {
     fun onRequestFailed(requestId: String, error: String) {}
 }
 
-/**
- * 请求配置数据类
- */
-data class RequestConfig(
-    /** 请求ID */
-    val requestId: String = java.util.UUID.randomUUID().toString(),
-    
-    /** 超时时间（毫秒） */
-    val timeoutMs: Long = 30000,
-    
-    /** 重试次数 */
-    val retryCount: Int = 0,
-    
-    /** 重试间隔（毫秒） */
-    val retryDelayMs: Long = 1000,
-    
-    /** 是否启用流式响应 */
-    val streaming: Boolean = false
-)

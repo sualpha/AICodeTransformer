@@ -1,6 +1,9 @@
 package cn.suso.aicodetransformer.service
 
-import kotlinx.serialization.Serializable
+import cn.suso.aicodetransformer.constants.UpdateStatus
+import cn.suso.aicodetransformer.model.BackupInfo
+import cn.suso.aicodetransformer.model.UpdateInfo
+import cn.suso.aicodetransformer.model.UpdateRecord
 
 /**
  * 自动更新服务接口
@@ -43,8 +46,9 @@ interface AutoUpdateService {
     
     /**
      * 启动自动更新检查
+     * @param triggerSource 触发源：manual（手动）或 timer（定时任务）
      */
-    fun startAutoUpdate()
+    fun startAutoUpdate(triggerSource: String = "manual")
     
     /**
      * 停止自动更新检查
@@ -56,6 +60,12 @@ interface AutoUpdateService {
      * @return 当前更新状态
      */
     fun getUpdateStatus(): UpdateStatus
+    
+    /**
+     * 获取当前更新信息
+     * @return 当前可用的更新信息，如果没有则返回null
+     */
+    fun getCurrentUpdateInfo(): UpdateInfo?
     
     /**
      * 添加状态监听器
@@ -78,85 +88,12 @@ interface AutoUpdateService {
      * @return 备份版本列表
      */
     fun getAvailableBackups(): List<BackupInfo>
-}
 
-/**
- * 更新信息
- */
-@Serializable
-data class UpdateInfo(
-    /** 版本号 */
-    val version: String,
-    
-    /** 版本名称 */
-    val versionName: String,
-    
-    /** 发布时间 */
-    val releaseDate: String,
-    
-    /** 更新描述 */
-    val description: String,
-    
-    /** 下载URL */
-    val downloadUrl: String,
-    
-    /** 文件大小（字节） */
-    val fileSize: Long,
-    
-    /** 文件校验和 */
-    val checksum: String,
-    
-    /** 是否为强制更新 */
-    val isForced: Boolean = false,
-    
-    /** 最低兼容版本 */
-    val minCompatibleVersion: String? = null,
-    
-    /** 更新日志 */
-    val changelog: List<String> = emptyList()
-)
-
-/**
- * 更新记录
- */
-@Serializable
-data class UpdateRecord(
-    /** 版本号 */
-    val version: String,
-    
-    /** 更新时间 */
-    val updateTime: String,
-    
-    /** 更新状态 */
-    val status: UpdateRecordStatus,
-    
-    /** 错误信息（如果有） */
-    val errorMessage: String? = null
-)
-
-/**
- * 更新记录状态
- */
-@Serializable
-enum class UpdateRecordStatus {
-    SUCCESS,    // 更新成功
-    FAILED,     // 更新失败
-}
-
-/**
- * 更新状态
- */
-@Serializable
-enum class UpdateStatus {
-    IDLE,           // 空闲状态
-    CHECKING,       // 检查更新中
-    AVAILABLE,      // 有可用更新
-    DOWNLOADING,    // 下载中
-    DOWNLOADED,     // 下载完成
-    INSTALLING,     // 安装中
-    INSTALLED,      // 安装完成
-    ERROR,          // 错误状态
-    UP_TO_DATE      // 已是最新版本
+    /**
+     * 取消当前下载
+     * @return 是否成功取消下载
+     */
+    fun cancelDownload(): Boolean
 }
 
 /**
@@ -170,14 +107,14 @@ interface UpdateStatusListener {
      * @param updateInfo 更新信息（可选）
      */
     fun onStatusChanged(oldStatus: UpdateStatus, newStatus: UpdateStatus, updateInfo: UpdateInfo? = null)
-    
+
     /**
      * 更新进度改变时调用
      * @param progress 进度百分比（0-100）
      * @param message 进度消息
      */
     fun onProgressChanged(progress: Int, message: String)
-    
+
     /**
      * 更新错误时调用
      * @param error 错误信息
@@ -185,23 +122,12 @@ interface UpdateStatusListener {
     fun onError(error: String)
 }
 
-/**
- * 备份信息
- */
-@Serializable
-data class BackupInfo(
-    /** 备份版本号 */
-    val version: String,
-    
-    /** 备份时间 */
-    val backupTime: String,
-    
-    /** 备份文件路径 */
-    val backupPath: String,
-    
-    /** 备份文件大小 */
-    val fileSize: Long,
-    
-    /** 备份描述 */
-    val description: String = ""
-)
+
+
+
+
+
+
+
+
+

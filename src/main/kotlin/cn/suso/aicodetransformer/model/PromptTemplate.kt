@@ -83,9 +83,9 @@ data class PromptTemplate(
 
     
     /**
-     * 验证结果
+     * 模板验证结果
      */
-    data class ValidationResult(
+    data class TemplateValidationResult(
         val isValid: Boolean,
         val errors: List<String> = emptyList()
     )
@@ -173,7 +173,7 @@ data class PromptTemplate(
     /**
      * 验证模板
      */
-    fun validate(): ValidationResult {
+    fun validate(): TemplateValidationResult {
         val errors = mutableListOf<String>()
         
         if (name.isBlank()) {
@@ -191,7 +191,7 @@ data class PromptTemplate(
             }
         }
         
-        return ValidationResult(
+        return TemplateValidationResult(
             isValid = errors.isEmpty(),
             errors = errors
         )

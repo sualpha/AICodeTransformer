@@ -1,13 +1,11 @@
 package cn.suso.aicodetransformer.service.impl
 
-import cn.suso.aicodetransformer.model.ExecutionResult
-import cn.suso.aicodetransformer.model.ModelConfiguration
+import cn.suso.aicodetransformer.constants.*
+import cn.suso.aicodetransformer.model.*
+import cn.suso.aicodetransformer.model.SortDirection
 import cn.suso.aicodetransformer.service.*
-import cn.suso.aicodetransformer.service.LogMetadata
-import cn.suso.aicodetransformer.service.impl.ConfigurationServiceImpl.LoggingConfigState
 import com.intellij.openapi.components.service
 import kotlinx.coroutines.*
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.PrintWriter
@@ -443,12 +441,25 @@ class LoggingServiceImpl : LoggingService {
         val cutoffTime = System.currentTimeMillis() - olderThanMs
         val initialSize = logEntries.size
         
+        // 统计要删除的日志
+        val logsToRemove = logEntries.filter { it.timestamp < cutoffTime }
+        val oldestLogTime = logEntries.minOfOrNull { it.timestamp }
+        val newestLogTime = logEntries.maxOfOrNull { it.timestamp }
+        
+        logInfo("日志清理详情 - 总日志数: $initialSize, 截止时间: $cutoffTime", "日志清理任务")
+        if (oldestLogTime != null && newestLogTime != null) {
+            logInfo("最旧日志时间: $oldestLogTime, 最新日志时间: $newestLogTime", "日志清理任务")
+        }
+        logInfo("符合清理条件的日志数: ${logsToRemove.size}", "日志清理任务")
+        
         logEntries.removeIf { it.timestamp < cutoffTime }
         
         val removedCount = initialSize - logEntries.size
         
         if (removedCount > 0) {
-            logInfo("清理了 $removedCount 条旧日志记录", "日志清理任务")
+            logInfo("清理了 $removedCount 条旧日志记录，剩余日志数: ${logEntries.size}", "日志清理任务")
+        } else {
+            logInfo("没有需要清理的旧日志，当前日志数: ${logEntries.size}", "日志清理任务")
         }
         
         return removedCount
@@ -661,12 +672,33 @@ class LoggingServiceImpl : LoggingService {
     
     private fun startCleanupTask() {
         logWriterScope.launch {
+            logInfo("日志清理任务已启动，每小时执行一次", "日志清理任务")
             while (true) {
                 delay(3600000) // 每小时执行一次
                 try {
-                    cleanupOldLogs(config.retentionTimeMs)
+                    if (config.enabled) {
+                        val currentTime = System.currentTimeMillis()
+                        val cutoffTime = currentTime - config.retentionTimeMs
+                        val retentionDays = config.retentionTimeMs / (24 * 60 * 60 * 1000)
+                        
+                        logInfo("开始执行日志清理任务，保留时间: ${retentionDays}天 (${config.retentionTimeMs}ms)", "日志清理任务")
+                        logInfo("当前时间: $currentTime, 清理截止时间: $cutoffTime", "日志清理任务")
+                        logInfo("清理前日志总数: ${logEntries.size}", "日志清理任务")
+                        
+                        val removedCount = cleanupOldLogs(config.retentionTimeMs)
+                        
+                        if (removedCount > 0) {
+                            logInfo("日志清理完成，清理了 $removedCount 条旧日志记录", "日志清理任务")
+                        } else {
+                            logInfo("日志清理完成，没有需要清理的旧日志", "日志清理任务")
+                        }
+                    } else {
+                        logInfo("日志功能已禁用，跳过清理任务", "日志清理任务")
+                    }
                 } catch (e: Exception) {
-                    System.err.println("日志清理任务失败: ${e.message}")
+                    val errorMsg = "日志清理任务失败: ${e.message}"
+                    System.err.println(errorMsg)
+                    logError(e, "日志清理任务执行失败")
                 }
             }
         }

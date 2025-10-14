@@ -2,7 +2,6 @@ package cn.suso.aicodetransformer.service
 
 import cn.suso.aicodetransformer.model.PromptTemplate
 import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.keymap.KeymapManager
 import javax.swing.KeyStroke
 
 /**
@@ -133,16 +132,3 @@ interface ActionListener {
     fun onActionFailed(actionId: String, error: String) {}
 }
 
-/**
- * Action执行结果
- */
-data class ActionExecutionResult(
-    /** 是否执行成功 */
-    val success: Boolean,
-    
-    /** 错误信息 */
-    val errorMessage: String? = null,
-    
-    /** 执行耗时（毫秒） */
-    val executionTimeMs: Long = 0
-)

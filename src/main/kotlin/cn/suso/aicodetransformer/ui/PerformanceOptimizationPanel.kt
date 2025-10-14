@@ -1,6 +1,10 @@
 package cn.suso.aicodetransformer.ui
 
 import cn.suso.aicodetransformer.service.*
+import cn.suso.aicodetransformer.model.CacheStats
+import cn.suso.aicodetransformer.model.PerformanceOptimizationConfig
+import cn.suso.aicodetransformer.model.PerformanceStats
+import cn.suso.aicodetransformer.model.OptimizationSuggestion
 import cn.suso.aicodetransformer.service.impl.PerformanceOptimizationServiceImpl
 import cn.suso.aicodetransformer.utils.PerformanceOptimizer
 import com.intellij.openapi.components.service
@@ -207,7 +211,7 @@ class PerformanceOptimizationPanel(private val project: Project) : DialogWrapper
                 }
                 
                 val text = buildString {
-                    suggestions.take(5).forEach { suggestion ->
+                    suggestions.take(5).forEach { suggestion: OptimizationSuggestion ->
                         appendLine("• ${suggestion.title}")
                         appendLine("  影响: ${suggestion.impact}, 难度: ${suggestion.difficulty}")
                         appendLine("  ${suggestion.description}")

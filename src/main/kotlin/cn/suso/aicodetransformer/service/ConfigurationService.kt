@@ -1,7 +1,8 @@
 package cn.suso.aicodetransformer.service
 
 import cn.suso.aicodetransformer.model.ModelConfiguration
-import cn.suso.aicodetransformer.service.impl.ConfigurationServiceImpl.LoggingConfigState
+import cn.suso.aicodetransformer.model.LoggingConfigState
+import cn.suso.aicodetransformer.model.GlobalSettings
 
 /**
  * 配置管理服务接口
@@ -126,13 +127,13 @@ interface ConfigurationService {
      * 获取全局设置
      * @return 全局设置
      */
-    fun getGlobalSettings(): cn.suso.aicodetransformer.service.impl.ConfigurationServiceImpl.GlobalSettings
+    fun getGlobalSettings(): GlobalSettings
     
     /**
      * 更新全局设置
      * @param settings 全局设置
      */
-    fun updateGlobalSettings(settings: cn.suso.aicodetransformer.service.impl.ConfigurationServiceImpl.GlobalSettings)
+    fun updateGlobalSettings(settings: GlobalSettings)
 }
 
 /**

@@ -1,5 +1,9 @@
 package cn.suso.aicodetransformer.service
 
+import cn.suso.aicodetransformer.model.CodeValidationResult
+import cn.suso.aicodetransformer.model.ExecutionContext
+import cn.suso.aicodetransformer.model.ReplacementResult
+import cn.suso.aicodetransformer.model.SelectionInfo
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 
@@ -69,7 +73,7 @@ interface CodeReplacementService {
      * @param newText 新文本
      * @return 验证结果
      */
-    fun validateReplacement(editor: Editor, newText: String): ValidationResult
+    fun validateReplacement(editor: Editor, newText: String): CodeValidationResult
     
     /**
      * 创建撤销操作
@@ -93,52 +97,4 @@ interface CodeReplacementService {
         startOffset: Int,
         endOffset: Int
     ): ReplacementResult
-}
-
-/**
- * 替换结果
- */
-data class ReplacementResult(
-    val success: Boolean,
-    val errorMessage: String? = null,
-    val originalText: String? = null,
-    val newText: String? = null,
-    val startOffset: Int = -1,
-    val endOffset: Int = -1,
-    val newStartOffset: Int = -1,
-    val newEndOffset: Int = -1
-)
-
-/**
- * 选择信息
- */
-data class SelectionInfo(
-    val hasSelection: Boolean,
-    val selectedText: String?,
-    val startOffset: Int,
-    val endOffset: Int,
-    val startLine: Int,
-    val endLine: Int,
-    val startColumn: Int,
-    val endColumn: Int
-)
-
-/**
- * 验证结果
- */
-data class ValidationResult(
-    val isValid: Boolean,
-    val errorMessage: String? = null,
-    val warnings: List<String> = emptyList(),
-    val suggestions: List<String> = emptyList()
-)
-
-/**
- * 文本操作类型
- */
-enum class TextOperationType {
-    REPLACE,    // 替换
-    INSERT,     // 插入
-    DELETE,     // 删除
-    FORMAT      // 格式化
 }

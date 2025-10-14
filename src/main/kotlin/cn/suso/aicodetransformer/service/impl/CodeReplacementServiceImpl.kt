@@ -1,25 +1,17 @@
 package cn.suso.aicodetransformer.service.impl
 
+import cn.suso.aicodetransformer.model.*
 import cn.suso.aicodetransformer.service.CodeReplacementService
-import cn.suso.aicodetransformer.service.ErrorContext
 import cn.suso.aicodetransformer.service.ErrorHandlingService
-import cn.suso.aicodetransformer.service.ReplacementResult
-import cn.suso.aicodetransformer.service.SelectionInfo
-import cn.suso.aicodetransformer.service.ValidationResult
-import cn.suso.aicodetransformer.service.ExecutionContext
-import com.intellij.codeInsight.actions.ReformatCodeProcessor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.editor.SelectionModel
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiFile
 import com.intellij.psi.codeStyle.CodeStyleManager
 
 /**
@@ -296,12 +288,12 @@ class CodeReplacementServiceImpl : CodeReplacementService {
         }
     }
     
-    override fun validateReplacement(editor: Editor, newText: String): ValidationResult {
+    override fun validateReplacement(editor: Editor, newText: String): CodeValidationResult {
         return try {
             val selectionModel = editor.selectionModel
             
             if (!selectionModel.hasSelection()) {
-                return ValidationResult(
+                return CodeValidationResult(
                     isValid = false,
                     errorMessage = "没有选中的文本"
                 )
@@ -311,7 +303,7 @@ class CodeReplacementServiceImpl : CodeReplacementService {
             
         } catch (e: Exception) {
             logger.error("验证替换失败", e)
-            ValidationResult(
+            CodeValidationResult(
                 isValid = false,
                 errorMessage = e.message ?: "验证替换失败"
             )
@@ -399,13 +391,13 @@ class CodeReplacementServiceImpl : CodeReplacementService {
     /**
      * 内部验证替换内容
      */
-    private fun validateReplacementInternal(newText: String): ValidationResult {
+    private fun validateReplacementInternal(newText: String): CodeValidationResult {
         val warnings = mutableListOf<String>()
         val suggestions = mutableListOf<String>()
         
         // 检查文本长度
         if (newText.length > 100000) {
-            return ValidationResult(
+            return CodeValidationResult(
                 isValid = false,
                 errorMessage = "替换文本过长（超过100,000字符）"
             )
@@ -413,7 +405,7 @@ class CodeReplacementServiceImpl : CodeReplacementService {
         
         // 检查是否包含不可见字符
         if (newText.contains("\u0000")) {
-            return ValidationResult(
+            return CodeValidationResult(
                 isValid = false,
                 errorMessage = "文本包含空字符（\\u0000）"
             )
@@ -444,7 +436,7 @@ class CodeReplacementServiceImpl : CodeReplacementService {
             suggestions.add("建议移除行尾的空白字符")
         }
         
-        return ValidationResult(
+        return CodeValidationResult(
             isValid = true,
             warnings = warnings,
             suggestions = suggestions

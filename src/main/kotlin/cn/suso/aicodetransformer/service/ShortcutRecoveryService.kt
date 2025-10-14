@@ -1,6 +1,7 @@
 package cn.suso.aicodetransformer.service
 
 import cn.suso.aicodetransformer.model.PromptTemplate
+import cn.suso.aicodetransformer.model.ShortcutValidationResult
 
 /**
  * 快捷键恢复服务接口
@@ -51,13 +52,3 @@ interface ShortcutRecoveryService {
      */
     fun validateShortcutIntegrity(): ShortcutValidationResult
 }
-
-/**
- * 快捷键验证结果
- */
-data class ShortcutValidationResult(
-    val isValid: Boolean,
-    val missingShortcuts: List<String>,
-    val conflictingShortcuts: List<String>,
-    val message: String
-)

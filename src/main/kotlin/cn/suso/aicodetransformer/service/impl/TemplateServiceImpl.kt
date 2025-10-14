@@ -2,9 +2,9 @@ package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.model.*
 import cn.suso.aicodetransformer.service.TemplateService
-import cn.suso.aicodetransformer.service.TemplateRenderResult
-import cn.suso.aicodetransformer.service.TemplateImportResult
-import cn.suso.aicodetransformer.service.TemplateStats
+import cn.suso.aicodetransformer.model.TemplateRenderResult
+import cn.suso.aicodetransformer.model.TemplateImportResult
+import cn.suso.aicodetransformer.model.TemplateStats
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory

@@ -2,9 +2,13 @@ package cn.suso.aicodetransformer
 
 import cn.suso.aicodetransformer.model.ExecutionResult
 import cn.suso.aicodetransformer.model.ModelConfiguration
+import cn.suso.aicodetransformer.model.ErrorContext
 import cn.suso.aicodetransformer.notification.ShortcutNotificationService
 import cn.suso.aicodetransformer.service.*
 import cn.suso.aicodetransformer.service.impl.*
+import cn.suso.aicodetransformer.constants.ExecutionStatus
+import cn.suso.aicodetransformer.model.ErrorHandlingResult
+import cn.suso.aicodetransformer.model.ExecutionContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger

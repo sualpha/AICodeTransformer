@@ -2,9 +2,10 @@ package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.model.ExecutionResult
 import cn.suso.aicodetransformer.model.ModelConfiguration
-import cn.suso.aicodetransformer.service.CacheConfig
+import cn.suso.aicodetransformer.model.CacheConfig
 import cn.suso.aicodetransformer.service.CacheService
-import cn.suso.aicodetransformer.service.CacheStats
+import cn.suso.aicodetransformer.model.CacheStats
+import cn.suso.aicodetransformer.model.CacheEntry
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import java.security.MessageDigest
@@ -204,18 +205,5 @@ class CacheServiceImpl : CacheService {
             Thread.currentThread().interrupt()
         }
         clearAllCache()
-    }
-}
-
-/**
- * 缓存条目
- */
-private data class CacheEntry(
-    val result: ExecutionResult,
-    val createdAt: Long,
-    val ttlMs: Long
-) {
-    fun isExpired(currentTime: Long = System.currentTimeMillis()): Boolean {
-        return currentTime - createdAt > ttlMs
     }
 }

@@ -12,8 +12,7 @@ import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.util.PsiTreeUtil
-import cn.suso.aicodetransformer.service.CodeAnalysisService.ClassInfo
-import cn.suso.aicodetransformer.service.CodeAnalysisService.FieldInfo
+import cn.suso.aicodetransformer.model.FieldInfo
 
 /**
  * 模板变量解析器，用于解析和替换模板中的内置变量
@@ -201,7 +200,7 @@ class TemplateVariableResolver(private val project: Project) {
         
         val sb = StringBuilder()
         sb.appendLine("// $title:")
-        fields.forEach { field ->
+        fields.forEach { field: FieldInfo ->
             sb.appendLine("// - ${field.name}: ${field.type}")
             if (field.annotations.isNotEmpty()) {
                 sb.appendLine("//   注解: ${field.annotations.joinToString(", ")}")

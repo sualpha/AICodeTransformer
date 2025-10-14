@@ -1,6 +1,14 @@
 package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.service.*
+import cn.suso.aicodetransformer.model.ErrorContext
+import cn.suso.aicodetransformer.model.ErrorHandlingResult
+import cn.suso.aicodetransformer.model.RetryConfig
+import cn.suso.aicodetransformer.model.RetryResult
+import cn.suso.aicodetransformer.model.ErrorSuggestion
+import cn.suso.aicodetransformer.model.NotificationAction
+import cn.suso.aicodetransformer.constants.ErrorSeverity
+import cn.suso.aicodetransformer.constants.ErrorType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger

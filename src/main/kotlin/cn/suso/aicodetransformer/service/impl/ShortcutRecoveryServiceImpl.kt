@@ -1,14 +1,15 @@
 package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.model.PromptTemplate
+import cn.suso.aicodetransformer.model.ShortcutBackup
+import cn.suso.aicodetransformer.model.ShortcutInfo
+import cn.suso.aicodetransformer.model.ShortcutValidationResult
 import cn.suso.aicodetransformer.service.*
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.Serializable
 
 /**
  * 快捷键恢复服务实现
@@ -195,23 +196,3 @@ class ShortcutRecoveryServiceImpl : ShortcutRecoveryService {
         }
     }
 }
-
-/**
- * 快捷键备份数据
- */
-@Serializable
-data class ShortcutBackup(
-    val version: String,
-    val timestamp: Long,
-    val shortcuts: List<ShortcutInfo>
-)
-
-/**
- * 快捷键信息
- */
-@Serializable
-data class ShortcutInfo(
-    val templateId: String,
-    val templateName: String,
-    val shortcut: String
-)

@@ -1,7 +1,7 @@
 package cn.suso.aicodetransformer.notification
 
 import cn.suso.aicodetransformer.service.ShortcutRecoveryService
-import cn.suso.aicodetransformer.service.ShortcutValidationResult
+import cn.suso.aicodetransformer.model.ShortcutValidationResult
 import com.intellij.notification.*
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent

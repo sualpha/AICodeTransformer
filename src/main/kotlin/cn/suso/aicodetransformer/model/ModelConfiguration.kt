@@ -92,7 +92,7 @@ data class ModelConfiguration(
     /**
      * 验证配置是否有效
      */
-    fun validate(): ValidationResult {
+    fun validate(): ModelValidationResult {
         val errors = mutableListOf<String>()
         
         if (id.isBlank()) {
@@ -122,9 +122,9 @@ data class ModelConfiguration(
         }
         
         return if (errors.isEmpty()) {
-            ValidationResult.Success
+            ModelValidationResult.Success
         } else {
-            ValidationResult.Error(errors)
+            ModelValidationResult.Error(errors)
         }
     }
     
@@ -268,11 +268,11 @@ enum class ModelType(val displayName: String, val defaultBaseUrl: String) {
  * 验证结果
  */
 @Serializable
-sealed class ValidationResult {
+sealed class ModelValidationResult {
     @Serializable
-    object Success : ValidationResult()
+    object Success : ModelValidationResult()
     @Serializable
-    data class Error(val errors: List<String>) : ValidationResult()
+    data class Error(val errors: List<String>) : ModelValidationResult()
     
     val isValid: Boolean
         get() = this is Success

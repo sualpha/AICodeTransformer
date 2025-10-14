@@ -1,28 +1,19 @@
 package cn.suso.aicodetransformer.service.impl
 
-import cn.suso.aicodetransformer.model.ExecutionResult
-import cn.suso.aicodetransformer.model.ErrorType
-import cn.suso.aicodetransformer.model.ModelConfiguration
-import cn.suso.aicodetransformer.model.ModelType
+import cn.suso.aicodetransformer.constants.SecurityEvent
+import cn.suso.aicodetransformer.constants.RequestStatusConstants
+import cn.suso.aicodetransformer.model.*
 import cn.suso.aicodetransformer.service.AIModelService
 import cn.suso.aicodetransformer.service.CacheService
 import cn.suso.aicodetransformer.service.ConfigurationService
-import cn.suso.aicodetransformer.service.ErrorContext
 import cn.suso.aicodetransformer.service.ErrorHandlingService
-import cn.suso.aicodetransformer.service.ModelInfo
 import cn.suso.aicodetransformer.service.LoggingService
 import cn.suso.aicodetransformer.service.PerformanceMonitorService
-import cn.suso.aicodetransformer.service.PerformanceTracker
 import cn.suso.aicodetransformer.service.RateLimitService
-import cn.suso.aicodetransformer.service.SecurityEvent
-import cn.suso.aicodetransformer.service.UserAction
-import cn.suso.aicodetransformer.service.RequestConfig
 import cn.suso.aicodetransformer.service.RequestListener
-import cn.suso.aicodetransformer.service.RequestStatus
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -33,10 +24,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicLong
@@ -361,14 +349,14 @@ class AIModelServiceImpl : AIModelService {
         return (text.length / 4).coerceAtLeast(1)
     }
     
-    override fun getRequestStatus(requestId: String): RequestStatus? {
+    override fun getRequestStatus(requestId: String): RequestStatusConstants? {
         val job = activeRequests[requestId]
         return when {
             job == null -> null
-            job.isCancelled -> RequestStatus.CANCELLED
-            job.isCompleted -> RequestStatus.COMPLETED
-            job.isActive -> RequestStatus.RUNNING
-            else -> RequestStatus.PENDING
+            job.isCancelled -> RequestStatusConstants.CANCELLED
+            job.isCompleted -> RequestStatusConstants.COMPLETED
+            job.isActive -> RequestStatusConstants.RUNNING
+            else -> RequestStatusConstants.PENDING
         }
     }
     
@@ -848,73 +836,3 @@ class AIModelServiceImpl : AIModelService {
         httpClient.close()
     }
 }
-
-// OpenAI API数据类
-@Serializable
-data class OpenAIRequest(
-    val model: String,
-    val messages: List<OpenAIMessage>,
-    @SerialName("max_tokens") val maxTokens: Int? = null,
-    val temperature: Double? = null,
-    val stream: Boolean = false
-)
-
-@Serializable
-data class OpenAIMessage(
-    val role: String,
-    val content: String? = null
-)
-
-@Serializable
-data class OpenAIResponse(
-    val choices: List<OpenAIChoice>
-)
-
-@Serializable
-data class OpenAIChoice(
-    val message: OpenAIMessage
-)
-
-// Claude API数据类
-@Serializable
-data class ClaudeRequest(
-    val model: String,
-    @SerialName("max_tokens") val maxTokens: Int,
-    val messages: List<ClaudeMessage>
-)
-
-@Serializable
-data class ClaudeMessage(
-    val role: String,
-    val content: String
-)
-
-@Serializable
-data class ClaudeResponse(
-    val content: List<ClaudeContent>
-)
-
-@Serializable
-data class ClaudeContent(
-    val text: String
-)
-
-// 本地模型API数据类
-@Serializable
-data class LocalModelRequest(
-    val model: String,
-    val prompt: String,
-    val stream: Boolean = false,
-    val options: LocalModelOptions
-)
-
-@Serializable
-data class LocalModelOptions(
-    val temperature: Double,
-    @SerialName("num_predict") val numPredict: Int
-)
-
-@Serializable
-data class LocalModelResponse(
-    val response: String
-)

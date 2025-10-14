@@ -1,5 +1,10 @@
 package cn.suso.aicodetransformer.service
 
+import cn.suso.aicodetransformer.constants.ExecutionStatus
+import cn.suso.aicodetransformer.constants.NotificationType
+import cn.suso.aicodetransformer.constants.BalloonType
+import cn.suso.aicodetransformer.model.NotificationAction
+import cn.suso.aicodetransformer.model.StatusInfo
 import com.intellij.openapi.project.Project
 
 /**
@@ -141,55 +146,7 @@ interface StatusService {
     fun removeStatusListener(listener: StatusListener)
 }
 
-/**
- * 通知类型枚举
- */
-enum class NotificationType {
-    INFORMATION,
-    WARNING,
-    ERROR,
-    SUCCESS
-}
 
-/**
- * 气球提示类型枚举
- */
-enum class BalloonType {
-    INFO,
-    WARNING,
-    ERROR,
-    SUCCESS
-}
-
-/**
- * 通知操作
- */
-data class NotificationAction(
-    val text: String,
-    val action: () -> Unit
-)
-
-/**
- * 状态信息
- */
-data class StatusInfo(
-    val message: String?,
-    val isProgressVisible: Boolean,
-    val progressMessage: String?,
-    val progressValue: Int,
-    val activeExecutions: Map<String, ExecutionStatusInfo>
-)
-
-/**
- * 执行状态信息
- */
-data class ExecutionStatusInfo(
-    val executionId: String,
-    val status: ExecutionStatus,
-    val message: String,
-    val progress: Int,
-    val startTime: Long
-)
 
 /**
  * 状态监听器接口

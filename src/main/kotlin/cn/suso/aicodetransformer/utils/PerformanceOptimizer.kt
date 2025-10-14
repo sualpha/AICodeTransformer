@@ -1,6 +1,11 @@
 package cn.suso.aicodetransformer.utils
 
 import cn.suso.aicodetransformer.service.*
+import cn.suso.aicodetransformer.model.CacheStats
+import cn.suso.aicodetransformer.model.OptimizationSuggestion
+import cn.suso.aicodetransformer.model.PerformanceStats
+import cn.suso.aicodetransformer.constants.DifficultyLevel
+import cn.suso.aicodetransformer.constants.ImpactLevel
 import cn.suso.aicodetransformer.service.impl.PerformanceOptimizationServiceImpl
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -51,7 +56,7 @@ class PerformanceOptimizer(private val project: Project) {
                     it.impact == ImpactLevel.HIGH && it.difficulty == DifficultyLevel.EASY 
                 }
                 
-                highImpactSuggestions.forEach { suggestion ->
+                highImpactSuggestions.forEach { suggestion: OptimizationSuggestion ->
                     try {
                         suggestion.action.invoke()
                         logger.info("已应用优化建议: ${suggestion.title}")

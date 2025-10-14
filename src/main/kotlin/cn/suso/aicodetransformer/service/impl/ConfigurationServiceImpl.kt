@@ -1,6 +1,9 @@
 package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.model.ModelConfiguration
+import cn.suso.aicodetransformer.model.ConfigurationState
+import cn.suso.aicodetransformer.model.GlobalSettings
+import cn.suso.aicodetransformer.model.LoggingConfigState
 import cn.suso.aicodetransformer.service.ConfigurationChangeListener
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.service.ErrorHandlingService
@@ -31,7 +34,7 @@ import kotlin.concurrent.write
     name = "AICodeTransformerConfiguration",
     storages = [Storage("aicodetransformer-config.xml")]
 )
-class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<ConfigurationServiceImpl.State> {
+class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<ConfigurationState> {
     
     companion object {
         private const val SERVICE_NAME = "AICodeTransformer"
@@ -50,95 +53,15 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
     
     private val errorHandlingService: ErrorHandlingService = service()
     private val listeners = CopyOnWriteArrayList<ConfigurationChangeListener>()
-    private var state = State()
+    private var state = ConfigurationState()
     private val lock = ReentrantReadWriteLock()
     private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
     
-    /**
-     * 持久化状态数据类
-     */
-    @kotlinx.serialization.Serializable
-    @com.intellij.util.xmlb.annotations.Tag("State")
-    data class State(
-        var modelConfigurations: MutableList<ModelConfiguration> = mutableListOf(),
-        @com.intellij.util.xmlb.annotations.Attribute("defaultModelConfigId")
-        var defaultModelConfigId: String? = null,
-        @com.intellij.util.xmlb.annotations.Attribute("autoBackupEnabled")
-        var autoBackupEnabled: Boolean = true,
-        @com.intellij.util.xmlb.annotations.Attribute("maxBackupFiles")
-        var maxBackupFiles: Int = MAX_BACKUP_FILES,
-        @com.intellij.util.xmlb.annotations.Attribute("lastBackupTime")
-        var lastBackupTime: String? = null,
-        @com.intellij.util.xmlb.annotations.Attribute("configVersion")
-        var configVersion: String = "1.0",
-        var globalSettings: GlobalSettings = GlobalSettings(),
-        var loggingConfig: LoggingConfigState = LoggingConfigState()
-    )
 
-    /**
-     * 全局设置
-     */
-    @kotlinx.serialization.Serializable
-    @com.intellij.util.xmlb.annotations.Tag("GlobalSettings")
-    data class GlobalSettings(
-        @com.intellij.util.xmlb.annotations.Attribute("enableLogging")
-        var enableLogging: Boolean = true,
-        @com.intellij.util.xmlb.annotations.Attribute("logLevel")
-        var logLevel: String = "INFO",
-        @com.intellij.util.xmlb.annotations.Attribute("connectionTimeoutMs")
-        var connectionTimeoutMs: Long = 30000,
-        @com.intellij.util.xmlb.annotations.Attribute("readTimeoutMs")
-        var readTimeoutMs: Long = 60000,
-        @com.intellij.util.xmlb.annotations.Attribute("retryAttempts")
-        var retryAttempts: Int = 3,
-        @com.intellij.util.xmlb.annotations.Attribute("retryDelayMs")
-        var retryDelayMs: Long = 1000,
-        // 更新设置
-        @com.intellij.util.xmlb.annotations.Attribute("enableAutoUpdate")
-        var enableAutoUpdate: Boolean = false,
-        @com.intellij.util.xmlb.annotations.Attribute("updateInterval")
-        var updateInterval: String = "每天一次",
-        @com.intellij.util.xmlb.annotations.Attribute("updateCheckIntervalHours")
-        var updateCheckIntervalHours: Int = 24,
-        @com.intellij.util.xmlb.annotations.Attribute("lastUpdateCheckTime")
-        var lastUpdateCheckTime: Long = 0L
-    )
     
-    /**
-     * 日志配置状态
-     */
-    @kotlinx.serialization.Serializable
-    @com.intellij.util.xmlb.annotations.Tag("LoggingConfigState")
-    data class LoggingConfigState(
-        @com.intellij.util.xmlb.annotations.Attribute("enabled")
-        var enabled: Boolean = true,
-        @com.intellij.util.xmlb.annotations.Attribute("minLevel")
-        var minLevel: String = "INFO",
-        @com.intellij.util.xmlb.annotations.Attribute("logToFile")
-        var logToFile: Boolean = true,
-        @com.intellij.util.xmlb.annotations.Attribute("logToConsole")
-        var logToConsole: Boolean = true,
-        @com.intellij.util.xmlb.annotations.Attribute("logFilePath")
-        var logFilePath: String = "logs/application.log",
-        @com.intellij.util.xmlb.annotations.Attribute("maxFileSize")
-        var maxFileSize: Long = 10485760, // 10MB
-        @com.intellij.util.xmlb.annotations.Attribute("maxFileCount")
-        var maxFileCount: Int = 10,
-        @com.intellij.util.xmlb.annotations.Attribute("retentionTimeMs")
-        var retentionTimeMs: Long = 604800000, // 7天
-        @com.intellij.util.xmlb.annotations.Attribute("enablePerformanceLogging")
-        var enablePerformanceLogging: Boolean = true,
-        @com.intellij.util.xmlb.annotations.Attribute("enableSecurityLogging")
-        var enableSecurityLogging: Boolean = true,
-        @com.intellij.util.xmlb.annotations.Attribute("logSensitiveData")
-        var logSensitiveData: Boolean = false,
-        @com.intellij.util.xmlb.annotations.Attribute("logFormat")
-        var logFormat: String = "JSON"
-    )
+    override fun getState(): ConfigurationState = lock.read { state }
     
-    override fun getState(): State = lock.read { state }
-    
-    override fun loadState(state: State) {
+    override fun loadState(state: ConfigurationState) {
         lock.write {
             this.state = state
             logger.info("Configuration state loaded with ${state.modelConfigurations.size} configurations")

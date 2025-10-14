@@ -2,6 +2,8 @@ package cn.suso.aicodetransformer.service
 
 import cn.suso.aicodetransformer.model.ExecutionResult
 import cn.suso.aicodetransformer.model.PromptTemplate
+import cn.suso.aicodetransformer.model.ExecutionContext
+import cn.suso.aicodetransformer.constants.ExecutionStatus
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 
@@ -94,16 +96,7 @@ interface ExecutionService {
     fun cleanup()
 }
 
-/**
- * 执行状态枚举
- */
-enum class ExecutionStatus {
-    PENDING,        // 等待执行
-    RUNNING,        // 正在执行
-    COMPLETED,      // 执行完成
-    FAILED,         // 执行失败
-    CANCELLED       // 已取消
-}
+
 
 /**
  * 执行监听器接口
@@ -144,24 +137,3 @@ interface ExecutionListener {
      */
     fun onExecutionCancelled(templateId: String)
 }
-
-/**
- * 执行上下文
- */
-data class ExecutionContext(
-    val executionId: String,
-    val template: PromptTemplate,
-    val templateName: String,
-    val selectedText: String,
-    val project: Project?,
-    val editor: Editor? = null,
-    val startTime: Long = System.currentTimeMillis(),
-    var status: ExecutionStatus = ExecutionStatus.PENDING,
-    var progress: Int = 0,
-    var progressMessage: String = "",
-    var result: ExecutionResult? = null,
-    var error: String? = null,
-    // 保存选中文本的位置信息，用于后续替换
-    val selectionStartOffset: Int = -1,
-    val selectionEndOffset: Int = -1
-)

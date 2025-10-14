@@ -1,7 +1,12 @@
 package cn.suso.aicodetransformer.service
 
+import cn.suso.aicodetransformer.model.ErrorContext
+import cn.suso.aicodetransformer.model.ErrorHandlingResult
+import cn.suso.aicodetransformer.model.RetryConfig
+import cn.suso.aicodetransformer.model.RetryResult
+import cn.suso.aicodetransformer.model.ErrorSuggestion
+import cn.suso.aicodetransformer.constants.ErrorSeverity
 import com.intellij.openapi.project.Project
-import kotlinx.serialization.Serializable
 
 /**
  * 错误处理服务接口
@@ -138,90 +143,6 @@ interface ErrorHandlingService {
      * @param listener 监听器
      */
     fun removeErrorListener(listener: ErrorListener)
-}
-
-/**
- * 错误上下文
- */
-@Serializable
-data class ErrorContext(
-    val operation: String,
-    val component: String,
-    val additionalInfo: Map<String, String> = emptyMap(),
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-/**
- * 错误处理结果
- */
-data class ErrorHandlingResult(
-    val handled: Boolean,
-    val userMessage: String,
-    val suggestions: List<ErrorSuggestion> = emptyList(),
-    val shouldRetry: Boolean = false,
-    val shouldShowNotification: Boolean = true,
-    val logLevel: ErrorSeverity = ErrorSeverity.ERROR
-)
-
-/**
- * 重试配置
- */
-data class RetryConfig(
-    val maxAttempts: Int = 3,
-    val initialDelayMs: Long = 1000,
-    val maxDelayMs: Long = 10000,
-    val backoffMultiplier: Double = 2.0,
-    val retryableExceptions: Set<Class<out Throwable>> = setOf(
-        java.net.SocketTimeoutException::class.java,
-        java.net.ConnectException::class.java,
-        java.io.IOException::class.java
-    )
-)
-
-/**
- * 重试结果
- */
-data class RetryResult<T>(
-    val success: Boolean,
-    val result: T? = null,
-    val exception: Throwable? = null,
-    val attempts: Int = 0,
-    val totalDuration: Long = 0
-)
-
-/**
- * 错误建议
- */
-data class ErrorSuggestion(
-    val title: String,
-    val description: String,
-    val action: (() -> Unit)? = null,
-    val actionText: String? = null
-)
-
-/**
- * 错误严重程度
- */
-enum class ErrorSeverity {
-    DEBUG,
-    INFO,
-    WARNING,
-    ERROR,
-    FATAL
-}
-
-/**
- * 错误类型
- */
-enum class ErrorType {
-    NETWORK,
-    CONFIGURATION,
-    MODEL,
-    CODE_REPLACEMENT,
-    VALIDATION,
-    AUTHENTICATION,
-    PERMISSION,
-    UNKNOWN
 }
 
 /**

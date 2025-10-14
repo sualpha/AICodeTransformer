@@ -2,6 +2,11 @@ package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.model.ExecutionResult
 import cn.suso.aicodetransformer.model.ModelConfiguration
+import cn.suso.aicodetransformer.model.PerformanceStats
+import cn.suso.aicodetransformer.model.RealTimeMetrics
+import cn.suso.aicodetransformer.model.MonitorConfig
+import cn.suso.aicodetransformer.model.PerformanceRecord
+import cn.suso.aicodetransformer.constants.PerformanceConstants.LoadStatus
 import cn.suso.aicodetransformer.service.*
 import com.intellij.openapi.Disposable
 import org.slf4j.LoggerFactory
@@ -10,8 +15,6 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * 性能监控服务实现
@@ -280,16 +283,16 @@ class PerformanceMonitorServiceImpl : PerformanceMonitorService, Disposable {
         
         return when {
             qps >= thresholds.qpsCritical || avgResponseTime >= thresholds.responseTimeCritical || successRate <= (1.0 - thresholds.errorRateCritical) -> {
-                LoadStatus.OVERLOAD
+                LoadStatus.OVERLOADED
             }
             qps >= thresholds.qpsWarning || avgResponseTime >= thresholds.responseTimeWarning || successRate <= (1.0 - thresholds.errorRateWarning) -> {
-                LoadStatus.HIGH
+                LoadStatus.BUSY
             }
             qps > 0 && avgResponseTime > 0 -> {
                 LoadStatus.NORMAL
             }
             else -> {
-                LoadStatus.LOW
+                LoadStatus.IDLE
             }
         }
     }
@@ -345,24 +348,3 @@ private class NoOpPerformanceTracker(override val requestId: String) : Performan
     override fun recordNetworkLatency(latencyMs: Long) {}
     override fun addMetric(key: String, value: Any) {}
 }
-
-/**
- * 性能记录数据类
- */
-private data class PerformanceRecord(
-    val requestId: String,
-    val modelConfigId: String,
-    val modelName: String,
-    val startTime: Long,
-    val endTime: Long,
-    val responseTime: Long,
-    val success: Boolean,
-    val errorType: String?,
-    val promptLength: Int,
-    val responseLength: Int,
-    val tokensUsed: Int,
-    val cacheHit: Boolean,
-    val rateLimited: Boolean,
-    val networkLatency: Long?,
-    val customMetrics: Map<String, Any>
-)

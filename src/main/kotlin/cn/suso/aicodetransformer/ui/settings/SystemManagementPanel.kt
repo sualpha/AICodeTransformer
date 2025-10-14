@@ -1,12 +1,12 @@
 package cn.suso.aicodetransformer.ui.settings
 
+import cn.suso.aicodetransformer.constants.UpdateStatus
+import cn.suso.aicodetransformer.model.UpdateInfo
 import cn.suso.aicodetransformer.service.LoggingService
-import cn.suso.aicodetransformer.service.LogLevel
-import cn.suso.aicodetransformer.service.LoggingConfig
+import cn.suso.aicodetransformer.constants.LogLevel
+import cn.suso.aicodetransformer.model.LoggingConfig
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.service.AutoUpdateService
-import cn.suso.aicodetransformer.service.UpdateStatus
-import cn.suso.aicodetransformer.service.UpdateInfo
 import cn.suso.aicodetransformer.service.UpdateStatusListener
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
@@ -14,8 +14,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.*
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import java.awt.BorderLayout
 import java.awt.Desktop
 import java.awt.FlowLayout
@@ -49,10 +48,17 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private lateinit var updateStatusLabel: JBLabel
     private lateinit var checkUpdateButton: JButton
     private lateinit var downloadUpdateButton: JButton
+    private lateinit var cancelDownloadButton: JButton
     private lateinit var installUpdateButton: JButton
     
     // 当前可用的更新信息
     private var currentUpdateInfo: UpdateInfo? = null
+    
+    // 协程作用域，用于管理后台任务
+    private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    
+    // 当前下载任务的Job
+    private var downloadJob: Job? = null
     
     init {
         setupUI()
@@ -203,7 +209,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         enableAutoUpdateCheckBox.addActionListener { 
             updateIntervalComboBox.isEnabled = enableAutoUpdateCheckBox.isSelected
             if (enableAutoUpdateCheckBox.isSelected) {
-                autoUpdateService.startAutoUpdate()
+                autoUpdateService.startAutoUpdate("timer")
             } else {
                 autoUpdateService.stopAutoUpdate()
             }
@@ -254,6 +260,14 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         
         updateActionPanel.add(Box.createHorizontalStrut(10))
         
+        // 取消下载按钮
+        cancelDownloadButton = JButton("取消下载")
+        cancelDownloadButton.isVisible = false // 初始隐藏
+        cancelDownloadButton.addActionListener { cancelDownloadManually() }
+        updateActionPanel.add(cancelDownloadButton)
+        
+        updateActionPanel.add(Box.createHorizontalStrut(10))
+        
         // 安装更新按钮
         installUpdateButton = JButton("安装更新")
         installUpdateButton.isVisible = false // 初始隐藏
@@ -278,16 +292,19 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                         UpdateStatus.INSTALLING -> "状态：安装中..."
                         UpdateStatus.INSTALLED -> "状态：安装完成"
                         UpdateStatus.UP_TO_DATE -> "状态：已是最新版本"
-                        UpdateStatus.ERROR -> "状态：检查失败"
-                        else -> "状态：未知"
+                        UpdateStatus.ERROR -> "状态：操作失败 - 请重新尝试"
                     }
                     
                     // 控制按钮状态
-                    checkUpdateButton.isEnabled = newStatus == UpdateStatus.IDLE
+                    checkUpdateButton.isEnabled = newStatus == UpdateStatus.IDLE || newStatus == UpdateStatus.ERROR || newStatus == UpdateStatus.UP_TO_DATE
                     
                     // 控制下载按钮
                     downloadUpdateButton.isVisible = newStatus == UpdateStatus.AVAILABLE
                     downloadUpdateButton.isEnabled = newStatus == UpdateStatus.AVAILABLE
+                    
+                    // 控制取消下载按钮
+                    cancelDownloadButton.isVisible = newStatus == UpdateStatus.DOWNLOADING
+                    cancelDownloadButton.isEnabled = newStatus == UpdateStatus.DOWNLOADING
                     
                     // 控制安装按钮
                     installUpdateButton.isVisible = newStatus == UpdateStatus.DOWNLOADED
@@ -432,14 +449,16 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
 
     
     private fun clearLogs() {
-        val result = Messages.showYesNoDialog(
+        val result = Messages.showOkCancelDialog(
             project,
             "确定要清空所有日志吗？此操作不可恢复。",
             "确认清空",
+            "确定",
+            "取消",
             Messages.getQuestionIcon()
         )
         
-        if (result == Messages.YES) {
+        if (result == Messages.OK) {
             try {
                 val logFilePath = getLogFilePath()
                 val logFile = File(logFilePath)
@@ -591,7 +610,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             
             // 根据设置启动或停止自动更新服务
             if (enableAutoUpdateCheckBox.isSelected) {
-                autoUpdateService.startAutoUpdate()
+                autoUpdateService.startAutoUpdate("timer")
             } else {
                 autoUpdateService.stopAutoUpdate()
             }
@@ -635,7 +654,14 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             
             // 设置按钮初始状态
             val currentStatus = autoUpdateService.getUpdateStatus()
-            checkUpdateButton.isEnabled = currentStatus == UpdateStatus.IDLE
+            checkUpdateButton.isEnabled = currentStatus == UpdateStatus.IDLE || currentStatus == UpdateStatus.ERROR || currentStatus == UpdateStatus.UP_TO_DATE
+            
+            // 获取当前更新信息
+            val currentUpdateInfo = autoUpdateService.getCurrentUpdateInfo()
+            if (currentUpdateInfo != null && (currentStatus == UpdateStatus.AVAILABLE || currentStatus == UpdateStatus.DOWNLOADED)) {
+                // 恢复更新信息
+                this.currentUpdateInfo = currentUpdateInfo
+            }
             
             // 设置下载和安装按钮的初始状态
             downloadUpdateButton.isVisible = currentStatus == UpdateStatus.AVAILABLE
@@ -652,14 +678,11 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                 UpdateStatus.INSTALLING -> "状态：安装中..."
                 UpdateStatus.INSTALLED -> "状态：安装完成"
                 UpdateStatus.UP_TO_DATE -> "状态：已是最新版本"
-                UpdateStatus.ERROR -> "状态：检查失败"
-                else -> "状态：未检查"
+                UpdateStatus.ERROR -> "状态：操作失败 - 可重新尝试"
             }
             
-            // 如果启用了自动更新，启动服务
-            if (settings.enableAutoUpdate) {
-                autoUpdateService.startAutoUpdate()
-            }
+            // 注意：不在这里自动启动更新服务
+            // 自动更新服务只应该通过用户手动操作或定时任务触发
             
         } catch (e: Exception) {
             // 如果加载失败，使用默认值
@@ -681,13 +704,39 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         updateStatusLabel.text = "状态：检查中..."
         
         // 使用协程在后台执行更新检查
-        GlobalScope.launch {
+        coroutineScope.launch {
             try {
                 autoUpdateService.checkForUpdates()
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {
-                    updateStatusLabel.text = "状态：检查失败 - ${e.message}"
+                    val errorMessage = when (e) {
+                        is java.net.UnknownHostException -> "网络连接失败，请检查网络连接"
+                        is java.net.SocketTimeoutException -> "连接超时，请稍后重试"
+                        is java.net.ConnectException -> "无法连接到更新服务器"
+                        else -> "检查更新失败: ${e.message}"
+                    }
+                    
+                    updateStatusLabel.text = "状态：检查失败 - $errorMessage"
                     checkUpdateButton.isEnabled = true
+                    
+                    // 显示详细的错误对话框，并提供重试选项
+                    val result = Messages.showOkCancelDialog(
+                        "$errorMessage\n\n解决建议：\n" +
+                        "1. 检查网络连接是否正常\n" +
+                        "2. 确认防火墙未阻止网络访问\n" +
+                        "3. 稍后重试检查更新\n" +
+                        "4. 如问题持续，请联系技术支持\n\n" +
+                        "是否立即重试检查更新？",
+                        "检查更新失败",
+                        "重试",
+                        "取消",
+                        Messages.getQuestionIcon()
+                    )
+                    
+                    // 如果用户选择重试，则重新检查更新
+                    if (result == Messages.OK) {
+                        checkForUpdatesManually()
+                    }
                 }
             }
         }
@@ -707,7 +756,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         updateStatusLabel.text = "状态：准备下载..."
         
         // 使用协程在后台执行下载
-        GlobalScope.launch {
+        downloadJob = coroutineScope.launch {
             try {
                 val success = autoUpdateService.downloadUpdate(updateInfo) { progress ->
                     SwingUtilities.invokeLater {
@@ -718,14 +767,30 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                 if (!success) {
                     SwingUtilities.invokeLater {
                         Messages.showErrorDialog(this@SystemManagementPanel, "下载失败，请检查网络连接", "下载失败")
+                        // 下载失败时，恢复按钮状态，允许用户重新尝试
                         downloadUpdateButton.isEnabled = true
+                        checkUpdateButton.isEnabled = true
+                        updateStatusLabel.text = "状态：下载失败 - 请重新检查更新或重试下载"
                     }
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {
-                    Messages.showErrorDialog(this@SystemManagementPanel, "下载失败: ${e.message}", "下载失败")
+                    val errorMessage = when (e) {
+                        is java.util.concurrent.CancellationException -> "下载已取消"
+                        is java.net.UnknownHostException -> "网络连接失败，请检查网络连接"
+                        is java.net.SocketTimeoutException -> "连接超时，请稍后重试"
+                        is java.net.ConnectException -> "无法连接到下载服务器"
+                        else -> "下载失败: ${e.message}"
+                    }
+                    
+                    Messages.showErrorDialog(this@SystemManagementPanel, errorMessage, "下载失败")
+                    // 下载异常时，恢复按钮状态，允许用户重新尝试
                     downloadUpdateButton.isEnabled = true
+                    checkUpdateButton.isEnabled = true
+                    updateStatusLabel.text = "状态：下载失败 - $errorMessage"
                 }
+            } finally {
+                downloadJob = null
             }
         }
     }
@@ -741,14 +806,16 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         }
         
         // 确认安装对话框
-        val result = Messages.showYesNoDialog(
+        val result = Messages.showOkCancelDialog(
             this,
             "确定要安装更新到版本 ${updateInfo.version} 吗？\n安装完成后需要重启 IntelliJ IDEA。",
             "确认安装更新",
+            "安装",
+            "取消",
             Messages.getQuestionIcon()
         )
         
-        if (result != Messages.YES) {
+        if (result != Messages.OK) {
             return
         }
         
@@ -756,7 +823,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         updateStatusLabel.text = "状态：准备安装..."
         
         // 使用协程在后台执行安装
-        GlobalScope.launch {
+        coroutineScope.launch {
             try {
                 val success = autoUpdateService.installUpdate(updateInfo)
                 
@@ -779,5 +846,67 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                 }
             }
         }
+    }
+    
+    /**
+     * 取消下载更新
+     */
+    private fun cancelDownloadManually() {
+        try {
+            // 取消UI层的下载协程
+            downloadJob?.let { job ->
+                if (job.isActive) {
+                    job.cancel()
+                }
+            }
+            downloadJob = null
+            
+            // 取消服务层的下载任务
+            val success = autoUpdateService.cancelDownload()
+            
+            // 重置UI状态
+            SwingUtilities.invokeLater {
+                downloadUpdateButton.isEnabled = true
+                checkUpdateButton.isEnabled = true
+                updateStatusLabel.text = "状态：下载已取消 - 可重新尝试"
+            }
+            
+            if (success) {
+                Messages.showInfoMessage(
+                    this,
+                    "下载已取消",
+                    "取消下载"
+                )
+            } else {
+                Messages.showWarningDialog(
+                    this,
+                    "没有正在进行的下载任务",
+                    "取消下载"
+                )
+            }
+        } catch (e: Exception) {
+            Messages.showErrorDialog(
+                this,
+                "取消下载失败: ${e.message}",
+                "取消下载失败"
+            )
+        }
+    }
+    
+    /**
+     * 清理资源，取消所有正在运行的协程
+     */
+    fun dispose() {
+        // 如果有正在进行的下载，先取消下载
+        downloadJob?.let { job ->
+            if (job.isActive) {
+                job.cancel()
+                // 取消下载操作
+                autoUpdateService.cancelDownload()
+            }
+        }
+        
+        // 取消所有协程
+        coroutineScope.cancel()
     }
 }

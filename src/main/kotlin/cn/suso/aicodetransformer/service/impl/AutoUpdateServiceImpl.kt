@@ -1,15 +1,24 @@
 package cn.suso.aicodetransformer.service.impl
 
+import cn.suso.aicodetransformer.constants.DownloadState
+import cn.suso.aicodetransformer.constants.UpdateRecordStatusConstants
+import cn.suso.aicodetransformer.constants.UpdateStatus
+import cn.suso.aicodetransformer.model.BackupInfo
+import cn.suso.aicodetransformer.model.UpdateInfo
+import cn.suso.aicodetransformer.model.UpdateRecord
 import cn.suso.aicodetransformer.service.*
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.net.ConnectException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.net.URL
 import java.security.MessageDigest
 import java.time.LocalDateTime
@@ -25,7 +34,6 @@ import java.util.concurrent.atomic.AtomicLong
 class AutoUpdateServiceImpl : AutoUpdateService {
     
     companion object {
-        private val logger = Logger.getInstance(AutoUpdateServiceImpl::class.java)
         private const val UPDATE_CHECK_URL = "https://api.github.com/repos/sualpha/AICodeTransformer/releases/latest"
         private const val CURRENT_VERSION = "1.0.0" // 从插件配置中读取
         private const val UPDATE_HISTORY_FILE = "update_history.json"
@@ -33,6 +41,9 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     
     private val configurationService: ConfigurationService = service()
     private val loggingService: LoggingService = service()
+    
+    // Logger instance for this service
+    private val logger = com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java)
     private val json = Json { 
         prettyPrint = true
         ignoreUnknownKeys = true
@@ -40,10 +51,86 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     }
     
     private var currentStatus = UpdateStatus.IDLE
+    private var currentUpdateInfo: UpdateInfo? = null
     private val listeners = CopyOnWriteArrayList<UpdateStatusListener>()
     private var updateJob: Job? = null
+    private var downloadJob: Job? = null
     private val updateScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var updateTimer: Timer? = null
+    
+    /**
+     * 统一的网络异常处理方法
+     */
+    private fun handleNetworkException(e: Exception, operation: String): String {
+        return when (e) {
+            is SocketTimeoutException -> {
+                logger.error("${operation}超时", e)
+                "${operation}超时，请检查网络连接"
+            }
+            is UnknownHostException -> {
+                logger.error("${operation}失败：无法解析主机", e)
+                "${operation}失败：无法连接到服务器，请检查网络连接"
+            }
+            is ConnectException -> {
+                logger.error("${operation}失败：连接被拒绝", e)
+                "${operation}失败：无法连接到服务器"
+            }
+            is IOException -> {
+                logger.error("${operation}失败：IO异常", e)
+                "${operation}失败：网络IO错误"
+            }
+            else -> {
+                logger.error("${operation}失败：未知错误", e)
+                "${operation}失败：${e.message ?: "未知错误"}"
+            }
+        }
+    }
+    
+    /**
+     * 统一的日志记录工具方法
+     */
+    private fun logOperationStart(operation: String, details: String = "") {
+        val message = if (details.isNotEmpty()) "$operation - $details" else operation
+        logger.info("开始$message")
+    }
+    
+    private fun logOperationSuccess(operation: String, details: String = "") {
+        val message = if (details.isNotEmpty()) "$operation - $details" else operation
+        logger.info("${message}成功")
+    }
+    
+    private fun logOperationError(operation: String, error: String, exception: Exception? = null) {
+        val message = "$operation 失败: $error"
+        if (exception != null) {
+            logger.error(message, exception)
+        } else {
+            logger.error(message)
+        }
+    }
+    
+    // 防重复下载机制
+    private var isDownloading = false
+    private var isAutoUpdateRunning = false
+    private var currentDownloadFile: File? = null
+    private var downloadStartTime: Long = 0
+    private val downloadLock = Any()
+    
+    // 下载进度监控
+    @Volatile
+    private var lastProgressTime: Long = 0
+    @Volatile
+    private var lastProgressBytes: Long = 0
+    @Volatile
+    private var currentProgressBytes: Long = 0
+    @Volatile
+    private var totalBytes: Long = 0
+    private val progressMonitoringInterval = 5000L // 5秒检查一次进度
+    private val downloadStuckThreshold = 30000L // 30秒无进度视为卡住
+    
+
+    
+    @Volatile
+    private var currentDownloadState = DownloadState.IDLE
     
     init {
         logger.info("AutoUpdateService 初始化完成")
@@ -92,11 +179,25 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     
     override suspend fun downloadUpdate(updateInfo: UpdateInfo, onProgress: (Int) -> Unit): Boolean {
         return withContext(Dispatchers.IO) {
+            // 保存当前下载协程的Job
+            downloadJob = coroutineContext[Job]
+            // 防重复下载检查
+            synchronized(downloadLock) {
+                if (isDownloading) {
+                    logger.warn("下载已在进行中，跳过重复下载请求")
+                    loggingService.logInfo("下载已在进行中，跳过重复下载请求", "自动更新")
+                    return@withContext false
+                }
+                updateDownloadState(DownloadState.PREPARING, "开始准备下载")
+                downloadStartTime = System.currentTimeMillis()
+            }
+            
             try {
                 updateStatus(UpdateStatus.DOWNLOADING, updateInfo)
                 notifyProgress(0, "开始下载更新...")
                 
                 logger.info("开始下载更新: ${updateInfo.version}")
+                loggingService.logInfo("开始下载更新: ${updateInfo.version}", "自动更新")
                 
                 val downloadDir = File(System.getProperty("java.io.tmpdir"), "aicodetransformer_updates")
                 if (!downloadDir.exists()) {
@@ -112,6 +213,9 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 }
                 val fileName = "aicodetransformer-${updateInfo.version}$fileExtension"
                 val downloadFile = File(downloadDir, fileName)
+                
+                // 设置当前下载文件
+                currentDownloadFile = downloadFile
                 
                 // 检查是否已存在完整的下载文件
                 if (downloadFile.exists()) {
@@ -129,39 +233,53 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     }
                 }
                 
+                // 启动进度监控
+                val progressMonitorJob = startProgressMonitoring()
+                
+                // 更新状态为下载中
+                updateDownloadState(DownloadState.DOWNLOADING, "开始下载文件")
+                
                 // 下载文件
                 val success = downloadFileWithResume(updateInfo.downloadUrl, downloadFile) { progress ->
                     onProgress(progress)
-                    notifyProgress(progress, "下载中... $progress%")
                 }
                 
+                // 停止进度监控
+                progressMonitorJob.cancel()
+                
                 if (success) {
-                    // 验证文件校验和（如果提供了校验和）
-                    if (updateInfo.checksum.isNotEmpty()) {
-                        val fileChecksum = calculateChecksum(downloadFile)
-                        if (fileChecksum == updateInfo.checksum) {
-                            updateStatus(UpdateStatus.DOWNLOADED, updateInfo)
-                            notifyProgress(100, "下载完成")
-                            logger.info("更新下载完成: ${downloadFile.absolutePath}")
-                            loggingService.logInfo("更新下载完成: ${downloadFile.absolutePath}", "自动更新")
-                            true
-                        } else {
-                            logger.error("文件校验和不匹配")
-                            loggingService.logError(Exception("文件校验和不匹配"), "自动更新")
-                            updateStatus(UpdateStatus.ERROR)
-                            notifyError("文件校验和不匹配")
-                            downloadFile.delete()
-                            false
-                        }
-                    } else {
-                        // 没有校验和，直接认为下载成功
+                    // 更新状态为校验中
+                    updateDownloadState(DownloadState.VERIFYING, "验证文件完整性")
+                    notifyProgress(90, "验证文件完整性...")
+                    val verificationResult = verifyFileIntegrity(downloadFile, updateInfo.checksum)
+                    
+                    if (verificationResult) {
+                        updateDownloadState(DownloadState.COMPLETED, "下载并校验完成")
                         updateStatus(UpdateStatus.DOWNLOADED, updateInfo)
                         notifyProgress(100, "下载完成")
                         logger.info("更新下载完成: ${downloadFile.absolutePath}")
                         loggingService.logInfo("更新下载完成: ${downloadFile.absolutePath}", "自动更新")
                         true
+                    } else {
+                        updateDownloadState(DownloadState.FAILED, "文件完整性校验失败")
+                        logger.error("文件完整性校验失败")
+                        loggingService.logError(Exception("文件完整性校验失败"), "自动更新")
+                        updateStatus(UpdateStatus.ERROR)
+                        notifyError("文件完整性校验失败，请重试下载")
+                        
+                        // 删除校验失败的文件
+                        try {
+                            if (downloadFile.exists()) {
+                                downloadFile.delete()
+                                logger.info("已删除校验失败的文件: ${downloadFile.name}")
+                            }
+                        } catch (e: Exception) {
+                            logger.warn("删除校验失败的文件时出错", e)
+                        }
+                         false
                     }
                 } else {
+                    updateDownloadState(DownloadState.FAILED, "下载失败")
                     updateStatus(UpdateStatus.ERROR)
                     val errorMsg = "下载失败，请检查网络连接或稍后重试"
                     logger.error(errorMsg)
@@ -171,6 +289,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 }
                 
             } catch (e: java.net.UnknownHostException) {
+                updateDownloadState(DownloadState.FAILED, "网络连接失败")
                 val errorMsg = "网络连接失败，无法连接到下载服务器"
                 logger.error(errorMsg, e)
                 loggingService.logError(e, "网络连接失败")
@@ -178,6 +297,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 notifyError("$errorMsg: ${e.message}")
                 false
             } catch (e: java.net.SocketTimeoutException) {
+                updateDownloadState(DownloadState.FAILED, "下载超时")
                 val errorMsg = "下载超时，请检查网络连接"
                 logger.error(errorMsg, e)
                 loggingService.logError(e, "下载超时")
@@ -185,6 +305,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 notifyError("$errorMsg: ${e.message}")
                 false
             } catch (e: java.io.IOException) {
+                updateDownloadState(DownloadState.FAILED, "文件操作失败")
                 val errorMsg = "文件操作失败"
                 logger.error(errorMsg, e)
                 loggingService.logError(e, "文件操作失败")
@@ -192,12 +313,26 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 notifyError("$errorMsg: ${e.message}")
                 false
             } catch (e: Exception) {
+                updateDownloadState(DownloadState.FAILED, "下载异常")
                 val errorMsg = "下载更新失败"
                 logger.error(errorMsg, e)
                 loggingService.logError(e, "下载更新失败")
                 updateStatus(UpdateStatus.ERROR)
                 notifyError("$errorMsg: ${e.message}")
                 false
+            } finally {
+                // 清理下载状态
+                synchronized(downloadLock) {
+                    // 如果状态不是已完成，则重置为空闲
+                    if (currentDownloadState != DownloadState.COMPLETED) {
+                        updateDownloadState(DownloadState.IDLE, "下载任务结束")
+                    }
+                    val downloadDuration = System.currentTimeMillis() - downloadStartTime
+                    logger.info("下载任务结束，耗时: ${downloadDuration}ms")
+                    loggingService.logInfo("下载任务结束，耗时: ${downloadDuration}ms", "自动更新")
+                }
+                // 清理下载Job
+                downloadJob = null
             }
         }
     }
@@ -212,8 +347,16 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 
                 // 1. 查找下载的更新文件
                 val downloadDir = File(System.getProperty("java.io.tmpdir"), "aicodetransformer_updates")
-                val fileName = "aicodetransformer-${updateInfo.version}.jar"
-                val downloadedFile = File(downloadDir, fileName)
+                
+                // 支持.jar和.zip文件，与下载逻辑保持一致
+                val urlFileName = updateInfo.downloadUrl.substringAfterLast("/")
+                val fileExtension = when {
+                    urlFileName.endsWith(".jar") -> ".jar"
+                    urlFileName.endsWith(".zip") -> ".zip"
+                    else -> ".jar" // 默认为jar
+                }
+                val fileNameTemp = "aicodetransformer-${updateInfo.version}$fileExtension"
+                val downloadedFile = File(downloadDir, fileNameTemp)
                 
                 if (!downloadedFile.exists()) {
                     throw Exception("更新文件不存在: ${downloadedFile.absolutePath}")
@@ -266,7 +409,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     notifyProgress(80, "验证安装...")
                     
                     // 6. 验证安装是否成功
-                    if (!verifyInstallation(currentPluginPath, updateInfo)) {
+                    if (!verifyInstallation(currentPluginPath)) {
                         throw Exception("安装验证失败")
                     }
                     
@@ -276,7 +419,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     downloadedFile.delete()
                     
                     // 8. 记录更新历史
-                    recordUpdateHistory(updateInfo, UpdateRecordStatus.SUCCESS)
+                    recordUpdateHistory(updateInfo, UpdateRecordStatusConstants.SUCCESS)
                     
                     updateStatus(UpdateStatus.INSTALLED, updateInfo)
                     notifyProgress(100, "安装完成")
@@ -303,7 +446,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             } catch (e: Exception) {
                 logger.error("安装更新失败", e)
                 loggingService.logError(e, "安装更新失败")
-                recordUpdateHistory(updateInfo, UpdateRecordStatus.FAILED, e.message)
+                recordUpdateHistory(updateInfo, UpdateRecordStatusConstants.FAILED, e.message)
                 updateStatus(UpdateStatus.ERROR)
                 notifyError("安装失败: ${e.message}")
                 false
@@ -324,8 +467,16 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 
                 // 1. 查找下载的更新文件
                 val downloadDir = File(System.getProperty("java.io.tmpdir"), "aicodetransformer_updates")
-                val fileName = "aicodetransformer-${updateInfo.version}.jar"
-                val downloadedFile = File(downloadDir, fileName)
+                
+                // 支持.jar和.zip文件，与下载逻辑保持一致
+                val urlFileName = updateInfo.downloadUrl.substringAfterLast("/")
+                val fileExtension = when {
+                    urlFileName.endsWith(".jar") -> ".jar"
+                    urlFileName.endsWith(".zip") -> ".zip"
+                    else -> ".jar" // 默认为jar
+                }
+                val fileNameTemp = "aicodetransformer-${updateInfo.version}$fileExtension"
+                val downloadedFile = File(downloadDir, fileNameTemp)
                 
                 if (!downloadedFile.exists()) {
                     throw Exception("更新文件不存在: ${downloadedFile.absolutePath}")
@@ -374,7 +525,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     notifyProgress(80, "验证安装...")
                     
                     // 6. 验证安装是否成功
-                    if (!verifyInstallation(currentPluginPath, updateInfo)) {
+                    if (!verifyInstallation(currentPluginPath)) {
                         throw Exception("安装验证失败")
                     }
                     
@@ -384,7 +535,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     downloadedFile.delete()
                     
                     // 8. 记录更新历史
-                    recordUpdateHistory(updateInfo, UpdateRecordStatus.SUCCESS)
+                    recordUpdateHistory(updateInfo, UpdateRecordStatusConstants.SUCCESS)
                     
                     updateStatus(UpdateStatus.INSTALLED, updateInfo)
                     notifyProgress(100, "安装完成")
@@ -411,7 +562,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             } catch (e: Exception) {
                 logger.error("自动安装更新失败", e)
                 loggingService.logError(e, "自动安装更新失败")
-                recordUpdateHistory(updateInfo, UpdateRecordStatus.FAILED, e.message)
+                recordUpdateHistory(updateInfo, UpdateRecordStatusConstants.FAILED, e.message)
                 updateStatus(UpdateStatus.ERROR)
                 notifyError("自动安装失败: ${e.message}")
                 false
@@ -438,9 +589,11 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         }
     }
     
-    override fun startAutoUpdate() {
+    override fun startAutoUpdate(triggerSource: String) {
         val settings = configurationService.getGlobalSettings()
-        if (settings.enableAutoUpdate) {
+        
+        // 只有在手动启用且触发源为timer时才启动定时任务
+        if (settings.enableAutoUpdate && triggerSource == "timer") {
             val intervalMs = when (settings.updateInterval) {
                 "每小时一次" -> 60 * 60 * 1000L
                 "每天一次" -> 24 * 60 * 60 * 1000L
@@ -455,9 +608,13 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                         performFullAutoUpdate()
                     }
                 }
-            }, 0, intervalMs)
+            }, intervalMs, intervalMs) // 修改：第一次延迟执行，不立即执行
             
-            loggingService.logInfo("自动更新已启动，检查间隔：${settings.updateInterval}")
+            loggingService.logInfo("定时自动更新已启动，检查间隔：${settings.updateInterval}")
+        } else if (triggerSource == "manual") {
+            loggingService.logInfo("手动触发自动更新设置，但不启动定时任务")
+        } else {
+            loggingService.logInfo("自动更新未启用或触发源无效：$triggerSource")
         }
     }
     
@@ -465,8 +622,24 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      * 执行完整的自动更新流程：检查 -> 下载 -> 安装
      */
     private suspend fun performFullAutoUpdate() {
+        // 防重复执行检查
+        synchronized(downloadLock) {
+            if (isAutoUpdateRunning) {
+                logger.warn("自动更新流程已在运行中，跳过本次执行")
+                loggingService.logInfo("自动更新流程已在运行中，跳过本次执行", "自动更新")
+                return
+            }
+            if (isDownloading) {
+                logger.warn("下载任务正在进行中，跳过本次自动更新")
+                loggingService.logInfo("下载任务正在进行中，跳过本次自动更新", "自动更新")
+                return
+            }
+            isAutoUpdateRunning = true
+        }
+        
         try {
             logger.info("开始执行完整的自动更新流程")
+            loggingService.logInfo("开始执行完整的自动更新流程", "自动更新")
             
             // 1. 检查更新
             val updateInfo = checkForUpdates()
@@ -507,6 +680,13 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             loggingService.logError(e, "自动更新流程失败")
             updateStatus(UpdateStatus.ERROR)
             notifyError("自动更新失败: ${e.message}")
+        } finally {
+            // 清理自动更新状态
+            synchronized(downloadLock) {
+                isAutoUpdateRunning = false
+                logger.info("自动更新流程结束")
+                loggingService.logInfo("自动更新流程结束", "自动更新")
+            }
         }
     }
     
@@ -520,6 +700,10 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         return currentStatus
     }
     
+    override fun getCurrentUpdateInfo(): UpdateInfo? {
+        return currentUpdateInfo
+    }
+    
     override fun addStatusListener(listener: UpdateStatusListener) {
         listeners.add(listener)
     }
@@ -531,6 +715,15 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     private fun updateStatus(newStatus: UpdateStatus, updateInfo: UpdateInfo? = null) {
         val oldStatus = currentStatus
         currentStatus = newStatus
+        
+        // 保存更新信息
+        if (updateInfo != null) {
+            currentUpdateInfo = updateInfo
+        } else if (newStatus == UpdateStatus.IDLE || newStatus == UpdateStatus.ERROR) {
+            // 当状态变为IDLE或ERROR时，清除更新信息
+            currentUpdateInfo = null
+        }
+        
         listeners.forEach { listener: UpdateStatusListener ->
             try {
                 listener.onStatusChanged(oldStatus, newStatus, updateInfo)
@@ -561,82 +754,49 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     }
     
     private suspend fun checkRemoteVersion(): UpdateInfo? {
-        var lastException: Exception? = null
-        
-        // 重试机制：最多重试3次
-        repeat(3) { attempt ->
-            try {
-                logger.info("开始检查GitHub最新版本 (尝试 ${attempt + 1}/3)")
-                
-                // 调用GitHub API获取最新版本信息
-                val url = URL(UPDATE_CHECK_URL)
-                val connection = url.openConnection() as HttpURLConnection
-                
-                connection.apply {
-                    requestMethod = "GET"
-                    setRequestProperty("Accept", "application/vnd.github.v3+json")
-                    setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
-                    setRequestProperty("Connection", "close")
-                    connectTimeout = 15000  // 增加到15秒
-                    readTimeout = 30000     // 增加到30秒
+        try {
+            logOperationStart("检查GitHub最新版本")
+            
+            // 调用GitHub API获取最新版本信息
+            val url = URL(UPDATE_CHECK_URL)
+            val connection = url.openConnection() as HttpURLConnection
+            configureGitHubApiConnection(connection)
+            
+            val responseCode = connection.responseCode
+            when (responseCode) {
+                200 -> {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    logger.info("GitHub API响应成功: ${response.take(200)}...")
+                    
+                    // 解析GitHub API响应
+                    val releaseInfo = parseGitHubRelease(response)
+                    if (releaseInfo == null) {
+                        logger.warn("无法解析GitHub API响应")
+                        return null
+                    }
+                    
+                    logOperationSuccess("获取最新版本", releaseInfo.version)
+                    return releaseInfo
                 }
-                
-                val responseCode = connection.responseCode
-                when (responseCode) {
-                    200 -> {
-                        val response = connection.inputStream.bufferedReader().use { it.readText() }
-                        logger.info("GitHub API响应成功: ${response.take(200)}...")
-                        
-                        // 解析GitHub API响应
-                        val releaseInfo = parseGitHubRelease(response)
-                        if (releaseInfo == null) {
-                            logger.warn("无法解析GitHub API响应")
-                            return null
-                        }
-                        
-                        logger.info("获取到最新版本: ${releaseInfo.version}")
-                        return releaseInfo
-                    }
-                    403 -> {
-                        logger.warn("GitHub API访问受限 (403)，可能触发了速率限制")
-                        lastException = Exception("GitHub API访问受限，请稍后重试")
-                    }
-                    404 -> {
-                        logger.error("GitHub仓库或发布版本不存在 (404)")
-                        return null // 404错误不重试
-                    }
-                    else -> {
-                        logger.warn("GitHub API返回错误状态码: $responseCode")
-                        lastException = Exception("GitHub API返回错误状态码: $responseCode")
-                    }
+                403 -> {
+                    logOperationError("GitHub API访问", "访问受限 (403)，可能触发了速率限制")
+                    return null
                 }
-                
-                connection.disconnect()
-                
-            } catch (e: java.net.SocketTimeoutException) {
-                logger.warn("网络连接超时 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("网络连接超时，请检查网络连接")
-            } catch (e: java.net.UnknownHostException) {
-                logger.warn("无法解析域名 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("无法连接到GitHub，请检查网络连接")
-            } catch (e: java.net.ConnectException) {
-                logger.warn("连接被拒绝 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("无法连接到GitHub服务器")
-            } catch (e: Exception) {
-                logger.warn("检查远程版本失败 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = e
+                404 -> {
+                     logOperationError("GitHub API访问", "仓库或发布版本不存在 (404)")
+                     return null
+                 }
+                 else -> {
+                     logOperationError("GitHub API访问", "返回错误状态码: $responseCode")
+                     return null
+                 }
             }
             
-            // 如果不是最后一次尝试，等待后重试
-            if (attempt < 2) {
-                delay(2000L * (attempt + 1)) // 递增延迟：2秒、4秒
-            }
+        } catch (e: Exception) {
+            handleNetworkException(e, "检查远程版本")
+            loggingService.logError(e, "检查远程版本失败")
+            return null
         }
-        
-        // 所有重试都失败了
-        logger.error("检查远程版本失败，已重试3次", lastException)
-        loggingService.logError(lastException ?: Exception("未知错误"), "检查远程版本失败")
-        return null
     }
     
     private fun isNewerVersion(remoteVersion: String, currentVersion: String): Boolean {
@@ -666,12 +826,8 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      * 支持断点续传的下载方法
      */
     private suspend fun downloadFileWithResume(url: String, file: File, onProgress: (Int) -> Unit): Boolean {
-        var lastException: Exception? = null
-        
-        // 重试机制：最多重试3次
-        repeat(3) { attempt ->
-            try {
-                logger.info("开始下载文件 (尝试 ${attempt + 1}/3): ${file.name}")
+        return try {
+            logger.info("开始下载文件: ${file.name}")
                 
                 // 检查是否存在部分下载的文件
                 val tempFile = File(file.parent, "${file.name}.tmp")
@@ -713,37 +869,180 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     tempFile.renameTo(file)
                 }
                 
-                if (success) {
-                    logger.info("文件下载成功: ${file.name}")
-                    return true
-                } else {
-                    lastException = Exception("下载失败，未知原因")
-                }
-                
-            } catch (e: java.net.SocketTimeoutException) {
-                logger.warn("下载超时 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("下载超时，请检查网络连接")
-            } catch (e: java.net.UnknownHostException) {
-                logger.warn("无法解析下载地址 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("无法连接到下载服务器")
-            } catch (e: java.io.IOException) {
-                logger.warn("下载IO错误 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("下载过程中发生IO错误: ${e.message}")
-            } catch (e: Exception) {
-                logger.warn("下载失败 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = e
+            if (success) {
+                logger.info("文件下载成功: ${file.name}")
+                true
+            } else {
+                logger.error("文件下载失败: ${file.name}")
+                false
             }
             
-            // 如果不是最后一次尝试，等待后重试
-            if (attempt < 2) {
-                delay(3000L * (attempt + 1)) // 递增延迟：3秒、6秒
+        } catch (e: java.net.SocketTimeoutException) {
+            logger.error("下载超时: ${e.message}")
+            throw Exception("下载超时，请检查网络连接")
+        } catch (e: java.net.UnknownHostException) {
+            logger.error("无法解析下载地址: ${e.message}")
+            throw Exception("无法连接到下载服务器")
+        } catch (e: java.io.IOException) {
+            logger.error("下载IO错误: ${e.message}")
+            throw Exception("下载过程中发生IO错误: ${e.message}")
+        } catch (e: Exception) {
+            logger.error("下载失败: ${e.message}")
+            throw Exception("下载失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 启动下载进度监控
+     */
+    private fun startProgressMonitoring(): Job {
+        return updateScope.launch {
+            while (isDownloading) {
+                delay(progressMonitoringInterval)
+                
+                val currentTime = System.currentTimeMillis()
+                val timeSinceLastProgress = currentTime - lastProgressTime
+                
+                // 检查是否卡住
+                if (timeSinceLastProgress > downloadStuckThreshold && lastProgressTime > 0) {
+                    logger.warn("下载可能卡住：${timeSinceLastProgress}ms 无进度更新")
+                    loggingService.logInfo("下载可能卡住：${timeSinceLastProgress}ms 无进度更新", "下载监控")
+                    
+                    // 计算下载速度
+                    val bytesDownloaded = currentProgressBytes - lastProgressBytes
+                    val speed = if (timeSinceLastProgress > 0) {
+                        (bytesDownloaded * 1000.0 / timeSinceLastProgress / 1024).toInt() // KB/s
+                    } else 0
+                    
+                    if (speed == 0) {
+                        logger.warn("下载速度为0，可能网络连接有问题")
+                        loggingService.logInfo("下载速度为0，可能网络连接有问题", "下载监控")
+                    }
+                }
+                
+                // 记录当前进度用于下次比较
+                lastProgressBytes = currentProgressBytes
+                lastProgressTime = currentTime
+                
+                // 计算并记录下载统计
+                if (totalBytes > 0) {
+                    val progressPercent = (currentProgressBytes * 100 / totalBytes).toInt()
+                    val downloadDuration = currentTime - downloadStartTime
+                    val avgSpeed = if (downloadDuration > 0) {
+                        (currentProgressBytes * 1000.0 / downloadDuration / 1024).toInt() // KB/s
+                    } else 0
+                    
+                    logger.debug("下载进度: $progressPercent%, 平均速度: ${avgSpeed}KB/s")
+                }
             }
         }
-        
-        // 所有重试都失败了
-        logger.error("文件下载失败，已重试3次: ${file.name}", lastException)
-        return false
     }
+    
+    /**
+     * 更新下载进度
+     */
+    private fun updateDownloadProgress(bytesDownloaded: Long, totalSize: Long) {
+        currentProgressBytes = bytesDownloaded
+        totalBytes = totalSize
+        lastProgressTime = System.currentTimeMillis()
+    }
+    
+    /**
+     * 更新下载状态
+     */
+    private fun updateDownloadState(newState: DownloadState, message: String = "") {
+        val oldState = currentDownloadState
+        currentDownloadState = newState
+        
+        logger.info("下载状态变更: $oldState -> $newState${if (message.isNotEmpty()) " ($message)" else ""}")
+        loggingService.logInfo("下载状态变更: $oldState -> $newState${if (message.isNotEmpty()) " ($message)" else ""}", "下载状态")
+        
+        // 根据状态更新相关标志
+        when (newState) {
+            DownloadState.IDLE -> {
+                isDownloading = false
+                currentDownloadFile = null
+            }
+            DownloadState.PREPARING -> {
+                isDownloading = true
+            }
+            DownloadState.DOWNLOADING -> {
+                isDownloading = true
+            }
+            DownloadState.VERIFYING -> {
+                // 保持下载状态，但标记为校验中
+            }
+            DownloadState.COMPLETED, DownloadState.FAILED, DownloadState.CANCELLED -> {
+                isDownloading = false
+            }
+        }
+    }
+    
+    /**
+      * 获取当前下载状态信息
+      */
+     private fun getDownloadStatusInfo(): String {
+         return when (currentDownloadState) {
+             DownloadState.IDLE -> "空闲"
+             DownloadState.PREPARING -> "准备下载中..."
+             DownloadState.DOWNLOADING -> {
+                 if (totalBytes > 0) {
+                     val progress = (currentProgressBytes * 100 / totalBytes).toInt()
+                     val downloadDuration = System.currentTimeMillis() - downloadStartTime
+                     val speed = if (downloadDuration > 0) {
+                         (currentProgressBytes * 1000.0 / downloadDuration / 1024).toInt()
+                     } else 0
+                     "下载中 $progress% (${speed}KB/s)"
+                 } else {
+                     "下载中..."
+                 }
+             }
+             DownloadState.VERIFYING -> "校验文件完整性..."
+             DownloadState.COMPLETED -> "下载完成"
+             DownloadState.FAILED -> "下载失败"
+             DownloadState.CANCELLED -> "下载已取消"
+         }
+     }
+     
+     /**
+      * 取消当前下载
+      */
+     override fun cancelDownload(): Boolean {
+         return synchronized(downloadLock) {
+             if (isDownloading) {
+                 updateDownloadState(DownloadState.CANCELLED, "用户取消下载")
+                 logger.info("用户取消下载")
+                 loggingService.logInfo("用户取消下载", "自动更新")
+                 
+                 // 取消下载协程
+                 downloadJob?.let { job ->
+                     if (job.isActive) {
+                         job.cancel()
+                         logger.info("已取消下载协程")
+                     }
+                 }
+                 downloadJob = null
+                 
+                 // 清理当前下载文件
+                 currentDownloadFile?.let { file ->
+                     try {
+                         if (file.exists()) {
+                             file.delete()
+                             logger.info("已删除未完成的下载文件: ${file.name}")
+                         }
+                     } catch (e: Exception) {
+                         logger.warn("删除未完成下载文件时出错", e)
+                     }
+                 }
+                 
+                 updateStatus(UpdateStatus.IDLE)
+                 true
+             } else {
+                 logger.warn("没有正在进行的下载任务")
+                 false
+             }
+         }
+     }
     
     /**
      * 单线程断点续传下载
@@ -756,12 +1055,9 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         return try {
             connection = URL(url).openConnection() as HttpURLConnection
             
-            // 配置连接
-            connection.connectTimeout = 60000
-            connection.readTimeout = 120000
-            connection.setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
-            connection.setRequestProperty("Accept", "*/*")
-            connection.setRequestProperty("Connection", "keep-alive")
+            // 配置下载连接
+            val fileSizeMB = if (totalSize > 0) totalSize / (1024 * 1024) else 0
+            configureDownloadConnection(connection, fileSizeMB)
             
             // 设置Range请求头进行断点续传
             if (resumeFrom > 0) {
@@ -786,8 +1082,17 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             var lastUpdateTime = System.currentTimeMillis()
             
             while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                // 检查是否被取消
+                if (currentDownloadState == DownloadState.CANCELLED) {
+                    logger.info("下载被取消，停止下载循环")
+                    return false
+                }
+                
                 outputStream.write(buffer, 0, bytesRead)
                 totalBytesRead += bytesRead
+                
+                // 更新下载进度监控
+                updateDownloadProgress(totalBytesRead, totalSize)
                 
                 // 防止除零错误
                 val progress = if (totalSize > 0) {
@@ -805,20 +1110,11 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 }
             }
             
-            logger.info("文件下载完成，总字节数: $totalBytesRead")
+            logOperationSuccess("文件下载", "总字节数: $totalBytesRead")
             true
             
-        } catch (e: java.net.SocketTimeoutException) {
-            logger.error("下载超时: ${e.message}")
-            false
-        } catch (e: java.net.UnknownHostException) {
-            logger.error("无法解析主机: ${e.message}")
-            false
-        } catch (e: java.io.IOException) {
-            logger.error("IO错误: ${e.message}")
-            false
         } catch (e: Exception) {
-            logger.error("断点续传下载失败", e)
+            handleNetworkException(e, "断点续传下载")
             false
         } finally {
             // 确保资源被正确释放
@@ -852,7 +1148,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 downloadFileSingle(url, file, onProgress)
             }
         } catch (e: Exception) {
-            logger.error("下载文件失败", e)
+            handleNetworkException(e, "下载文件")
             false
         }
     }
@@ -864,9 +1160,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         return try {
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.requestMethod = "HEAD"
-            connection.setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
-            connection.connectTimeout = 30000
-            connection.readTimeout = 30000
+            configureHttpConnection(connection)
             
             val acceptRanges = connection.getHeaderField("Accept-Ranges")
             connection.disconnect()
@@ -970,9 +1264,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     private fun downloadChunk(url: String, file: File, start: Long, end: Long, onProgress: (Long) -> Unit): Boolean {
         return try {
             val connection = URL(url).openConnection() as HttpURLConnection
-            connection.connectTimeout = 60000
-            connection.readTimeout = 120000
-            connection.setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
+            configureDownloadConnection(connection, 0)
             connection.setRequestProperty("Range", "bytes=$start-$end")
             
             val inputStream = connection.inputStream.buffered(65536)
@@ -993,7 +1285,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             
             true
         } catch (e: Exception) {
-            logger.error("下载分块失败", e)
+            handleNetworkException(e, "下载分块")
             false
         }
     }
@@ -1017,39 +1309,29 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      * 单线程下载文件（备用方法）
      */
     private fun downloadFileSingle(url: String, file: File, onProgress: (Int) -> Unit): Boolean {
-        var lastException: Exception? = null
+        var connection: HttpURLConnection? = null
+        var inputStream: java.io.InputStream? = null
+        var outputStream: java.io.OutputStream? = null
         
-        // 重试机制：最多重试3次
-        repeat(3) { attempt ->
-            var connection: HttpURLConnection? = null
-            var inputStream: java.io.InputStream? = null
-            var outputStream: java.io.OutputStream? = null
-            
-            try {
-                logger.info("开始单线程下载 (尝试 ${attempt + 1}/3): ${file.name}")
+        return try {
+            logOperationStart("单线程下载", file.name)
                 
                 connection = URL(url).openConnection() as HttpURLConnection
                 
                 // 优化连接配置
-                connection.connectTimeout = 60000  // 增加连接超时到60秒
-                connection.readTimeout = 120000    // 增加读取超时到120秒
-                connection.setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
-                connection.setRequestProperty("Accept", "*/*")
-                connection.setRequestProperty("Connection", "keep-alive")
+                configureDownloadConnection(connection, 0)
                 
                 // 检查响应码
                 val responseCode = connection.responseCode
                 if (responseCode !in 200..299) {
-                    logger.error("下载失败，HTTP响应码: $responseCode")
-                    lastException = Exception("HTTP错误: $responseCode")
-                    return@repeat
+                    logOperationError("下载文件", "HTTP响应码: $responseCode")
+                    throw Exception("HTTP错误: $responseCode")
                 }
                 
                 val fileSize = connection.contentLengthLong  // 使用Long类型支持大文件
                 if (fileSize <= 0) {
-                    logger.warn("无法获取文件大小")
-                    lastException = Exception("无法获取文件大小")
-                    return@repeat
+                    logOperationError("下载文件", "无法获取文件大小")
+                    throw Exception("无法获取文件大小")
                 }
                 
                 inputStream = connection.inputStream.buffered(65536)  // 64KB缓冲
@@ -1063,6 +1345,12 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 var lastUpdateTime = System.currentTimeMillis()
                 
                 while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    // 检查是否被取消
+                    if (currentDownloadState == DownloadState.CANCELLED) {
+                        logger.info("下载被取消，停止下载循环")
+                        return false
+                    }
+                    
                     outputStream.write(buffer, 0, bytesRead)
                     totalBytesRead += bytesRead
                     
@@ -1082,21 +1370,12 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     }
                 }
                 
-                logger.info("单线程下载成功: ${file.name}, 总字节数: $totalBytesRead")
-                return true
+                logOperationSuccess("单线程下载", "${file.name}, 总字节数: $totalBytesRead")
+                true
                 
-            } catch (e: java.net.SocketTimeoutException) {
-                logger.warn("下载超时 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("下载超时，请检查网络连接")
-            } catch (e: java.net.UnknownHostException) {
-                logger.warn("无法解析下载地址 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("无法连接到下载服务器")
-            } catch (e: java.io.IOException) {
-                logger.warn("下载IO错误 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = Exception("下载过程中发生IO错误: ${e.message}")
             } catch (e: Exception) {
-                logger.warn("下载失败 (尝试 ${attempt + 1}/3): ${e.message}")
-                lastException = e
+                val errorMessage = handleNetworkException(e, "下载文件")
+                throw Exception(errorMessage)
             } finally {
                 // 确保资源被正确释放
                 try {
@@ -1115,31 +1394,148 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     logger.warn("断开连接时出错: ${e.message}")
                 }
             }
-            
-            // 如果不是最后一次尝试，等待后重试
-            if (attempt < 2) {
-                Thread.sleep((2000 * (attempt + 1)).toLong()) // 递增延迟：2秒、4秒
-            }
         }
-        
-        // 所有重试都失败了
-        logger.error("单线程下载失败，已重试3次: ${file.name}", lastException)
-        return false
-    }
     
     private fun calculateChecksum(file: File): String {
         return try {
+            if (!file.exists()) {
+                logger.error("文件不存在，无法计算校验和: ${file.absolutePath}")
+                return ""
+            }
+            
+            if (file.length() == 0L) {
+                logger.error("文件为空，无法计算校验和: ${file.absolutePath}")
+                return ""
+            }
+            
+            logger.info("开始计算文件校验和: ${file.name}, 大小: ${file.length()} bytes")
+            val startTime = System.currentTimeMillis()
+            
             val digest = MessageDigest.getInstance("SHA-256")
-            val bytes = file.readBytes()
-            val hash = digest.digest(bytes)
-            hash.joinToString("") { "%02x".format(it) }
+            
+            // 对于大文件，使用流式读取避免内存溢出
+            if (file.length() > 50 * 1024 * 1024) { // 50MB以上使用流式读取
+                file.inputStream().buffered(65536).use { input ->
+                    val buffer = ByteArray(65536)
+                    var bytesRead: Int
+                    var totalBytesRead = 0L
+                    
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        digest.update(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+                        
+                        // 每处理10MB记录一次进度
+                        if (totalBytesRead % (10 * 1024 * 1024) == 0L) {
+                            val progress = (totalBytesRead * 100 / file.length()).toInt()
+                            logger.debug("校验和计算进度: $progress%")
+                        }
+                    }
+                }
+            } else {
+                // 小文件直接读取
+                val bytes = file.readBytes()
+                digest.update(bytes)
+            }
+            
+            val hash = digest.digest()
+            val checksum = hash.joinToString("") { "%02x".format(it) }
+            
+            val duration = System.currentTimeMillis() - startTime
+            logger.info("文件校验和计算完成: ${file.name}, 耗时: ${duration}ms, 校验和: $checksum")
+            
+            checksum
+        } catch (e: OutOfMemoryError) {
+            logger.error("内存不足，无法计算校验和: ${file.absolutePath}", e)
+            loggingService.logError(e, "校验和计算内存不足")
+            ""
         } catch (e: Exception) {
-            logger.error("计算文件校验和失败", e)
+            logger.error("计算文件校验和失败: ${file.absolutePath}", e)
+            loggingService.logError(e, "校验和计算失败")
             ""
         }
     }
     
-    private fun recordUpdateHistory(updateInfo: UpdateInfo, status: UpdateRecordStatus, errorMessage: String? = null) {
+    /**
+     * 增强的文件校验方法，支持多种校验算法和完整性检查
+     */
+    internal fun verifyFileIntegrity(file: File, expectedChecksum: String, algorithm: String = "SHA-256"): Boolean {
+        return try {
+            if (!file.exists()) {
+                logger.error("文件不存在，校验失败: ${file.absolutePath}")
+                return false
+            }
+            
+            if (file.length() == 0L) {
+                logger.error("文件为空，校验失败: ${file.absolutePath}")
+                return false
+            }
+            
+            if (expectedChecksum.isEmpty()) {
+                logger.warn("未提供期望的校验和，跳过校验")
+                return true
+            }
+            
+            logger.info("开始文件完整性校验: ${file.name}")
+            
+            // 1. 计算文件校验和
+            val actualChecksum = when (algorithm.uppercase()) {
+                "SHA-256" -> calculateChecksum(file)
+                "MD5" -> calculateMD5(file)
+                else -> {
+                    logger.warn("不支持的校验算法: $algorithm，使用SHA-256")
+                    calculateChecksum(file)
+                }
+            }
+            
+            if (actualChecksum.isEmpty()) {
+                logger.error("无法计算文件校验和")
+                return false
+            }
+            
+            // 2. 比较校验和
+            val checksumMatch = actualChecksum.equals(expectedChecksum, ignoreCase = true)
+            
+            if (checksumMatch) {
+                logger.info("文件校验成功: ${file.name}")
+                loggingService.logInfo("文件校验成功: ${file.name}", "文件校验")
+            } else {
+                logger.error("文件校验失败: ${file.name}")
+                logger.error("期望校验和: $expectedChecksum")
+                logger.error("实际校验和: $actualChecksum")
+                loggingService.logError(Exception("文件校验失败"), "文件校验失败: ${file.name}")
+            }
+            
+            checksumMatch
+            
+        } catch (e: Exception) {
+            logger.error("文件校验过程中发生错误: ${file.absolutePath}", e)
+            loggingService.logError(e, "文件校验错误")
+            false
+        }
+    }
+    
+    /**
+     * 计算MD5校验和
+     */
+    private fun calculateMD5(file: File): String {
+        return try {
+            val digest = MessageDigest.getInstance("MD5")
+            file.inputStream().buffered(65536).use { input ->
+                val buffer = ByteArray(65536)
+                var bytesRead: Int
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    digest.update(buffer, 0, bytesRead)
+                }
+            }
+            val hash = digest.digest()
+            hash.joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            logger.error("计算MD5校验和失败: ${file.absolutePath}", e)
+            ""
+        }
+    }
+    
+    private fun recordUpdateHistory(updateInfo: UpdateInfo, status: UpdateRecordStatusConstants, errorMessage: String? = null) {
         try {
             val history = getUpdateHistory().toMutableList()
             val record = UpdateRecord(
@@ -1194,7 +1590,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             
             // 方法3：在开发环境中，尝试查找build目录
             var currentDir = classFile
-            while (currentDir != null && currentDir.exists()) {
+            while (currentDir.exists()) {
                 if (currentDir.name == "classes" && currentDir.parentFile?.name == "kotlin") {
                     // 开发环境：.../build/classes/kotlin/main
                     val buildDir = currentDir.parentFile?.parentFile?.parentFile
@@ -1247,73 +1643,308 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     }
     
     /**
+     * 清理冗余的目录结构
+     */
+    private fun cleanupRedundantDirectories(targetPath: File) {
+        if (!targetPath.exists() || !targetPath.isDirectory) {
+            return
+        }
+        
+        try {
+            logger.info("检查目录结构是否需要清理: ${targetPath.absolutePath}")
+            
+            // 检查是否存在重复的插件目录嵌套
+            val redundantPath = findRedundantPluginDirectory(targetPath)
+            if (redundantPath != null) {
+                logger.info("发现冗余目录结构，准备清理: ${redundantPath.absolutePath}")
+                loggingService.logInfo("发现冗余目录结构，准备清理: ${redundantPath.absolutePath}", "目录清理")
+                
+                // 将内容移动到正确位置
+                moveDirectoryContents(redundantPath, targetPath)
+                
+                logger.info("冗余目录结构清理完成")
+                loggingService.logInfo("冗余目录结构清理完成", "目录清理")
+            }
+        } catch (e: Exception) {
+            logger.warn("目录结构清理过程中出现异常: ${e.message}", e)
+            loggingService.logWarning("目录结构清理过程中出现异常: ${e.message}", "目录清理")
+        }
+    }
+    
+    /**
+     * 查找冗余的插件目录
+     */
+    private fun findRedundantPluginDirectory(baseDir: File): File? {
+        var currentDir = baseDir
+        var depth = 0
+        val maxDepth = 5 // 防止无限循环
+        
+        while (depth < maxDepth) {
+            val children = currentDir.listFiles() ?: break
+            
+            // 如果当前目录只有一个子目录，且子目录名包含插件名
+            if (children.size == 1 && children[0].isDirectory) {
+                val childDir = children[0]
+                if (childDir.name.contains("AICodeTransformer", ignoreCase = true)) {
+                    // 检查子目录是否包含插件文件
+                    if (hasPluginFiles(childDir)) {
+                        return childDir
+                    }
+                    currentDir = childDir
+                    depth++
+                } else {
+                    break
+                }
+            } else {
+                break
+            }
+        }
+        
+        return null
+    }
+    
+    /**
+     * 检查目录是否包含插件文件
+     */
+    private fun hasPluginFiles(dir: File): Boolean {
+        if (!dir.exists() || !dir.isDirectory) return false
+        
+        val files = dir.listFiles() ?: return false
+        
+        return files.any { file ->
+            when {
+                file.name == "plugin.xml" -> true
+                file.name == "lib" && file.isDirectory -> true
+                file.name.endsWith(".jar") -> true
+                file.isDirectory && file.name == "META-INF" -> true
+                else -> false
+            }
+        }
+    }
+    
+    /**
+     * 移动目录内容
+     */
+    private fun moveDirectoryContents(sourceDir: File, targetDir: File) {
+        if (!sourceDir.exists() || !sourceDir.isDirectory) return
+        
+        val files = sourceDir.listFiles() ?: return
+        
+        for (file in files) {
+            val targetFile = File(targetDir, file.name)
+            
+            if (file.isDirectory) {
+                // 递归移动目录
+                if (!targetFile.exists()) {
+                    targetFile.mkdirs()
+                }
+                moveDirectoryContents(file, targetFile)
+                file.deleteRecursively()
+            } else {
+                // 移动文件
+                file.copyTo(targetFile, overwrite = true)
+                file.delete()
+            }
+        }
+        
+        // 删除空的源目录
+        if (sourceDir.listFiles()?.isEmpty() == true) {
+            sourceDir.delete()
+        }
+    }
+    
+    /**
+     * 安装后的目录清理
+     */
+    private fun postInstallDirectoryCleanup(targetPath: File) {
+        try {
+            logger.info("执行安装后目录结构检查: ${targetPath.absolutePath}")
+            
+            // 再次检查是否有冗余目录
+            cleanupRedundantDirectories(targetPath)
+            
+            // 验证最终的目录结构
+            if (!hasPluginFiles(targetPath)) {
+                logger.warn("安装后目录结构验证失败，未找到必要的插件文件")
+                loggingService.logWarning("安装后目录结构验证失败，未找到必要的插件文件", "安装验证")
+            } else {
+                logger.info("安装后目录结构验证通过")
+                loggingService.logInfo("安装后目录结构验证通过", "安装验证")
+            }
+        } catch (e: Exception) {
+            logger.warn("安装后目录清理过程中出现异常: ${e.message}", e)
+            loggingService.logWarning("安装后目录清理过程中出现异常: ${e.message}", "安装验证")
+        }
+    }
+    
+    /**
      * 安装新版本
      */
     private fun installNewVersion(newVersionFile: File, targetPath: File) {
-        if (targetPath.isDirectory) {
-            // 如果目标是目录，需要先清空目录再解压新版本
-            targetPath.deleteRecursively()
-            targetPath.mkdirs()
-            unzipFile(newVersionFile, targetPath)
-        } else {
-            // 如果目标是文件，直接替换
-            val parentDir = targetPath.parentFile
-            if (!parentDir.exists()) {
-                parentDir.mkdirs()
+        logger.info("开始安装新版本: ${newVersionFile.absolutePath} -> ${targetPath.absolutePath}")
+        loggingService.logInfo("开始安装新版本: ${newVersionFile.absolutePath} -> ${targetPath.absolutePath}", "安装新版本")
+        
+        // 在安装前检查并清理可能存在的重复目录结构
+        cleanupRedundantDirectories(targetPath)
+        
+        // 判断新版本文件类型
+        val isZipFile = newVersionFile.name.endsWith(".zip")
+        val isJarFile = newVersionFile.name.endsWith(".jar")
+        
+        if (isZipFile) {
+            // 处理zip文件安装
+            if (targetPath.isDirectory) {
+                // 目标是目录，清空目录后解压
+                logger.info("目标是目录，清空后解压zip文件")
+                loggingService.logInfo("目标是目录，清空后解压zip文件", "安装新版本")
+                targetPath.deleteRecursively()
+                targetPath.mkdirs()
+                // 使用智能解压功能
+                unzipFileIntelligent(newVersionFile, targetPath)
+            } else {
+                // 目标是文件（jar），需要替换为目录
+                logger.info("目标是jar文件，替换为目录并解压zip文件")
+                loggingService.logInfo("目标是jar文件，替换为目录并解压zip文件", "安装新版本")
+                
+                // 删除原jar文件
+                if (targetPath.exists()) {
+                    targetPath.delete()
+                }
+                
+                // 创建同名目录
+                targetPath.mkdirs()
+                
+                // 使用智能解压功能
+                unzipFileIntelligent(newVersionFile, targetPath)
             }
-            newVersionFile.copyTo(targetPath, overwrite = true)
+            
+            // 安装后验证并修复目录结构
+            postInstallDirectoryCleanup(targetPath)
+            
+        } else if (isJarFile) {
+            // 处理jar文件安装
+            if (targetPath.isDirectory) {
+                // 目标是目录，需要替换为jar文件
+                logger.info("目标是目录，替换为jar文件")
+                loggingService.logInfo("目标是目录，替换为jar文件", "安装新版本")
+                
+                // 删除目录
+                targetPath.deleteRecursively()
+                
+                // 复制jar文件
+                newVersionFile.copyTo(targetPath, overwrite = true)
+            } else {
+                // 目标是文件，直接替换
+                logger.info("目标是jar文件，直接替换")
+                loggingService.logInfo("目标是jar文件，直接替换", "安装新版本")
+                
+                val parentDir = targetPath.parentFile
+                if (!parentDir.exists()) {
+                    parentDir.mkdirs()
+                }
+                newVersionFile.copyTo(targetPath, overwrite = true)
+            }
+        } else {
+            // 未知文件类型，按原逻辑处理
+            logger.warn("未知文件类型，按原逻辑处理")
+            loggingService.logWarning("未知文件类型，按原逻辑处理: ${newVersionFile.name}", "安装新版本")
+            
+            if (targetPath.isDirectory) {
+                targetPath.deleteRecursively()
+                targetPath.mkdirs()
+                unzipFile(newVersionFile, targetPath)
+            } else {
+                val parentDir = targetPath.parentFile
+                if (!parentDir.exists()) {
+                    parentDir.mkdirs()
+                }
+                newVersionFile.copyTo(targetPath, overwrite = true)
+            }
         }
         
-        logger.info("新版本安装完成: ${targetPath.absolutePath}")
+        val successMsg = "新版本安装完成: ${targetPath.absolutePath}"
+        logger.info(successMsg)
+        loggingService.logInfo(successMsg, "安装新版本")
     }
     
     /**
      * 验证安装是否成功
      */
-    private fun verifyInstallation(installedPath: File, updateInfo: UpdateInfo): Boolean {
+    private fun verifyInstallation(installedPath: File): Boolean {
         return try {
             logger.info("开始验证安装: ${installedPath.absolutePath}")
+            loggingService.logInfo("开始验证安装: ${installedPath.absolutePath}", "安装验证")
+            
+            // 添加详细的路径信息调试
+            logger.info("验证路径详情 - 存在: ${installedPath.exists()}, 是文件: ${installedPath.isFile}, 是目录: ${installedPath.isDirectory}")
+            loggingService.logInfo("验证路径详情 - 存在: ${installedPath.exists()}, 是文件: ${installedPath.isFile}, 是目录: ${installedPath.isDirectory}", "安装验证")
             
             // 1. 检查文件是否存在
             if (!installedPath.exists()) {
-                logger.error("安装验证失败：文件不存在")
+                val errorMsg = "安装验证失败：文件不存在 - ${installedPath.absolutePath}"
+                logger.error(errorMsg)
+                loggingService.logError(Exception(errorMsg), "安装验证")
                 return false
             }
             
             // 2. 检查文件大小
             if (installedPath.isFile) {
                 val fileSize = installedPath.length()
+                logger.info("检查文件大小: $fileSize bytes")
+                loggingService.logInfo("检查文件大小: $fileSize bytes", "安装验证")
+                
                 if (fileSize == 0L) {
-                    logger.error("安装验证失败：文件大小为0")
+                    val errorMsg = "安装验证失败：文件大小为0 - ${installedPath.absolutePath}"
+                    logger.error(errorMsg)
+                    loggingService.logError(Exception(errorMsg), "安装验证")
                     return false
                 }
                 
                 // 检查文件大小是否合理（至少1KB）
                 if (fileSize < 1024) {
-                    logger.warn("安装验证警告：文件大小过小 ($fileSize bytes)")
+                    val warnMsg = "安装验证警告：文件大小过小 ($fileSize bytes) - ${installedPath.absolutePath}"
+                    logger.warn(warnMsg)
+                    loggingService.logWarning(warnMsg, "安装验证")
                 }
                 
-                logger.info("文件大小验证通过: ${fileSize / 1024} KB")
+                val sizeMsg = "文件大小验证通过: ${fileSize / 1024} KB"
+                logger.info(sizeMsg)
+                loggingService.logInfo(sizeMsg, "安装验证")
             }
             
             // 3. 检查文件可读性
+            logger.info("检查文件可读性: ${installedPath.canRead()}")
+            loggingService.logInfo("检查文件可读性: ${installedPath.canRead()}", "安装验证")
+            
             if (!installedPath.canRead()) {
-                logger.error("安装验证失败：文件不可读")
+                val errorMsg = "安装验证失败：文件不可读 - ${installedPath.absolutePath}"
+                logger.error(errorMsg)
+                loggingService.logError(Exception(errorMsg), "安装验证")
                 return false
             }
             
             // 4. 如果是JAR文件，验证JAR文件完整性
             if (installedPath.name.endsWith(".jar")) {
+                logger.info("检测到JAR文件，开始验证JAR完整性")
+                loggingService.logInfo("检测到JAR文件，开始验证JAR完整性", "安装验证")
+                
                 if (!verifyJarFile(installedPath)) {
-                    logger.error("安装验证失败：JAR文件完整性检查失败")
+                    val errorMsg = "安装验证失败：JAR文件完整性检查失败 - ${installedPath.absolutePath}"
+                    logger.error(errorMsg)
+                    loggingService.logError(Exception(errorMsg), "安装验证")
                     return false
                 }
             }
             
             // 5. 如果是目录，验证目录结构
             if (installedPath.isDirectory) {
+                logger.info("检测到目录，开始验证目录结构")
+                loggingService.logInfo("检测到目录，开始验证目录结构", "安装验证")
+                
                 if (!verifyDirectoryStructure(installedPath)) {
-                    logger.error("安装验证失败：目录结构验证失败")
+                    val errorMsg = "安装验证失败：目录结构验证失败 - ${installedPath.absolutePath}"
+                    logger.error(errorMsg)
+                    loggingService.logError(Exception(errorMsg), "安装验证")
                     return false
                 }
             }
@@ -1372,35 +2003,128 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      */
     private fun verifyDirectoryStructure(directory: File): Boolean {
         return try {
+            logger.info("开始验证目录结构: ${directory.absolutePath}")
+            loggingService.logInfo("开始验证目录结构: ${directory.absolutePath}", "目录结构验证")
+            
             if (!directory.isDirectory) {
+                val errorMsg = "路径不是目录: ${directory.absolutePath}"
+                logger.error(errorMsg)
+                loggingService.logError(Exception(errorMsg), "目录结构验证")
                 return false
             }
             
             val files = directory.listFiles()
-            if (files == null || files.isEmpty()) {
-                logger.warn("目录为空: ${directory.absolutePath}")
+            if (files == null) {
+                val errorMsg = "无法读取目录内容: ${directory.absolutePath}"
+                logger.error(errorMsg)
+                loggingService.logError(Exception(errorMsg), "目录结构验证")
                 return false
             }
             
-            // 检查是否有必要的文件
-            var hasValidFiles = false
-            files.forEach { file ->
-                if (file.isFile && file.length() > 0) {
-                    hasValidFiles = true
+            if (files.isEmpty()) {
+                val errorMsg = "目录为空: ${directory.absolutePath}"
+                logger.warn(errorMsg)
+                loggingService.logWarning(errorMsg, "目录结构验证")
+                return false
+            }
+            
+            // 检查是否存在重复的目录嵌套
+            val redundantPath = findRedundantPluginDirectory(directory)
+            if (redundantPath != null) {
+                logger.warn("检测到重复的目录嵌套结构: ${redundantPath.absolutePath}")
+                loggingService.logWarning("检测到重复的目录嵌套结构: ${redundantPath.absolutePath}", "目录结构验证")
+                
+                // 尝试自动修复
+                try {
+                    cleanupRedundantDirectories(directory)
+                    logger.info("已自动修复重复的目录结构")
+                    loggingService.logInfo("已自动修复重复的目录结构", "目录结构验证")
+                    
+                    // 重新获取文件列表
+                    val updatedFiles = directory.listFiles()
+                    if (updatedFiles != null && updatedFiles.isNotEmpty()) {
+                        return verifyDirectoryStructureInternal(directory, updatedFiles)
+                    }
+                } catch (e: Exception) {
+                    logger.warn("自动修复重复目录结构失败: ${e.message}", e)
+                    loggingService.logWarning("自动修复重复目录结构失败: ${e.message}", "目录结构验证")
                 }
             }
             
-            if (!hasValidFiles) {
-                logger.error("目录中没有有效文件")
-                return false
-            }
-            
-            logger.info("目录结构验证通过，包含 ${files.size} 个项目")
-            true
+            return verifyDirectoryStructureInternal(directory, files)
         } catch (e: Exception) {
             logger.error("目录结构验证失败", e)
+            loggingService.logError(e, "目录结构验证")
             false
         }
+    }
+    
+    /**
+     * 内部目录结构验证方法
+     */
+    private fun verifyDirectoryStructureInternal(directory: File, files: Array<File>): Boolean {
+        // 记录目录内容详情
+        logger.info("验证目录 ${directory.absolutePath} 包含 ${files.size} 个项目:")
+        loggingService.logInfo("验证目录 ${directory.absolutePath} 包含 ${files.size} 个项目:", "目录结构验证")
+        
+        var hasValidFiles = false
+        var validFileCount = 0
+        var totalFileSize = 0L
+        
+        files.forEach { file ->
+            val fileInfo = if (file.isFile) {
+                val size = file.length()
+                totalFileSize += size
+                if (size > 0) {
+                    hasValidFiles = true
+                    validFileCount++
+                }
+                "文件: ${file.name} (${size} bytes)"
+            } else if (file.isDirectory) {
+                "目录: ${file.name}/"
+            } else {
+                "其他: ${file.name}"
+            }
+            logger.info("  - $fileInfo")
+            loggingService.logInfo("  - $fileInfo", "目录结构验证")
+        }
+        
+        logger.info("统计信息 - 有效文件数: $validFileCount, 总文件大小: $totalFileSize bytes")
+        loggingService.logInfo("统计信息 - 有效文件数: $validFileCount, 总文件大小: $totalFileSize bytes", "目录结构验证")
+        
+        // 更智能的验证逻辑
+        if (!hasValidFiles) {
+            // 检查是否有关键的插件文件
+            val hasPluginXml = files.any { it.name == "plugin.xml" || it.name.endsWith(".xml") }
+            val hasJarFiles = files.any { it.name.endsWith(".jar") }
+            val hasLibDirectory = files.any { it.isDirectory && it.name == "lib" }
+            val hasClassesDirectory = files.any { it.isDirectory && it.name == "classes" }
+            val hasMetaInfDirectory = files.any { it.isDirectory && it.name == "META-INF" }
+            
+            if (hasPluginXml || hasJarFiles || hasLibDirectory || hasClassesDirectory || hasMetaInfDirectory) {
+                logger.info("虽然没有大文件，但发现了插件相关文件结构，验证通过")
+                loggingService.logInfo("虽然没有大文件，但发现了插件相关文件结构，验证通过", "目录结构验证")
+            } else {
+                // 检查子目录中是否有插件文件
+                val hasNestedPluginFiles = files.any { file ->
+                    file.isDirectory && hasPluginFiles(file)
+                }
+                
+                if (hasNestedPluginFiles) {
+                    logger.info("在子目录中发现了插件相关文件结构，验证通过")
+                    loggingService.logInfo("在子目录中发现了插件相关文件结构，验证通过", "目录结构验证")
+                } else {
+                    val errorMsg = "目录中没有有效文件（大小 > 0 的文件）且未发现插件相关结构"
+                    logger.error(errorMsg)
+                    loggingService.logError(Exception(errorMsg), "目录结构验证")
+                    return false
+                }
+            }
+        }
+        
+        logger.info("目录结构验证通过")
+        loggingService.logInfo("目录结构验证通过", "目录结构验证")
+        return true
     }
     
     /**
@@ -1501,6 +2225,146 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     /**
      * 解压zip文件到目录
      */
+    /**
+     * 智能解压文件，自动处理嵌套目录问题
+     */
+    private fun unzipFileIntelligent(zipFile: File, targetDir: File) {
+        if (!zipFile.exists()) {
+            throw Exception("压缩文件不存在: ${zipFile.absolutePath}")
+        }
+        
+        if (!targetDir.exists()) {
+            targetDir.mkdirs()
+        }
+        
+        try {
+            // 首先分析zip文件结构
+            val zipStructure = analyzeZipStructure(zipFile)
+            logger.info("Zip文件结构分析: $zipStructure")
+            
+            // 根据结构决定解压策略
+            val shouldSkipRootDir = zipStructure.hasRedundantRootDir
+            val rootDirToSkip = zipStructure.rootDirName
+            
+            java.util.zip.ZipInputStream(zipFile.inputStream()).use { zipIn ->
+                var entry = zipIn.nextEntry
+                
+                while (entry != null) {
+                    var entryPath = entry.name
+                    
+                    // 如果需要跳过根目录，则移除根目录路径
+                    if (shouldSkipRootDir && rootDirToSkip != null && entryPath.startsWith("$rootDirToSkip/")) {
+                        entryPath = entryPath.substring(rootDirToSkip.length + 1)
+                    }
+                    
+                    // 跳过空路径
+                    if (entryPath.isEmpty()) {
+                        zipIn.closeEntry()
+                        entry = zipIn.nextEntry
+                        continue
+                    }
+                    
+                    val entryFile = File(targetDir, entryPath)
+                    
+                    if (entry.isDirectory) {
+                        // 创建目录
+                        entryFile.mkdirs()
+                    } else {
+                        // 创建父目录
+                        entryFile.parentFile?.mkdirs()
+                        
+                        // 解压文件
+                        FileOutputStream(entryFile).use { output ->
+                            zipIn.copyTo(output)
+                        }
+                    }
+                    
+                    zipIn.closeEntry()
+                    entry = zipIn.nextEntry
+                }
+            }
+            logger.info("智能文件解压完成: ${zipFile.absolutePath} -> ${targetDir.absolutePath}")
+        } catch (e: Exception) {
+            logger.error("智能文件解压失败", e)
+            throw e
+        }
+    }
+    
+    /**
+     * 分析zip文件结构
+     */
+    private fun analyzeZipStructure(zipFile: File): ZipStructureInfo {
+        val entries = mutableListOf<String>()
+        var rootDirs = mutableSetOf<String>()
+        var hasPluginXml = false
+        var hasLibDir = false
+        var hasJarFiles = false
+        
+        java.util.zip.ZipInputStream(zipFile.inputStream()).use { zipIn ->
+            var entry = zipIn.nextEntry
+            while (entry != null) {
+                entries.add(entry.name)
+                
+                // 检查是否有插件相关文件
+                if (entry.name.endsWith("plugin.xml")) {
+                    hasPluginXml = true
+                }
+                if (entry.name.contains("/lib/") || entry.name == "lib/") {
+                    hasLibDir = true
+                }
+                if (entry.name.endsWith(".jar")) {
+                    hasJarFiles = true
+                }
+                
+                // 收集根目录
+                val pathParts = entry.name.split("/")
+                if (pathParts.isNotEmpty() && pathParts[0].isNotEmpty()) {
+                    rootDirs.add(pathParts[0])
+                }
+                
+                zipIn.closeEntry()
+                entry = zipIn.nextEntry
+            }
+        }
+        
+        // 判断是否有冗余的根目录
+        val hasRedundantRootDir = when {
+            rootDirs.size == 1 -> {
+                val singleRoot = rootDirs.first()
+                // 如果只有一个根目录，且该目录下包含插件文件，则可能是冗余的
+                val hasPluginFilesInRoot = entries.any { 
+                    it.startsWith("$singleRoot/") && 
+                    (it.endsWith("plugin.xml") || it.contains("/lib/") || it.endsWith(".jar"))
+                }
+                hasPluginFilesInRoot && singleRoot.contains("AICodeTransformer", ignoreCase = true)
+            }
+            else -> false
+        }
+        
+        return ZipStructureInfo(
+            totalEntries = entries.size,
+            rootDirs = rootDirs.toList(),
+            hasPluginXml = hasPluginXml,
+            hasLibDir = hasLibDir,
+            hasJarFiles = hasJarFiles,
+            hasRedundantRootDir = hasRedundantRootDir,
+            rootDirName = if (hasRedundantRootDir) rootDirs.firstOrNull() else null
+        )
+    }
+    
+    /**
+     * Zip文件结构信息
+     */
+    private data class ZipStructureInfo(
+        val totalEntries: Int,
+        val rootDirs: List<String>,
+        val hasPluginXml: Boolean,
+        val hasLibDir: Boolean,
+        val hasJarFiles: Boolean,
+        val hasRedundantRootDir: Boolean,
+        val rootDirName: String?
+    )
+    
     private fun unzipFile(zipFile: File, targetDir: File) {
         if (!zipFile.exists()) {
             throw Exception("压缩文件不存在: ${zipFile.absolutePath}")
@@ -1652,87 +2516,89 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 // 显示通知
                 com.intellij.notification.Notifications.Bus.notify(notification)
                 
-                logger.info("已显示重启提醒通知")
+                com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).info("已显示重启提醒通知")
             }
         } catch (e: Exception) {
-             logger.error("显示重启提醒失败", e)
-         }
-     }
-     
-     override suspend fun rollbackToPreviousVersion(): Boolean {
-         return withContext(Dispatchers.IO) {
-             try {
-                 updateStatus(UpdateStatus.INSTALLING)
-                 notifyProgress(0, "准备回滚到上一版本...")
-                 
-                 logger.info("开始回滚到上一版本")
-                 
-                 // 1. 获取当前插件路径
-                 val currentPluginPath = getCurrentPluginPath()
-                 if (currentPluginPath == null) {
-                     throw Exception("无法确定当前插件路径")
-                 }
-                 
-                 notifyProgress(20, "查找备份文件...")
-                 
-                 // 2. 查找最新的备份文件
-                 val backupDir = File(System.getProperty("java.io.tmpdir"), "aicodetransformer_backups")
-                 val latestBackup = findLatestBackup(backupDir)
-                 if (latestBackup == null) {
-                     throw Exception("未找到可用的备份文件")
-                 }
-                 
-                 notifyProgress(40, "验证备份文件...")
-                 
-                 // 3. 验证备份文件
-                 if (!latestBackup.exists()) {
-                     throw Exception("备份文件不存在: ${latestBackup.absolutePath}")
-                 }
-                 
-                 notifyProgress(60, "恢复备份...")
-                 
-                 // 4. 恢复备份
-                 restoreBackup(latestBackup, currentPluginPath)
-                 
-                 notifyProgress(80, "验证回滚...")
-                 
-                 // 5. 验证回滚是否成功
-                 if (!currentPluginPath.exists()) {
-                     throw Exception("回滚验证失败")
-                 }
-                 
-                 notifyProgress(100, "回滚完成")
-                 
-                 // 6. 记录回滚历史
-                 val rollbackInfo = UpdateInfo(
-                     version = "rollback",
-                     versionName = "回滚操作",
-                     releaseDate = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
-                     description = "回滚到上一版本",
-                     downloadUrl = "",
-                     fileSize = latestBackup.length(),
-                     checksum = ""
-                 )
-                 recordUpdateHistory(rollbackInfo, UpdateRecordStatus.SUCCESS)
-                 
-                 updateStatus(UpdateStatus.INSTALLED)
-                 logger.info("回滚完成")
-                 loggingService.logInfo("回滚到上一版本完成", "自动更新")
-                 
-                 // 7. 提示用户重启IDE
-                 showRollbackRestartPrompt()
-                 
-                 true
-                 
-             } catch (e: Exception) {
-                 logger.error("回滚失败", e)
-                 loggingService.logError(e, "回滚失败")
-                 updateStatus(UpdateStatus.ERROR)
-                 notifyError("回滚失败: ${e.message}")
-                 false
-             }
-         }
-     }
+            com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).error("显示重启提醒失败", e)
+        }
+    }
+    
+    override suspend fun rollbackToPreviousVersion(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                updateStatus(UpdateStatus.INSTALLING)
+                notifyProgress(0, "准备回滚到上一版本...")
+
+                com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java)
+                    .info("开始回滚到上一版本")
+
+                // 1. 获取当前插件路径
+                val currentPluginPath = getCurrentPluginPath()
+                if (currentPluginPath == null) {
+                    throw Exception("无法确定当前插件路径")
+                }
+
+                notifyProgress(20, "查找备份文件...")
+
+                // 2. 查找最新的备份文件
+                val backupDir = File(System.getProperty("java.io.tmpdir"), "aicodetransformer_backups")
+                val latestBackup = findLatestBackup(backupDir)
+                if (latestBackup == null) {
+                    throw Exception("未找到可用的备份文件")
+                }
+
+                notifyProgress(40, "验证备份文件...")
+
+                // 3. 验证备份文件
+                if (!latestBackup.exists()) {
+                    throw Exception("备份文件不存在: ${latestBackup.absolutePath}")
+                }
+
+                notifyProgress(60, "恢复备份...")
+
+                // 4. 恢复备份
+                restoreBackup(latestBackup, currentPluginPath)
+
+                notifyProgress(80, "验证回滚...")
+
+                // 5. 验证回滚是否成功
+                if (!currentPluginPath.exists()) {
+                    throw Exception("回滚验证失败")
+                }
+
+                notifyProgress(100, "回滚完成")
+
+                // 6. 记录回滚历史
+                val rollbackInfo = UpdateInfo(
+                    version = "rollback",
+                    versionName = "回滚操作",
+                    releaseDate = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                    description = "回滚到上一版本",
+                    downloadUrl = "",
+                    fileSize = latestBackup.length(),
+                    checksum = ""
+                )
+                recordUpdateHistory(rollbackInfo, UpdateRecordStatusConstants.SUCCESS)
+
+                updateStatus(UpdateStatus.INSTALLED)
+                com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).info("回滚完成")
+                loggingService.logInfo("回滚到上一版本完成", "自动更新")
+
+                // 7. 提示用户重启IDE
+                showRollbackRestartPrompt()
+
+                true
+
+            } catch (e: Exception) {
+                com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java)
+                    .error("回滚失败", e)
+                loggingService.logError(e, "回滚失败")
+                updateStatus(UpdateStatus.ERROR)
+                notifyError("回滚失败: ${e.message}")
+                false
+            }
+        }
+    }
      
      override fun getAvailableBackups(): List<BackupInfo> {
          return try {
@@ -1756,10 +2622,10 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                      )
                  } ?: emptyList()
          } catch (e: Exception) {
-             logger.error("获取备份列表失败", e)
-             emptyList()
-         }
-     }
+            com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).error("获取备份列表失败", e)
+            emptyList()
+        }
+    }
      
      /**
      * 查找最新的备份文件
@@ -1787,7 +2653,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             }?.sortedByDescending { it.lastModified() } ?: return
             
             if (backupFiles.size <= keepCount) {
-                logger.info("备份文件数量 ${backupFiles.size} 未超过限制 $keepCount，无需清理")
+                com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).info("备份文件数量 ${backupFiles.size} 未超过限制 $keepCount，无需清理")
                 return
             }
             
@@ -1801,22 +2667,22 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     if (file.delete()) {
                         deletedCount++
                         deletedSize += fileSize
-                        logger.info("删除旧备份文件: ${file.name}")
+                        com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).info("删除旧备份文件: ${file.name}")
                     } else {
-                        logger.warn("无法删除备份文件: ${file.name}")
+                        com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).warn("无法删除备份文件: ${file.name}")
                     }
                 } catch (e: Exception) {
-                    logger.warn("删除备份文件时发生错误: ${file.name}", e)
+                    com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).warn("删除备份文件时发生错误: ${file.name}", e)
                 }
             }
             
             if (deletedCount > 0) {
                 val sizeInMB = deletedSize / (1024.0 * 1024.0)
-                logger.info("备份清理完成: 删除了 $deletedCount 个文件，释放空间 ${String.format("%.2f", sizeInMB)} MB")
+                com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).info("备份清理完成: 删除了 $deletedCount 个文件，释放空间 ${String.format("%.2f", sizeInMB)} MB")
             }
             
         } catch (e: Exception) {
-            logger.warn("备份清理过程中发生错误", e)
+            com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).warn("备份清理过程中发生错误", e)
         }
     }
      
@@ -1856,7 +2722,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                  }
              }
          } catch (e: Exception) {
-             logger.error("显示回滚重启提示失败", e)
+             com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).error("显示回滚重启提示失败", e)
          }
      }
      
@@ -1881,10 +2747,10 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                  })
                  
                  com.intellij.notification.Notifications.Bus.notify(notification)
-                 logger.info("已显示回滚重启提醒通知")
+                 com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).info("已显示回滚重启提醒通知")
              }
          } catch (e: Exception) {
-             logger.error("显示回滚重启提醒失败", e)
+             com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).error("显示回滚重启提醒失败", e)
          }
      }
      
@@ -1924,7 +2790,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                  changelog = changelog
              )
          } catch (e: Exception) {
-             logger.error("解析GitHub API响应失败", e)
+             com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).error("解析GitHub API响应失败", e)
              null
          }
      }
@@ -1955,8 +2821,68 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                  changelog
              }
          } catch (e: Exception) {
-             logger.error("解析changelog失败", e)
+             com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).error("解析changelog失败", e)
              listOf("新版本发布")
          }
+     }
+     
+     // ==================== HTTP连接配置工具方法 ====================
+     
+     /**
+      * 配置标准HTTP连接
+      */
+     private fun configureHttpConnection(
+         connection: HttpURLConnection,
+         connectTimeoutMs: Int = 15000,
+         readTimeoutMs: Int = 30000
+     ) {
+         connection.apply {
+             setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
+             setRequestProperty("Accept", "*/*")
+             setRequestProperty("Connection", "keep-alive")
+             connectTimeout = connectTimeoutMs
+             readTimeout = readTimeoutMs
+         }
+     }
+     
+     /**
+      * 配置GitHub API连接
+      */
+     private fun configureGitHubApiConnection(connection: HttpURLConnection) {
+         connection.apply {
+             requestMethod = "GET"
+             setRequestProperty("Accept", "application/vnd.github.v3+json")
+             setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
+             setRequestProperty("Connection", "close")
+             connectTimeout = 15000
+             readTimeout = 30000
+         }
+     }
+     
+     /**
+      * 配置下载连接（支持动态超时）
+      */
+     private fun configureDownloadConnection(
+         connection: HttpURLConnection,
+         fileSizeMB: Long = 0
+     ) {
+         val connectTimeout = 60000 // 连接超时固定60秒
+         val baseReadTimeout = 120000 // 基础读取超时120秒
+         val dynamicReadTimeout = if (fileSizeMB > 0) {
+             // 根据文件大小动态调整读取超时：每MB增加10秒，最大10分钟
+             (baseReadTimeout + fileSizeMB * 10000).toInt().coerceIn(120000, 600000)
+         } else {
+             baseReadTimeout
+         }
+         
+         connection.apply {
+             setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
+             setRequestProperty("Accept", "*/*")
+             setRequestProperty("Connection", "keep-alive")
+             this.connectTimeout = connectTimeout
+             this.readTimeout = dynamicReadTimeout
+         }
+         
+         com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).info("设置下载超时时间 - 连接: ${connectTimeout}ms, 读取: ${dynamicReadTimeout}ms")
      }
 }

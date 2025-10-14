@@ -1,7 +1,6 @@
 package cn.suso.aicodetransformer.service.impl
 
-import cn.suso.aicodetransformer.model.PromptTemplate
-import cn.suso.aicodetransformer.service.ErrorContext
+import cn.suso.aicodetransformer.model.*
 import cn.suso.aicodetransformer.service.ErrorHandlingService
 import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.TemplateChangeListener
@@ -10,14 +9,11 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
-import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
@@ -32,7 +28,7 @@ import kotlin.concurrent.write
     name = "AICodeTransformerTemplates",
     storages = [Storage("aicodetransformer-templates.xml")]
 )
-class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponent<PromptTemplateServiceImpl.State> {
+class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponent<PromptTemplateState> {
     
     companion object {
         fun getInstance(): PromptTemplateService = service<PromptTemplateService>()
@@ -49,48 +45,11 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
     private val listeners = CopyOnWriteArrayList<TemplateChangeListener>()
     private val usageStats = ConcurrentHashMap<String, Int>()
     private val lock = ReentrantReadWriteLock()
-    private var state = State()
+    private var state = PromptTemplateState()
     
-    /**
-     * 持久化状态数据类
-     */
-    @kotlinx.serialization.Serializable
-    @com.intellij.util.xmlb.annotations.Tag("State")
-    data class State(
-        @com.intellij.util.xmlb.annotations.Transient
-        var templates: MutableList<PromptTemplate> = mutableListOf(),
-        @com.intellij.util.xmlb.annotations.Transient
-        var usageStatistics: MutableMap<String, Int> = mutableMapOf(),
-        
-        // 用于XML序列化的JSON字符串字段
-        @com.intellij.util.xmlb.annotations.Tag("templatesXml")
-        var templatesXml: String = "",
-        @com.intellij.util.xmlb.annotations.Tag("usageStatisticsXml")
-        var usageStatisticsXml: String = ""
-    )
+
     
-    /**
-     * 导出数据的元数据
-     */
-    @kotlinx.serialization.Serializable
-    data class ExportMetadata(
-        val totalCount: Int,
-        val categories: List<String>,
-        val exportedBy: String
-    )
-    
-    /**
-     * 模板导出数据结构
-     */
-    @kotlinx.serialization.Serializable
-    data class TemplateExportData(
-        val version: String,
-        val exportTime: String,
-        val templates: List<PromptTemplate>,
-        val metadata: ExportMetadata
-    )
-    
-    override fun getState(): State {
+    override fun getState(): PromptTemplateState {
         return lock.read {
             // 直接返回当前状态，让IntelliJ的XML序列化机制处理
             // templatesXml和usageStatisticsXml字段用于XML序列化
@@ -109,7 +68,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
         }
     }
     
-    override fun loadState(state: State) {
+    override fun loadState(state: PromptTemplateState) {
         lock.write {
             this.state = state
             

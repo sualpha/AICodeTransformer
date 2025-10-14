@@ -1,10 +1,21 @@
 package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.service.*
+import cn.suso.aicodetransformer.model.CacheStats
+import cn.suso.aicodetransformer.model.CacheConfig
+import cn.suso.aicodetransformer.model.PerformanceOptimizationConfig
+import cn.suso.aicodetransformer.model.HttpOptimizationConfig
+import cn.suso.aicodetransformer.model.CacheOptimizationConfig
+import cn.suso.aicodetransformer.model.RequestOptimizationConfig
+import cn.suso.aicodetransformer.model.OptimizationSuggestion
+import cn.suso.aicodetransformer.model.PerformanceStats
+import cn.suso.aicodetransformer.model.PerformanceReport
+import cn.suso.aicodetransformer.constants.OptimizationType
+import cn.suso.aicodetransformer.constants.ImpactLevel
+import cn.suso.aicodetransformer.constants.DifficultyLevel
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.util.concurrency.annotations.RequiresEdt
 
 /**
  * 性能优化服务实现
@@ -103,7 +114,7 @@ class PerformanceOptimizationServiceImpl : PerformanceOptimizationService {
         if (cacheStats.totalEntries > 4000) {
             suggestions.add(
                 OptimizationSuggestion(
-                    type = OptimizationType.MEMORY_MANAGEMENT,
+                    type = OptimizationType.MEMORY_OPTIMIZATION,
                     title = "优化内存使用",
                     description = "当前缓存条目数为 ${cacheStats.totalEntries}，建议启用更积极的清理策略",
                     impact = ImpactLevel.LOW,
@@ -247,23 +258,4 @@ class PerformanceOptimizationServiceImpl : PerformanceOptimizationService {
         
         return cacheScore + responseScore + configScore
     }
-}
-
-/**
- * 性能报告
- */
-data class PerformanceReport(
-    val cacheHitRate: Double,
-    val averageResponseTime: Long,
-    val totalCacheEntries: Int,
-    val optimizationSuggestions: List<OptimizationSuggestion>,
-    val overallScore: Int
-) {
-    val performanceLevel: String
-        get() = when {
-            overallScore >= 90 -> "优秀"
-            overallScore >= 75 -> "良好"
-            overallScore >= 60 -> "一般"
-            else -> "需要优化"
-        }
 }

@@ -6,7 +6,11 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.psi.*
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiShortNamesCache
-import com.intellij.psi.util.PsiTypesUtil
+import cn.suso.aicodetransformer.model.FieldInfo
+import cn.suso.aicodetransformer.model.ClassInfo
+import cn.suso.aicodetransformer.model.MethodInfo
+import cn.suso.aicodetransformer.model.ParameterInfo
+import cn.suso.aicodetransformer.model.MethodAnalysisResult
 
 /**
  * 代码分析服务，用于解析Java类的字段信息
@@ -14,58 +18,7 @@ import com.intellij.psi.util.PsiTypesUtil
 @Service
 class CodeAnalysisService {
     
-    /**
-     * 字段信息数据类
-     */
-    data class FieldInfo(
-        val name: String,
-        val type: String,
-        val annotations: List<String> = emptyList(),
-        val isPrivate: Boolean = false,
-        val hasGetter: Boolean = false,
-        val hasSetter: Boolean = false
-    )
-    
-    /**
-     * 类信息数据类
-     */
-    data class ClassInfo(
-        val name: String,
-        val packageName: String,
-        val fields: List<FieldInfo>
-    )
-    
-    /**
-     * 方法信息数据类
-     */
-    data class MethodInfo(
-        val name: String,
-        val returnType: String,
-        val parameters: List<ParameterInfo>,
-        val isPublic: Boolean = true,
-        val isStatic: Boolean = false,
-        val annotations: List<String> = emptyList()
-    )
-    
-    /**
-     * 参数信息数据类
-     */
-    data class ParameterInfo(
-        val name: String,
-        val type: String,
-        val annotations: List<String> = emptyList()
-    )
-    
-    /**
-     * 方法分析结果
-     */
-    data class MethodAnalysisResult(
-        val isMethod: Boolean,
-        val methodInfo: MethodInfo?,
-        val hasRequestParameters: Boolean,
-        val hasResponseParameters: Boolean,
-        val errorMessage: String? = null
-    )
+
     
     /**
      * 检测选中代码是否为方法并分析其参数
