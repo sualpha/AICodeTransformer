@@ -45,6 +45,10 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
+    
+    <!-- Dynamic plugin support - allows installation/uninstallation without IDE restart -->
+    <!-- Note: Some complex dependencies may still require restart -->
+    <idea-version since-build="203.0" until-build="999.*"/>
 
     <!-- Extension points defined by the plugin.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
@@ -100,17 +104,10 @@
                 text="性能优化" 
                 description="打开AI代码转换器性能优化面板">
         </action>
-
-        <action id="AICodeTransformer.DebugExecution" 
-                class="cn.suso.aicodetransformer.debug.ExecutionDebugAction"
-                text="调试执行过程" 
-                description="调试AI代码转换的执行过程">
-        </action>
         
         <!-- AI Code Transformer 主菜单组 -->
         <group id="AICodeTransformer.MainGroup" text="AI代码转换器" description="AI代码转换工具" popup="true">
             <reference ref="AICodeTransformer.PerformanceOptimization"/>
-            <reference ref="AICodeTransformer.DebugExecution"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </group>
         

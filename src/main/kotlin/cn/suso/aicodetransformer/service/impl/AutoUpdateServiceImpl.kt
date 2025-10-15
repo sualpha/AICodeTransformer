@@ -758,7 +758,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             logOperationStart("检查GitHub最新版本")
             
             // 调用GitHub API获取最新版本信息
-            val url = URL(UPDATE_CHECK_URL)
+            val url = java.net.URI(UPDATE_CHECK_URL).toURL()
             val connection = url.openConnection() as HttpURLConnection
             configureGitHubApiConnection(connection)
             
@@ -1053,7 +1053,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         var outputStream: java.io.OutputStream? = null
         
         return try {
-            connection = URL(url).openConnection() as HttpURLConnection
+            connection = java.net.URI(url).toURL().openConnection() as HttpURLConnection
             
             // 配置下载连接
             val fileSizeMB = if (totalSize > 0) totalSize / (1024 * 1024) else 0
@@ -1158,7 +1158,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      */
     private fun checkRangeSupport(url: String): Boolean {
         return try {
-            val connection = URL(url).openConnection() as HttpURLConnection
+            val connection = java.net.URI(url).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "HEAD"
             configureHttpConnection(connection)
             
@@ -1176,7 +1176,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      */
     private fun getFileSize(url: String): Long {
         return try {
-            val connection = URL(url).openConnection() as HttpURLConnection
+            val connection = java.net.URI(url).toURL().openConnection() as HttpURLConnection
             connection.requestMethod = "HEAD"
             connection.setRequestProperty("User-Agent", "AICodeTransformer-Plugin/1.0")
             connection.connectTimeout = 30000
@@ -1263,7 +1263,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      */
     private fun downloadChunk(url: String, file: File, start: Long, end: Long, onProgress: (Long) -> Unit): Boolean {
         return try {
-            val connection = URL(url).openConnection() as HttpURLConnection
+            val connection = java.net.URI(url).toURL().openConnection() as HttpURLConnection
             configureDownloadConnection(connection, 0)
             connection.setRequestProperty("Range", "bytes=$start-$end")
             
@@ -1316,7 +1316,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         return try {
             logOperationStart("单线程下载", file.name)
                 
-                connection = URL(url).openConnection() as HttpURLConnection
+                connection = java.net.URI(url).toURL().openConnection() as HttpURLConnection
                 
                 // 优化连接配置
                 configureDownloadConnection(connection, 0)
