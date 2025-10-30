@@ -1,13 +1,19 @@
 package cn.suso.aicodetransformer.ui.settings
 
+import cn.suso.aicodetransformer.constants.TemplateConstants
 import cn.suso.aicodetransformer.model.PromptTemplate
 import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
 
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.ui.components.*
+import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTabbedPane
+import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
@@ -24,6 +30,9 @@ class PromptTemplateEditPanel : JPanel() {
     
     private val templateService: PromptTemplateService = PromptTemplateServiceImpl.getInstance()
     
+    // 可用变量列表，默认为所有内置变量
+    private var availableVariables: List<Pair<String, String>> = TemplateConstants.getBuiltInVariablesMap().toList()
+    
     // 基本信息字段
     private val nameField = JBTextField()
     private val descriptionField = JBTextField()
@@ -38,6 +47,7 @@ class PromptTemplateEditPanel : JPanel() {
     // 编辑按钮
     private val validateTemplateButton = JButton("验证模板")
     private val insertVariableButton = JButton("插入变量")
+    private val resetContentButton = JButton("重置内容")
     private val contentToolbar = JPanel()
     
     private var currentTemplate: PromptTemplate? = null
@@ -100,6 +110,8 @@ class PromptTemplateEditPanel : JPanel() {
         contentToolbar.add(insertVariableButton)
         contentToolbar.add(Box.createHorizontalStrut(8))
         contentToolbar.add(validateTemplateButton)
+        contentToolbar.add(Box.createHorizontalStrut(8))
+        contentToolbar.add(resetContentButton)
         panel.add(contentToolbar, BorderLayout.SOUTH)
         
         return panel
@@ -124,6 +136,7 @@ class PromptTemplateEditPanel : JPanel() {
         // 编辑按钮事件监听器
         validateTemplateButton.addActionListener { validateTemplateAndShowResult() }
         insertVariableButton.addActionListener { showInsertVariableDialog() }
+        resetContentButton.addActionListener { resetTemplateContent() }
     }
     
     /**
@@ -234,20 +247,7 @@ class PromptTemplateEditPanel : JPanel() {
      * 显示插入变量对话框
      */
     private fun showInsertVariableDialog() {
-        val variables = listOf(
-            "{{selectedCode}}" to "当前选中的代码",
-            "{{fileName}}" to "当前文件名",
-            "{{language}}" to "当前文件的编程语言",
-            "{{filePath}}" to "当前文件路径",
-            "{{className}}" to "当前类名",
-            "{{methodName}}" to "当前方法名",
-            "{{packageName}}" to "当前包名",
-            "{{projectName}}" to "项目名称",
-            "{{requestParams}}" to "方法请求参数信息（所有参数）",
-            "{{firstRequestParam}}" to "第一个请求参数信息",
-            "{{responseParams}}" to "方法返回参数信息",
-
-        )
+        val variables = availableVariables
         
         val variableNames = variables.map { "${it.first} - ${it.second}" }.toTypedArray()
 
@@ -273,6 +273,53 @@ class PromptTemplateEditPanel : JPanel() {
         contentArea.caretPosition = caretPosition + variable.length
         contentArea.requestFocus()
         notifyModification()
+    }
+    
+    /**
+     * 重置模板内容
+     */
+    private fun resetTemplateContent() {
+        val result = Messages.showYesNoDialog(
+            null,
+            "确定要重置模板内容吗？这将清空当前的所有内容。",
+            "重置模板内容",
+            "重置",
+            "取消",
+            Messages.getQuestionIcon()
+        )
+        
+        if (result == Messages.YES) {
+            // 根据模板类型提供默认内容
+            val defaultContent = getDefaultContentForTemplate()
+            contentArea.text = defaultContent
+            contentArea.caretPosition = 0
+            contentArea.requestFocus()
+            notifyModification()
+        }
+    }
+    
+    /**
+     * 根据模板类型获取默认内容
+     */
+    private fun getDefaultContentForTemplate(): String {
+        val category = categoryField.text.trim()
+        return when {
+            category.contains("commit", ignoreCase = true) || 
+            category.contains("git", ignoreCase = true) -> {
+                "请为以下代码变更生成提交信息：\n\n{SELECTED_TEXT}\n\n要求：\n- 使用简洁明了的语言\n- 遵循约定式提交格式\n- 突出主要变更内容"
+            }
+            category.contains("代码", ignoreCase = true) || 
+            category.contains("code", ignoreCase = true) -> {
+                "请分析以下代码：\n\n{SELECTED_TEXT}\n\n请提供：\n- 代码功能说明\n- 可能的改进建议\n- 潜在问题分析"
+            }
+            category.contains("文档", ignoreCase = true) || 
+            category.contains("doc", ignoreCase = true) -> {
+                "请为以下内容生成文档：\n\n{SELECTED_TEXT}\n\n要求：\n- 结构清晰\n- 内容详细\n- 易于理解"
+            }
+            else -> {
+                "请处理以下内容：\n\n{SELECTED_TEXT}\n\n请根据具体需求进行分析和处理。"
+            }
+        }
     }
     
     private fun notifyModification() {
@@ -330,5 +377,12 @@ class PromptTemplateEditPanel : JPanel() {
             Messages.showErrorDialog(this, "创建模板对象失败：${e.message}", "错误")
             return null
         }
+    }
+    
+    /**
+     * 设置可用变量列表
+     */
+    fun setAvailableVariables(variables: List<Pair<String, String>>) {
+        this.availableVariables = variables
     }
 }

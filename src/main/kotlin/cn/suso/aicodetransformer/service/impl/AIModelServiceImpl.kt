@@ -11,6 +11,7 @@ import cn.suso.aicodetransformer.service.LoggingService
 import cn.suso.aicodetransformer.service.PerformanceMonitorService
 import cn.suso.aicodetransformer.service.RateLimitService
 import cn.suso.aicodetransformer.service.RequestListener
+import cn.suso.aicodetransformer.util.TokenCounter
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import io.ktor.client.*
@@ -50,7 +51,6 @@ class AIModelServiceImpl : AIModelService {
     private val activeRequests = mutableMapOf<String, Job>()
     private val pendingRequests = mutableMapOf<String, MutableList<CompletableDeferred<ExecutionResult>>>()
     private val listeners = CopyOnWriteArrayList<RequestListener>()
-    
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -59,15 +59,15 @@ class AIModelServiceImpl : AIModelService {
     
     init {
         httpClient = HttpClient(CIO) {
-            // 连接池配置 - 优化版本
+            // 连接池配置 - 进一步优化，减少UI卡顿
             engine {
-                maxConnectionsCount = 200
+                maxConnectionsCount = 50   // 进一步减少连接数
                 endpoint {
-                    maxConnectionsPerRoute = 50
-                    pipelineMaxSize = 30
-                    keepAliveTime = 30000  // 增加到30秒
-                    connectTimeout = 3000   // 减少到3秒
-                    connectAttempts = 3
+                    maxConnectionsPerRoute = 10  // 减少每个路由的连接数
+                    pipelineMaxSize = 10
+                    keepAliveTime = 30000  // 30秒保持连接
+                    connectTimeout = 3000   // 3秒连接超时
+                    connectAttempts = 3     // 减少连接尝试次数
                 }
             }
             
@@ -80,7 +80,11 @@ class AIModelServiceImpl : AIModelService {
             }
             
             // 超时配置将在每次请求时动态设置
-            install(HttpTimeout)
+            install(HttpTimeout) {
+                requestTimeoutMillis = 120000  // 默认2分钟请求超时
+                connectTimeoutMillis = 10000   // 默认10秒连接超时
+                socketTimeoutMillis = 120000   // 默认2分钟socket超时
+            }
             
             install(HttpRequestRetry) {
                 retryOnServerErrors(maxRetries = 0)  // 禁用HTTP层重试，避免与ErrorHandlingService重试叠加
@@ -106,7 +110,7 @@ class AIModelServiceImpl : AIModelService {
         val performanceTracker = performanceMonitorService.startTracking(requestId, config, prompt)
         
         // 检查限流
-        if (!rateLimitService.isAllowed(config, apiKey)) {
+/*        if (!rateLimitService.isAllowed(config, apiKey)) {
             val nextAllowedTime = rateLimitService.getNextAllowedTime(config, apiKey)
             val waitTime = if (nextAllowedTime > 0) {
                 (nextAllowedTime - System.currentTimeMillis()) / 1000
@@ -127,9 +131,8 @@ class AIModelServiceImpl : AIModelService {
             val rateLimitResult = ExecutionResult.failure(errorMessage, ErrorType.RATE_LIMIT_ERROR)
             performanceMonitorService.endTracking(performanceTracker, rateLimitResult)
             loggingService.logApiCallEnd(requestId, rateLimitResult, 0)
-            
             return rateLimitResult
-        }
+        }*/
         
         // 检查缓存
         val cacheKey = cacheService.generateCacheKey(config, prompt, config.temperature, config.maxTokens)
@@ -343,12 +346,6 @@ class AIModelServiceImpl : AIModelService {
         }
     }
     
-    override fun estimateTokens(text: String): Int {
-        // Simple estimation: roughly 4 characters per token for English text
-        // This is a rough approximation, real tokenization would be more accurate
-        return (text.length / 4).coerceAtLeast(1)
-    }
-    
     override fun getRequestStatus(requestId: String): RequestStatusConstants? {
         val job = activeRequests[requestId]
         return when {
@@ -377,17 +374,96 @@ class AIModelServiceImpl : AIModelService {
         prompt: String,
         config: RequestConfig
     ): ExecutionResult {
-        return when (modelConfig.modelType) {
-            ModelType.OPENAI_COMPATIBLE -> {
-                callOpenAICompatibleModel(modelConfig, apiKey, prompt, config)
-            }
-            ModelType.CLAUDE -> {
-                callClaudeModel(modelConfig, apiKey, prompt, config)
-            }
-            ModelType.LOCAL -> {
-                callLocalModel(modelConfig, prompt, config)
+        return executeWithRetry(maxRetries = 3) {
+            when (modelConfig.modelType) {
+                ModelType.OPENAI_COMPATIBLE -> {
+                    callOpenAICompatibleModel(modelConfig, apiKey, prompt, config)
+                }
+                ModelType.CLAUDE -> {
+                    callClaudeModel(modelConfig, apiKey, prompt, config)
+                }
+                ModelType.LOCAL -> {
+                    callLocalModel(modelConfig, prompt, config)
+                }
             }
         }
+    }
+    
+    /**
+     * 带重试机制的执行方法
+     */
+    private suspend fun executeWithRetry(
+        maxRetries: Int = 3,
+        initialDelayMs: Long = 1000,
+        maxDelayMs: Long = 8000,
+        multiplier: Double = 2.0,
+        operation: suspend () -> ExecutionResult
+    ): ExecutionResult {
+        var lastException: Exception? = null
+        var delay = initialDelayMs
+        
+        repeat(maxRetries + 1) { attempt ->
+            try {
+                val result = operation()
+                
+                // 如果成功或者是非网络错误，直接返回
+                if (result.success || !isRetryableError(result)) {
+                    return result
+                }
+                
+                // 如果是最后一次尝试，返回结果
+                if (attempt == maxRetries) {
+                    return result
+                }
+                
+                // 等待后重试
+                logger.warn("API调用失败，${delay}ms后进行第${attempt + 1}次重试: ${result.errorMessage}")
+                delay(delay)
+                delay = (delay * multiplier).toLong().coerceAtMost(maxDelayMs)
+                
+            } catch (e: Exception) {
+                lastException = e
+                
+                // 检查是否是可重试的异常
+                if (!isRetryableException(e) || attempt == maxRetries) {
+                    throw e
+                }
+                
+                logger.warn("API调用异常，${delay}ms后进行第${attempt + 1}次重试: ${e.message}")
+                delay(delay)
+                delay = (delay * multiplier).toLong().coerceAtMost(maxDelayMs)
+            }
+        }
+        
+        // 如果所有重试都失败了，抛出最后的异常
+        throw lastException ?: RuntimeException("所有重试都失败了")
+    }
+    
+    /**
+     * 判断是否是可重试的错误结果
+     */
+    private fun isRetryableError(result: ExecutionResult): Boolean {
+        val errorMessage = result.errorMessage?.lowercase() ?: return false
+        return errorMessage.contains("unexpected eof") ||
+               errorMessage.contains("connection reset") ||
+               errorMessage.contains("timeout") ||
+               errorMessage.contains("网络连接被意外中断") ||
+               errorMessage.contains("响应读取超时")
+    }
+    
+    /**
+     * 判断是否是可重试的异常
+     */
+    private fun isRetryableException(exception: Exception): Boolean {
+        val message = exception.message?.lowercase() ?: return false
+        return message.contains("unexpected eof") ||
+               message.contains("connection reset") ||
+               message.contains("timeout") ||
+               message.contains("connect timed out") ||
+               message.contains("read timed out") ||
+               exception is java.net.SocketTimeoutException ||
+               exception is java.net.ConnectException ||
+               exception is java.io.EOFException
     }
     
     /**
@@ -439,7 +515,22 @@ class AIModelServiceImpl : AIModelService {
         }
         
         val responseTime = System.currentTimeMillis() - startTime
-        val responseBodyText = response.bodyAsText()
+        
+        // 改进的响应体读取，添加EOF错误处理
+        val responseBodyText = try {
+            response.bodyAsText()
+        } catch (e: Exception) {
+            logger.error("读取Claude响应体失败", e)
+            val errorMessage = when {
+                e.message?.contains("unexpected EOF", ignoreCase = true) == true -> 
+                    "网络连接被意外中断，请检查网络连接稳定性并重试"
+                e.message?.contains("timeout", ignoreCase = true) == true -> 
+                    "响应读取超时，请检查网络连接或增加超时时间"
+                else -> "读取Claude API响应失败: ${e.message}"
+            }
+            return ExecutionResult.failure(errorMessage, ErrorType.NETWORK_ERROR)
+        }
+        
         val responseHeaders = response.headers.entries().associate { it.key to it.value.joinToString(", ") }
         
         // 记录详细的响应参数
@@ -454,9 +545,39 @@ class AIModelServiceImpl : AIModelService {
         if (response.status.isSuccess()) {
             try {
                 val responseBody = json.decodeFromString<OpenAIResponse>(responseBodyText)
-                val message = responseBody.choices.firstOrNull()?.message
-                val content = message?.content
+                val choice = responseBody.choices.firstOrNull()
                 
+                if (choice == null) {
+                    return ExecutionResult.failure(
+                        "API响应格式错误：choices数组为空", 
+                        ErrorType.API_ERROR
+                    )
+                }
+                
+                // 检查finish_reason，如果是input_length_exceeded等错误状态
+                val finishReason = choice.finishReason
+                if (finishReason != null && finishReason != "stop") {
+                    val errorMessage = when (finishReason) {
+                        "length" -> "响应被截断：达到最大token限制"
+                        "content_filter" -> "内容被过滤：违反了内容政策"
+                        "input_length_exceeded", "input_length" -> "输入长度超限：请减少输入内容或分批处理"
+                        "model_length" -> "模型长度限制：请使用支持更长输入的模型"
+                        "function_call" -> "函数调用完成"
+                        "tool_calls" -> "工具调用完成"
+                        else -> "API响应异常：finish_reason=$finishReason，请检查输入内容或联系技术支持"
+                    }
+                    return ExecutionResult.failure(errorMessage, ErrorType.API_ERROR)
+                }
+                
+                val message = choice.message
+                if (message == null) {
+                    return ExecutionResult.failure(
+                        "API响应格式错误：message字段为null，finish_reason=$finishReason", 
+                        ErrorType.API_ERROR
+                    )
+                }
+                
+                val content = message.content
                 if (content.isNullOrBlank()) {
                     return ExecutionResult.failure(
                         "API响应格式错误：消息内容为空或缺失content字段", 
@@ -468,7 +589,7 @@ class AIModelServiceImpl : AIModelService {
             } catch (e: Exception) {
                 logger.error("解析响应失败", e)
                 return ExecutionResult.failure(
-                    "API响应解析失败: ${e.message}",
+                    "API响应解析失败: ${e.message}\nJSON input: ${responseBodyText.take(200)}...",
                     ErrorType.API_ERROR
                 )
             }

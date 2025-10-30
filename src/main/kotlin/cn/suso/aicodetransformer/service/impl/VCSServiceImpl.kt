@@ -1,15 +1,32 @@
 package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.service.VCSService
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.LocalChangeList
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.AbstractVcs
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VfsUtilCore
+import com.intellij.openapi.progress.ProgressManager
+import git4idea.commands.Git
+import git4idea.commands.GitCommand
+import git4idea.commands.GitLineHandler
+import git4idea.repo.GitRepository
+import git4idea.repo.GitRepositoryManager
 import java.io.File
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
+import cn.suso.aicodetransformer.util.LineEndingUtils
+import cn.suso.aicodetransformer.util.LineEndingIssueType
+import cn.suso.aicodetransformer.util.GitCommandExecutor
+import com.intellij.openapi.ui.Messages
 
 /**
  * VCS服务实现类
@@ -18,348 +35,265 @@ import java.io.File
 class VCSServiceImpl : VCSService {
 
     override fun getGitDiff(project: Project, staged: Boolean): String {
+        val result = GitCommandExecutor.executeGitDiff(
+            project = project,
+            staged = staged,
+            progressTitle = "获取Git差异..."
+        )
+        return result.getDisplayMessage()
+    }
+    
+
+
+    override fun getFileDiff(project: Project, filePath: String, staged: Boolean): String {
+        val result = GitCommandExecutor.executeGitDiff(
+            project = project,
+            staged = staged,
+            filePath = filePath,
+            progressTitle = "获取文件差异..."
+        )
+        return result.getDisplayMessage()
+    }
+
+    /**
+     * 从Change对象中提取文件路径
+     */
+    private fun getFilePathFromChange(change: Change, root: VirtualFile): String? {
+        val virtualFile = change.virtualFile
+        if (virtualFile != null) {
+            // 使用虚拟文件的相对路径
+            return VfsUtilCore.getRelativePath(virtualFile, root)
+        } else {
+            // 备用方案：使用revision的路径
+            val filePath = when {
+                change.afterRevision != null -> {
+                    val path = change.afterRevision!!.file.path
+                    // 转换为相对于仓库根目录的路径
+                    if (path.startsWith(root.path)) {
+                        path.substring(root.path.length + 1).replace('\\', '/')
+                    } else {
+                        path
+                    }
+                }
+                change.beforeRevision != null -> {
+                    val path = change.beforeRevision!!.file.path
+                    // 转换为相对于仓库根目录的路径
+                    if (path.startsWith(root.path)) {
+                        path.substring(root.path.length + 1).replace('\\', '/')
+                    } else {
+                        path
+                    }
+                }
+                else -> null
+            }
+            return filePath
+        }
+    }
+
+    override fun getActualFileCount(changes: List<Change>): Int {
         return try {
-            val changeListManager = ChangeListManager.getInstance(project)
-            val changes = changeListManager.defaultChangeList.changes
-            
             if (changes.isEmpty()) {
-                return "没有文件变更"
+                return 0
             }
-            
-            val diffBuilder = StringBuilder()
-            changes.forEach { change ->
-                val filePath = change.virtualFile?.path ?: "未知文件"
-                val changeType = when (change.type) {
-                    Change.Type.NEW -> "新增"
-                    Change.Type.DELETED -> "删除"
-                    Change.Type.MODIFICATION -> "修改"
-                    Change.Type.MOVED -> "移动"
-                    else -> "未知"
+
+            // 从Change对象中获取项目实例 - 避免慢操作
+            val project = changes.firstOrNull()?.let { change ->
+                // 尝试从虚拟文件获取项目
+                val virtualFile = change.virtualFile ?: change.beforeRevision?.file?.virtualFile ?: change.afterRevision?.file?.virtualFile
+                virtualFile?.let { vf ->
+                    // 使用更安全的方式查找项目，避免在EDT中执行慢操作
+                    ApplicationManager.getApplication().runReadAction<Project?> {
+                        ProjectManager.getInstance().openProjects.find { project ->
+                            try {
+                                val projectBasePath = project.basePath
+                                if (projectBasePath != null) {
+                                    val filePath = vf.path
+                                    filePath.startsWith(projectBasePath)
+                                } else {
+                                    false
+                                }
+                            } catch (e: Exception) {
+                                false
+                            }
+                        }
+                    }
                 }
-                diffBuilder.append("[$changeType] $filePath\n")
             }
-            
-            diffBuilder.toString()
-        } catch (e: Exception) {
-            "获取文件差异异常: ${e.message}"
-        }
-    }
 
-    override fun getChangedFiles(project: Project, staged: Boolean): List<String> {
-        return try {
-            val changeListManager = ChangeListManager.getInstance(project)
-            val changes = if (staged) {
-                // 获取暂存区文件
-                changeListManager.defaultChangeList.changes.filter { change ->
-                    // 这里可以根据需要过滤暂存文件
-                    true
-                }
-            } else {
-                changeListManager.defaultChangeList.changes
+            if (project == null) {
+                println("VCSServiceImpl: getActualFileCount - 无法获取项目实例")
+                return changes.size // 回退到原始数量
             }
-            
-            changes.mapNotNull { change ->
-                change.virtualFile?.path
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
 
-    override fun getFileStatus(project: Project, filePath: String): String {
-        return try {
-            val changeListManager = ChangeListManager.getInstance(project)
-            val virtualFile = com.intellij.openapi.vfs.VfsUtil.findFileByIoFile(
-                java.io.File(filePath), false
-            )
-            
-            if (virtualFile != null) {
-                val status = changeListManager.getStatus(virtualFile)
-                status?.toString() ?: "未知状态"
-            } else {
-                "文件不存在"
-            }
-        } catch (e: Exception) {
-            "获取文件状态失败: ${e.message}"
-        }
-    }
+            // 获取Git仓库
+            val repositories = GitRepositoryManager.getInstance(project).repositories
 
-    override fun getCurrentBranch(project: Project): String {
-        return try {
-            val vcsManager = ProjectLevelVcsManager.getInstance(project)
-            val vcs = vcsManager.allActiveVcss.firstOrNull()
+            if (repositories.isEmpty()) {
+                println("VCSServiceImpl: getActualFileCount - 没有找到Git仓库")
+                return changes.size // 回退到原始数量
+            }
+
+            val repository = repositories.first()
+            val root = repository.root
             
-            if (vcs?.name == "Git") {
-                // 尝试从.git/HEAD文件读取当前分支
-                val projectDir = project.basePath?.let { File(it) }
-                val gitHeadFile = File(projectDir, ".git/HEAD")
-                if (gitHeadFile.exists()) {
-                    val headContent = gitHeadFile.readText().trim()
-                    if (headContent.startsWith("ref: refs/heads/")) {
-                        return headContent.substring("ref: refs/heads/".length)
+            var actualFileCount = 0
+            
+            for (change in changes) {
+                when (change.type) {
+                    Change.Type.DELETED -> {
+                        // 删除文件：无论是否存在都会被处理
+                        val filePath = getFilePathFromChange(change, root)
+                        if (filePath != null) {
+                            actualFileCount++
+                        }
+                    }
+                    Change.Type.NEW, Change.Type.MODIFICATION, Change.Type.MOVED -> {
+                        // 新增、修改、移动文件：都会被处理
+                        val filePath = getFilePathFromChange(change, root)
+                        if (filePath != null) {
+                            actualFileCount++
+                        }
+                    }
+                    else -> {
+                        // 其他类型暂时不计入
                     }
                 }
             }
             
-            "main"
+            println("VCSServiceImpl: getActualFileCount - 变更数量: ${changes.size}, 实际处理文件数量: $actualFileCount")
+            actualFileCount
+            
         } catch (e: Exception) {
-            "main"
-        }
-    }
-
-    override fun getGitAuthor(project: Project): Pair<String, String> {
-        return try {
-            val projectDir = project.basePath?.let { File(it) }
-            val gitConfigFile = File(projectDir, ".git/config")
-            
-            var name = "Unknown"
-            var email = "unknown@example.com"
-            
-            if (gitConfigFile.exists()) {
-                val configContent = gitConfigFile.readText()
-                val nameMatch = Regex("name\\s*=\\s*(.+)").find(configContent)
-                val emailMatch = Regex("email\\s*=\\s*(.+)").find(configContent)
-                
-                if (nameMatch != null) {
-                    name = nameMatch.groupValues[1].trim()
-                }
-                if (emailMatch != null) {
-                    email = emailMatch.groupValues[1].trim()
-                }
-            }
-            
-            // 如果本地配置没有找到，尝试全局配置
-            if (name == "Unknown") {
-                val userHome = System.getProperty("user.home")
-                val globalGitConfig = File(userHome, ".gitconfig")
-                if (globalGitConfig.exists()) {
-                    val configContent = globalGitConfig.readText()
-                    val nameMatch = Regex("name\\s*=\\s*(.+)").find(configContent)
-                    val emailMatch = Regex("email\\s*=\\s*(.+)").find(configContent)
-                    
-                    if (nameMatch != null) {
-                        name = nameMatch.groupValues[1].trim()
-                    }
-                    if (emailMatch != null) {
-                        email = emailMatch.groupValues[1].trim()
-                    }
-                }
-            }
-            
-            name to email
-        } catch (e: Exception) {
-            "Unknown" to "unknown@example.com"
-        }
-    }
-
-    override fun getRepositoryName(project: Project): String {
-        return try {
-            project.name
-        } catch (e: Exception) {
-            project.name
-        }
-    }
-
-    override fun getRemoteUrl(project: Project): String {
-        return try {
-            val projectDir = project.basePath?.let { File(it) }
-            val gitConfigFile = File(projectDir, ".git/config")
-            
-            if (gitConfigFile.exists()) {
-                val configContent = gitConfigFile.readText()
-                val urlMatch = Regex("url\\s*=\\s*(.+)").find(configContent)
-                if (urlMatch != null) {
-                    return urlMatch.groupValues[1].trim()
-                }
-            }
-            
-            "未找到远程仓库URL"
-        } catch (e: Exception) {
-            "获取远程URL异常: ${e.message}"
-        }
-    }
-
-    override fun getRecentCommits(project: Project, count: Int): List<String> {
-        return try {
-            // 简化实现，返回示例提交记录
-            listOf(
-                "feat: 添加新功能",
-                "fix: 修复bug",
-                "docs: 更新文档",
-                "style: 代码格式化",
-                "refactor: 重构代码"
-            ).take(count)
-        } catch (e: Exception) {
-            emptyList()
+            println("VCSServiceImpl: getActualFileCount异常: ${e.message}")
+            e.printStackTrace()
+            changes.size // 回退到原始数量
         }
     }
 
     override fun isGitRepository(project: Project): Boolean {
         return try {
-            val projectDir = project.basePath?.let { File(it) }
-            val gitDir = File(projectDir, ".git")
-            gitDir.exists() && (gitDir.isDirectory || gitDir.isFile)
+            val gitRepositoryManager = GitRepositoryManager.getInstance(project)
+            gitRepositoryManager.repositories.isNotEmpty()
         } catch (e: Exception) {
             false
         }
     }
 
-    override fun hasUncommittedChanges(project: Project): Boolean {
+    override fun commitChanges(changes: List<Change>, message: String): Boolean {
         return try {
-            val changeListManager = ChangeListManager.getInstance(project)
-            changeListManager.defaultChangeList.changes.isNotEmpty()
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    override fun commitChanges(project: Project, message: String): Boolean {
-        return try {
-            // 这里简化实现，实际应该调用VCS的提交功能
-            // 由于我们主要是生成提交消息，暂时返回true
-            true
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    override fun getFileDiff(project: Project, filePath: String, staged: Boolean): String {
-        return try {
-            val changeListManager = ChangeListManager.getInstance(project)
-            val changes = changeListManager.defaultChangeList.changes
-            
-            val targetChange = changes.find { change ->
-                change.virtualFile?.path == filePath
+            if (changes.isEmpty()) {
+                return false
             }
-            
-            if (targetChange != null) {
-                val changeType = when (targetChange.type) {
-                    Change.Type.NEW -> "新增文件"
-                    Change.Type.DELETED -> "删除文件"
-                    Change.Type.MODIFICATION -> "修改文件"
-                    Change.Type.MOVED -> "移动文件"
-                    else -> "未知变更"
-                }
-                
-                // 获取详细的差异内容
-                val diffContent = getDetailedDiff(targetChange)
-                
-                """
-                [$changeType] $filePath
-                
-                差异内容:
-                $diffContent
-                """.trimIndent()
-            } else {
-                "文件无变更"
-            }
-        } catch (e: Exception) {
-            "获取文件差异异常: ${e.message}"
-        }
-    }
-    
-    /**
-     * 获取详细的文件差异内容
-     */
-    private fun getDetailedDiff(change: Change): String {
-        return try {
-            when (change.type) {
-                Change.Type.NEW -> {
-                    // 新增文件，只显示文件名
-                    val filePath = change.afterRevision?.file?.path ?: "未知文件"
-                    val fileName = java.io.File(filePath).name
-                    "新增文件: $fileName"
-                }
-                Change.Type.DELETED -> {
-                    // 删除文件，只显示文件名
-                    val filePath = change.beforeRevision?.file?.path ?: "未知文件"
-                    val fileName = java.io.File(filePath).name
-                    "删除文件: $fileName"
-                }
-                Change.Type.MODIFICATION -> {
-                    // 修改文件，显示完整的行级差异
-                    val beforeContent = change.beforeRevision?.content ?: ""
-                    val afterContent = change.afterRevision?.content ?: ""
-                    val fileName = java.io.File(change.afterRevision?.file?.path ?: "未知文件").name
-                    
-                    // 精确的行级差异比较
-                    val beforeLines = beforeContent.lines()
-                    val afterLines = afterContent.lines()
-                    
-                    val diffLines = mutableListOf<String>()
-                    diffLines.add("修改文件: $fileName")
-                    diffLines.add("原始内容 (-):")
-                    diffLines.add("变更内容 (+):")
-                    diffLines.add("")
-                    
-                    val maxLines = maxOf(beforeLines.size, afterLines.size)
-                    
-                    // 移除行数限制，显示所有差异
-                    for (i in 0 until maxLines) {
-                        val beforeLine = beforeLines.getOrNull(i) ?: ""
-                        val afterLine = afterLines.getOrNull(i) ?: ""
-                        
-                        if (beforeLine != afterLine) {
-                            if (beforeLine.isNotEmpty()) {
-                                diffLines.add("- $beforeLine")
-                            }
-                            if (afterLine.isNotEmpty()) {
-                                diffLines.add("+ $afterLine")
+
+            // 从Change对象中获取项目实例 - 避免慢操作
+            val project = changes.firstOrNull()?.let { change ->
+                val virtualFile = change.virtualFile ?: change.beforeRevision?.file?.virtualFile ?: change.afterRevision?.file?.virtualFile
+                virtualFile?.let { vf ->
+                    // 使用更安全的方式查找项目，避免在EDT中执行慢操作
+                    ApplicationManager.getApplication().runReadAction<Project?> {
+                        // 首先尝试通过文件路径匹配项目根目录
+                        ProjectManager.getInstance().openProjects.find { project ->
+                            try {
+                                val projectBasePath = project.basePath
+                                if (projectBasePath != null) {
+                                    val filePath = vf.path
+                                    filePath.startsWith(projectBasePath)
+                                } else {
+                                    false
+                                }
+                            } catch (e: Exception) {
+                                false
                             }
                         }
                     }
-                    
-                    if (diffLines.size <= 4) {
-                        "修改文件: $fileName\n文件内容无明显差异"
-                    } else {
-                        diffLines.joinToString("\n")
+                }
+            }
+
+            if (project == null) {
+                return false
+            }
+
+            val gitRepositoryManager = GitRepositoryManager.getInstance(project)
+            val repositories = gitRepositoryManager.repositories
+
+            if (repositories.isEmpty()) {
+                return false
+            }
+
+            val repository = repositories.first()
+            val root = repository.root
+
+            // 使用ProgressManager在后台线程执行Git命令
+            var success = false
+            ProgressManager.getInstance().runProcessWithProgressSynchronously({
+                try {
+                    // 提取选中文件的路径
+                    val filePaths = mutableListOf<String>()
+                    changes.forEach { change ->
+                        val filePath = getFilePathFromChange(change, root)
+                        if (filePath != null) {
+                            filePaths.add(filePath)
+                        }
                     }
+
+                    if (filePaths.isNotEmpty()) {
+                        // 直接使用 git commit 命令指定要提交的文件，不影响暂存区
+                        val commitHandler = GitLineHandler(project, root, GitCommand.COMMIT)
+                        commitHandler.addParameters("-m", message)
+                        
+                        // 添加所有选中的文件作为参数
+                        filePaths.forEach { path ->
+                            commitHandler.addParameters(path)
+                        }
+                        
+                        // 执行git commit命令，只提交指定的文件
+                        val commitResult = Git.getInstance().runCommand(commitHandler)
+                        success = commitResult.success()
+                    } else {
+                        success = false
+                    }
+                } catch (e: Exception) {
+                    success = false
                 }
-                Change.Type.MOVED -> {
-                    val beforePath = change.beforeRevision?.file?.path ?: ""
-                    val afterPath = change.afterRevision?.file?.path ?: ""
-                    val beforeFileName = java.io.File(beforePath).name
-                    val afterFileName = java.io.File(afterPath).name
-                    "文件移动: $beforeFileName -> $afterFileName"
-                }
-                else -> "未知变更类型"
-            }
+            }, "提交变更...", true, project)
+
+            success
         } catch (e: Exception) {
-            "获取差异内容失败: ${e.message}"
+            false
         }
     }
 
-    override fun getChangesSummary(project: Project, changes: Collection<Change>): String {
+    override fun pushChanges(project: Project): Boolean {
         return try {
-            val summary = StringBuilder()
-            val groupedChanges = changes.groupBy { it.type }
-            
-            groupedChanges.forEach { (type, changeList) ->
-                val typeStr = when (type) {
-                    Change.Type.NEW -> "新增"
-                    Change.Type.DELETED -> "删除"
-                    Change.Type.MODIFICATION -> "修改"
-                    Change.Type.MOVED -> "移动"
-                    else -> "其他"
-                }
-                summary.append("$typeStr: ${changeList.size} 个文件\n")
-                
-                changeList.take(5).forEach { change ->
-                    val fileName = change.virtualFile?.name ?: "未知文件"
-                    summary.append("  - $fileName\n")
-                }
-                
-                if (changeList.size > 5) {
-                    summary.append("  ... 还有 ${changeList.size - 5} 个文件\n")
-                }
-                summary.append("\n")
+            val gitRepositoryManager = GitRepositoryManager.getInstance(project)
+            val repositories = gitRepositoryManager.repositories
+
+            if (repositories.isEmpty()) {
+                return false
             }
-            
-            summary.toString().trim()
+
+            val repository = repositories.first()
+            val root = repository.root
+
+            // 使用ProgressManager在后台线程执行Git命令
+            var success = false
+            ProgressManager.getInstance().runProcessWithProgressSynchronously({
+                try {
+                    // 创建GitLineHandler执行git push命令
+                    val handler = GitLineHandler(project, root, GitCommand.PUSH)
+
+                    // 执行git push命令
+                    val gitResult = Git.getInstance().runCommand(handler)
+                    success = gitResult.success()
+                } catch (e: Exception) {
+                    success = false
+                }
+            }, "推送变更...", true, project)
+
+            success
         } catch (e: Exception) {
-            "获取变更摘要失败: ${e.message}"
+            false
         }
     }
-
 
 }

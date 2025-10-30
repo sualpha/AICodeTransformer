@@ -4,6 +4,7 @@ import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.model.ConfigurationState
 import cn.suso.aicodetransformer.model.GlobalSettings
 import cn.suso.aicodetransformer.model.LoggingConfigState
+import cn.suso.aicodetransformer.model.CommitSettings
 import cn.suso.aicodetransformer.service.ConfigurationChangeListener
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.service.ErrorHandlingService
@@ -66,10 +67,9 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
             this.state = state
             logger.info("Configuration state loaded with ${state.modelConfigurations.size} configurations")
             
-            // 确保有默认配置
+            // 不再自动初始化默认配置，让用户手动添加
             if (this.state.modelConfigurations.isEmpty()) {
-                logger.info("No configurations found, initializing defaults")
-                initializeDefaultConfigurations()
+                logger.info("No configurations found, user needs to add configurations manually")
             }
             
             // 验证配置完整性
@@ -265,8 +265,8 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
         // 清除API密钥
         oldConfigs.forEach { deleteApiKey(it.id) }
         
-        // 重新初始化默认配置
-        initializeDefaultConfigurations()
+        // 不再自动创建默认配置，让用户手动添加
+        logger.info("All configurations cleared, user needs to add configurations manually")
         
         // 通知监听器
         oldConfigs.forEach { listeners.forEach { listener -> listener.onConfigurationDeleted(it) } }
@@ -293,26 +293,7 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
         }
     }
     
-    /**
-     * 初始化默认配置
-     */
-    private fun initializeDefaultConfigurations() {
-        val defaultConfigs = listOf(
-            ModelConfiguration.createLocalDefault(),
-            ModelConfiguration.createOpenAIDefault(),
-            ModelConfiguration.createClaudeDefault()
-        )
-        
-        defaultConfigs.forEach { config ->
-            state.modelConfigurations.add(config)
-            listeners.forEach { it.onConfigurationAdded(config) }
-        }
-        
-        // 设置第一个为默认配置（本地模型）
-        if (defaultConfigs.isNotEmpty()) {
-            state.defaultModelConfigId = defaultConfigs.first().id
-        }
-    }
+
     
 
     
@@ -477,6 +458,23 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
         lock.write {
             state.globalSettings = settings
             logger.info("Global settings updated")
+        }
+    }
+    
+    /**
+     * 获取Commit设置
+     */
+    override fun getCommitSettings(): CommitSettings {
+        return lock.read { state.commitSettings }
+    }
+    
+    /**
+     * 保存Commit设置
+     */
+    override fun saveCommitSettings(settings: CommitSettings) {
+        lock.write {
+            state.commitSettings = settings
+            logger.info("Commit settings saved")
         }
     }
 }

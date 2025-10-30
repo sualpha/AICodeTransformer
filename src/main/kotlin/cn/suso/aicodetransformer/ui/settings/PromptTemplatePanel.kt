@@ -348,7 +348,9 @@ class PromptTemplatePanel(
     
     private fun addTemplate() {
         try {
-            val dialog = PromptTemplateEditDialog.showCreateDialog(project)
+            val selectedCategory = categoryComboBox.selectedItem as? String
+            val category = if (selectedCategory == "全部") null else selectedCategory
+            val dialog = PromptTemplateEditDialog.showCreateDialog(project, category)
             if (dialog != null) {
                 promptTemplateService.saveTemplate(dialog)
                 loadTemplates()

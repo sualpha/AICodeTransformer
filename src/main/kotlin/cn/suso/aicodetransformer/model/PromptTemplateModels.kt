@@ -5,20 +5,55 @@ import kotlinx.serialization.Serializable
 /**
  * 持久化状态数据类
  */
-@Serializable
 @com.intellij.util.xmlb.annotations.Tag("State")
-data class PromptTemplateState(
+class PromptTemplateState {
     @com.intellij.util.xmlb.annotations.Transient
-    var templates: MutableList<PromptTemplate> = mutableListOf(),
+    var templates: MutableList<PromptTemplate> = mutableListOf()
+        get() = field
+        set(value) { field = value }
+    
     @com.intellij.util.xmlb.annotations.Transient
-    var usageStatistics: MutableMap<String, Int> = mutableMapOf(),
+    var usageStatistics: MutableMap<String, Int> = mutableMapOf()
+        get() = field
+        set(value) { field = value }
     
     // 用于XML序列化的JSON字符串字段
     @com.intellij.util.xmlb.annotations.Tag("templatesXml")
-    var templatesXml: String = "",
+    var templatesXml: String = ""
+        get() = field
+        set(value) { field = value }
+    
     @com.intellij.util.xmlb.annotations.Tag("usageStatisticsXml")
     var usageStatisticsXml: String = ""
-)
+        get() = field
+        set(value) { field = value }
+    
+    // 默认构造函数
+    constructor()
+    
+    // 复制构造函数
+    constructor(
+        templates: MutableList<PromptTemplate> = mutableListOf(),
+        usageStatistics: MutableMap<String, Int> = mutableMapOf(),
+        templatesXml: String = "",
+        usageStatisticsXml: String = ""
+    ) {
+        this.templates = templates
+        this.usageStatistics = usageStatistics
+        this.templatesXml = templatesXml
+        this.usageStatisticsXml = usageStatisticsXml
+    }
+    
+    // 复制方法
+    fun copy(
+        templates: MutableList<PromptTemplate> = this.templates,
+        usageStatistics: MutableMap<String, Int> = this.usageStatistics,
+        templatesXml: String = this.templatesXml,
+        usageStatisticsXml: String = this.usageStatisticsXml
+    ): PromptTemplateState {
+        return PromptTemplateState(templates, usageStatistics, templatesXml, usageStatisticsXml)
+    }
+}
 
 /**
  * 导出数据的元数据

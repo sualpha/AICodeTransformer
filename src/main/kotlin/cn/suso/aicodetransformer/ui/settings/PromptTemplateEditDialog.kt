@@ -3,19 +3,25 @@ package cn.suso.aicodetransformer.ui.settings
 import cn.suso.aicodetransformer.model.PromptTemplate
 import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
+import cn.suso.aicodetransformer.constants.TemplateConstants
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.ValidationInfo
 import java.awt.Dimension
+import java.awt.FlowLayout
+import javax.swing.Action
+import javax.swing.JButton
 import javax.swing.JComponent
+import javax.swing.JPanel
 
 /**
  * Prompt模板编辑对话框
  */
 class PromptTemplateEditDialog(
     private val project: Project?,
-    private val template: PromptTemplate? = null
+    private val template: PromptTemplate? = null,
+    private val defaultCategory: String? = null
 ) : DialogWrapper(project) {
     
     private val templateService: PromptTemplateService = PromptTemplateServiceImpl.getInstance()
@@ -25,9 +31,13 @@ class PromptTemplateEditDialog(
     
     init {
         title = if (template != null) "编辑模板" else "创建模板"
-        setOKButtonText("保存")
+        setOKButtonText("确认")
+        setCancelButtonText("取消")
         
         editPanel.setTemplate(template)
+        
+        // 根据模板类型设置可用变量
+        setAvailableVariablesForTemplate(template)
         
         init()
         
@@ -38,6 +48,53 @@ class PromptTemplateEditDialog(
     override fun createCenterPanel(): JComponent {
         editPanel.preferredSize = Dimension(750, 550)
         return editPanel
+    }
+    
+    override fun createSouthPanel(): JComponent {
+        val panel = JPanel(FlowLayout(FlowLayout.LEFT))
+        
+        // 创建应用按钮
+        val applyButton = JButton("应用")
+        applyButton.addActionListener {
+            if (doValidate() == null) {
+                doApplyAction()
+            }
+        }
+        
+        // 创建确认按钮
+        val okButton = JButton("确认")
+        okButton.addActionListener {
+            doOKAction()
+        }
+        
+        // 创建取消按钮
+        val cancelButton = JButton("取消")
+        cancelButton.addActionListener {
+            doCancelAction()
+        }
+        
+        panel.add(applyButton)
+        panel.add(okButton)
+        panel.add(cancelButton)
+        
+        return panel
+    }
+    
+    private fun doApplyAction() {
+        val templateFromFields = editPanel.createTemplateFromFields()
+        if (templateFromFields != null) {
+            try {
+                templateService.saveTemplate(templateFromFields)
+                result = templateFromFields
+                // 应用后不关闭对话框，只是保存
+            } catch (e: Exception) {
+                Messages.showErrorDialog(
+                    contentPanel,
+                    "保存模板失败: ${e.message}",
+                    "保存失败"
+                )
+            }
+        }
     }
     
     override fun doValidate(): ValidationInfo? {
@@ -143,13 +200,32 @@ class PromptTemplateEditDialog(
      * 获取编辑结果
      */
     fun getTemplate(): PromptTemplate? = result
+     
+     /**
+      * 根据模板类型设置可用变量
+      */
+     private fun setAvailableVariablesForTemplate(template: PromptTemplate?) {
+          val availableVariables = when {
+                // 如果是提交相关的模板，只显示Git相关的变量
+                template?.tags?.contains("commit") == true ||
+                template?.tags?.contains("git") == true ||
+                template?.category == "GIT_OPERATIONS" ||
+                defaultCategory == "GIT_OPERATIONS" -> {
+                    TemplateConstants.GitBuiltInVariable.values().map { it.variable to it.description }
+                }
+                // 其他情况显示模板变量
+                else -> TemplateConstants.TemplateBuiltInVariable.values().map { it.variable to it.description }
+            }
+          
+          editPanel.setAvailableVariables(availableVariables)
+      }
     
     companion object {
         /**
          * 显示创建模板对话框
          */
-        fun showCreateDialog(project: Project?): PromptTemplate? {
-            val dialog = PromptTemplateEditDialog(project)
+        fun showCreateDialog(project: Project?, category: String? = null): PromptTemplate? {
+            val dialog = PromptTemplateEditDialog(project, null, category)
             return if (dialog.showAndGet()) {
                 dialog.getTemplate()
             } else {

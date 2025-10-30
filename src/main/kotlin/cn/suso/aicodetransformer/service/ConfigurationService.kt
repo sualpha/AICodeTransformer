@@ -3,6 +3,7 @@ package cn.suso.aicodetransformer.service
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.model.LoggingConfigState
 import cn.suso.aicodetransformer.model.GlobalSettings
+import cn.suso.aicodetransformer.model.CommitSettings
 
 /**
  * 配置管理服务接口
@@ -134,6 +135,18 @@ interface ConfigurationService {
      * @param settings 全局设置
      */
     fun updateGlobalSettings(settings: GlobalSettings)
+    
+    /**
+     * 获取Commit设置
+     * @return Commit设置
+     */
+    fun getCommitSettings(): CommitSettings
+    
+    /**
+     * 保存Commit设置
+     * @param settings Commit设置
+     */
+    fun saveCommitSettings(settings: CommitSettings)
 }
 
 /**

@@ -67,13 +67,6 @@ interface AIModelService {
     fun validateApiKeyFormat(apiKey: String, modelType: String): Boolean
     
     /**
-     * 估算Token使用量
-     * @param text 文本内容
-     * @return 估算的Token数量
-     */
-    fun estimateTokens(text: String): Int
-    
-    /**
      * 获取请求状态
      * @param requestId 请求ID
      * @return 请求状态

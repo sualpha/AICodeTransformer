@@ -2,6 +2,7 @@ package cn.suso.aicodetransformer.ui.settings
 
 import cn.suso.aicodetransformer.constants.UpdateStatus
 import cn.suso.aicodetransformer.model.UpdateInfo
+import cn.suso.aicodetransformer.model.GlobalSettings
 import cn.suso.aicodetransformer.service.LoggingService
 import cn.suso.aicodetransformer.constants.LogLevel
 import cn.suso.aicodetransformer.model.LoggingConfig
@@ -598,7 +599,13 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             }
             
             // 创建新的全局设置
-            val newSettings = currentSettings.copy(
+            val newSettings = GlobalSettings(
+                enableLogging = currentSettings.enableLogging,
+                logLevel = currentSettings.logLevel,
+                connectionTimeoutMs = currentSettings.connectionTimeoutMs,
+                readTimeoutMs = currentSettings.readTimeoutMs,
+                retryAttempts = currentSettings.retryAttempts,
+                retryDelayMs = currentSettings.retryDelayMs,
                 enableAutoUpdate = enableAutoUpdateCheckBox.isSelected,
                 updateInterval = intervalString,
                 updateCheckIntervalHours = intervalHours,

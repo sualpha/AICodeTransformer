@@ -8,67 +8,44 @@ object ModelConfigConstants {
     
     /**
      * AI服务提供商配置枚举
-     * 将每个服务提供商的所有相关配置整合到一个枚举中
+     * 提供各个服务提供商的基本配置信息
      */
     enum class AIProviderConfig(
-        val id: String,
-        val displayName: String,
-        val description: String,
+        val typeDisplayName: String,
         val apiBaseUrl: String,
-        val defaultModelName: String,
         val supportedModels: List<String>,
-        val defaultMaxTokens: Int,
-        val typeDisplayName: String
+        val defaultMaxTokens: Int
     ) {
         OPENAI(
-            id = "openai-default",
-            displayName = "OpenAI GPT-4",
-            description = "OpenAI官方GPT-4模型",
+            typeDisplayName = "OpenAI兼容",
             apiBaseUrl = "https://api.openai.com/v1",
-            defaultModelName = "gpt-4",
             supportedModels = listOf(
                 "gpt-4", "gpt-4-turbo-preview", "gpt-4-0125-preview",
                 "gpt-3.5-turbo", "gpt-3.5-turbo-0125"
             ),
-            defaultMaxTokens = 4096,
-            typeDisplayName = "OpenAI兼容"
+            defaultMaxTokens = 8000
         ),
         
         CLAUDE(
-            id = "claude-default",
-            displayName = "Claude 3 Sonnet",
-            description = "Anthropic Claude 3 Sonnet模型",
+            typeDisplayName = "Claude",
             apiBaseUrl = "https://api.anthropic.com",
-            defaultModelName = "claude-3-sonnet-20240229",
             supportedModels = listOf(
                 "claude-3-opus-20240229", "claude-3-sonnet-20240229", 
                 "claude-3-haiku-20240307", "claude-2.1", "claude-2.0"
             ),
-            defaultMaxTokens = 100000,
-            typeDisplayName = "Claude"
+            defaultMaxTokens = 100000
         ),
         
         LOCAL(
-            id = "local-default",
-            displayName = "Local Model (Ollama)",
-            description = "本地部署的Ollama AI模型",
+            typeDisplayName = "本地模型",
             apiBaseUrl = "http://localhost:11434",
-            defaultModelName = "llama2",
             supportedModels = listOf(
                 "local-model", "llama2", "codellama", "mistral", "custom"
             ),
-            defaultMaxTokens = 2048,
-            typeDisplayName = "本地模型"
+            defaultMaxTokens = 2048
         );
         
         companion object {
-            /**
-             * 根据ID查找配置
-             */
-            fun findById(id: String): AIProviderConfig? {
-                return values().find { it.id == id }
-            }
-            
             /**
              * 根据模型类型查找配置
              */
@@ -94,8 +71,8 @@ object ModelConfigConstants {
      * 默认参数值
      */
     object DefaultParameters {
-        const val TEMPERATURE = 0.7
-        const val MAX_TOKENS_OPENAI = 4096
+        const val TEMPERATURE = 0.2
+        const val MAX_TOKENS_OPENAI = 8000
         const val MAX_TOKENS_CLAUDE = 100000
         const val MAX_TOKENS_LOCAL = 2048
         const val CONNECT_TIMEOUT_SECONDS = 30

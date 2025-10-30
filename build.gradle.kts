@@ -1,7 +1,7 @@
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.23"
-    id("org.jetbrains.intellij") version "1.17.3"
+    id("org.jetbrains.intellij") version "1.17.4"
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.23"
 }
 
@@ -40,9 +40,9 @@ dependencies {
 // Configure Gradle IntelliJ Plugin
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-gradle-intellij-plugin.html
 intellij {
-    localPath.set("D:\\application\\tool\\IntelliJ IDEA 2024.1.2")
-    // version.set("2023.2.6")
-    // type.set("IC") // Target IDE Platform
+    // localPath.set("D:\\application\\tool\\IntelliJ IDEA 2024.1.2")  // 注释掉本地路径
+    version.set("2024.1.2")  // 使用指定版本
+    type.set("IC") // 使用 Community Edition (免费版)
     
     // 禁用下载源码和文档以避免网络问题
     downloadSources.set(false)
@@ -50,7 +50,7 @@ intellij {
     // 禁用版本检查以避免网络问题
     updateSinceUntilBuild.set(false)
     
-    plugins.set(listOf("com.intellij.java", "org.jetbrains.kotlin"))
+    plugins.set(listOf("com.intellij.java", "org.jetbrains.kotlin", "Git4Idea"))
 }
 
 tasks {

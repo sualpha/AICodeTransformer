@@ -132,6 +132,7 @@ enum class TemplateCategory(val displayName: String, val description: String) {
     MOBILE("移动开发", "移动应用开发相关"),
     DEVOPS("运维部署", "部署和运维相关代码"),
     ALGORITHM("算法实现", "算法和数据结构实现"),
+    GIT_OPERATIONS("Git操作", "Git提交、分支管理等版本控制相关"),
     CUSTOM("自定义", "用户自定义模板")
 }
 

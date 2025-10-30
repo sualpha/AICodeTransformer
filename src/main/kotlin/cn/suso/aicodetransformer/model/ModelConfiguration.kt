@@ -12,83 +12,195 @@ import cn.suso.aicodetransformer.constants.ModelConfigConstants
  */
 @Serializable
 @Tag("ModelConfiguration")
-data class ModelConfiguration(
+class ModelConfiguration {
     /** 配置ID，唯一标识 */
     @Attribute("id")
-    val id: String = "",
+    var id: String = ""
+        get() = field
+        set(value) { field = value }
     
     /** 模型名称，用于显示 */
     @Attribute("name")
-    val name: String = "",
+    var name: String = ""
+        get() = field
+        set(value) { field = value }
     
     /** 模型描述 */
     @Attribute("description")
-    val description: String = "",
+    var description: String = ""
+        get() = field
+        set(value) { field = value }
     
     /** API基础URL */
     @Attribute("apiBaseUrl")
-    val apiBaseUrl: String = "",
+    var apiBaseUrl: String = ""
+        get() = field
+        set(value) { field = value }
 
     /** 模型名称（如gpt-4, claude-3-sonnet等） */
     @Attribute("modelName")
-    val modelName: String = "",
+    var modelName: String = ""
+        get() = field
+        set(value) { field = value }
     
     /** 温度参数，控制输出随机性 (0.0-2.0) */
     @Attribute("temperature")
-    val temperature: Double = ModelConfigConstants.DefaultParameters.TEMPERATURE,
+    var temperature: Double = ModelConfigConstants.DefaultParameters.TEMPERATURE
+        get() = field
+        set(value) { field = value }
     
     /** 最大Token数 */
     @Attribute("maxTokens")
-    val maxTokens: Int = ModelConfigConstants.DefaultParameters.MAX_TOKENS_OPENAI,
+    var maxTokens: Int = ModelConfigConstants.DefaultParameters.MAX_TOKENS_OPENAI
+        get() = field
+        set(value) { field = value }
     
     /** 是否启用 */
     @Attribute("enabled")
-    val enabled: Boolean = ModelConfigConstants.DefaultParameters.ENABLED,
+    var enabled: Boolean = ModelConfigConstants.DefaultParameters.ENABLED
+        get() = field
+        set(value) { field = value }
     
     /** 模型类型 */
     @Attribute("modelType")
-    val modelType: ModelType = ModelType.OPENAI_COMPATIBLE,
+    var modelType: ModelType = ModelType.OPENAI_COMPATIBLE
+        get() = field
+        set(value) { field = value }
     
     /** 连接超时时间（秒） */
     @Attribute("connectTimeoutSeconds")
-    val connectTimeoutSeconds: Int = ModelConfigConstants.DefaultParameters.CONNECT_TIMEOUT_SECONDS,
+    var connectTimeoutSeconds: Int = ModelConfigConstants.DefaultParameters.CONNECT_TIMEOUT_SECONDS
+        get() = field
+        set(value) { field = value }
     
     /** 读取超时时间（秒） */
     @Attribute("readTimeoutSeconds")
-    val readTimeoutSeconds: Int = ModelConfigConstants.DefaultParameters.READ_TIMEOUT_SECONDS,
+    var readTimeoutSeconds: Int = ModelConfigConstants.DefaultParameters.READ_TIMEOUT_SECONDS
+        get() = field
+        set(value) { field = value }
     
     /** 重试次数 */
     @Attribute("retryCount")
-    val retryCount: Int = ModelConfigConstants.DefaultParameters.RETRY_COUNT,
+    var retryCount: Int = ModelConfigConstants.DefaultParameters.RETRY_COUNT
+        get() = field
+        set(value) { field = value }
     
     /** 是否启用流式响应 */
     @Attribute("streamResponse")
-    val streamResponse: Boolean = ModelConfigConstants.DefaultParameters.STREAM_RESPONSE,
+    var streamResponse: Boolean = ModelConfigConstants.DefaultParameters.STREAM_RESPONSE
+        get() = field
+        set(value) { field = value }
     
     /** 自定义请求头 */
-    @kotlinx.serialization.Transient
-    val customHeaders: Map<String, String> = emptyMap(),
+    @Transient
+    var customHeaders: Map<String, String> = emptyMap()
+        get() = field
+        set(value) { field = value }
     
     /** 创建时间 */
     @Attribute("createdAt")
-    val createdAt: Long = System.currentTimeMillis(),
+    var createdAt: Long = System.currentTimeMillis()
+        get() = field
+        set(value) { field = value }
     
     /** 最后更新时间 */
     @Attribute("updatedAt")
-    val updatedAt: Long = System.currentTimeMillis(),
+    var updatedAt: Long = System.currentTimeMillis()
+        get() = field
+        set(value) { field = value }
     
     /** 最后使用时间 */
     @Attribute("lastUsedAt")
-    val lastUsedAt: Long? = null,
+    var lastUsedAt: Long? = null
+        get() = field
+        set(value) { field = value }
     
     /** 使用次数统计 */
     @Attribute("usageCount")
-    val usageCount: Int = 0,
+    var usageCount: Int = 0
+        get() = field
+        set(value) { field = value }
     
     /** API密钥 */
     @Attribute("apiKey")
-    val apiKey: String = ""
-) {
+    var apiKey: String = ""
+        get() = field
+        set(value) { field = value }
+    
+    // 默认构造函数
+    constructor()
+    
+    // 复制构造函数
+    constructor(
+        id: String = "",
+        name: String = "",
+        description: String = "",
+        apiBaseUrl: String = "",
+        modelName: String = "",
+        temperature: Double = ModelConfigConstants.DefaultParameters.TEMPERATURE,
+        maxTokens: Int = ModelConfigConstants.DefaultParameters.MAX_TOKENS_OPENAI,
+        enabled: Boolean = ModelConfigConstants.DefaultParameters.ENABLED,
+        modelType: ModelType = ModelType.OPENAI_COMPATIBLE,
+        connectTimeoutSeconds: Int = ModelConfigConstants.DefaultParameters.CONNECT_TIMEOUT_SECONDS,
+        readTimeoutSeconds: Int = ModelConfigConstants.DefaultParameters.READ_TIMEOUT_SECONDS,
+        retryCount: Int = ModelConfigConstants.DefaultParameters.RETRY_COUNT,
+        streamResponse: Boolean = ModelConfigConstants.DefaultParameters.STREAM_RESPONSE,
+        customHeaders: Map<String, String> = emptyMap(),
+        createdAt: Long = System.currentTimeMillis(),
+        updatedAt: Long = System.currentTimeMillis(),
+        lastUsedAt: Long? = null,
+        usageCount: Int = 0,
+        apiKey: String = ""
+    ) {
+        this.id = id
+        this.name = name
+        this.description = description
+        this.apiBaseUrl = apiBaseUrl
+        this.modelName = modelName
+        this.temperature = temperature
+        this.maxTokens = maxTokens
+        this.enabled = enabled
+        this.modelType = modelType
+        this.connectTimeoutSeconds = connectTimeoutSeconds
+        this.readTimeoutSeconds = readTimeoutSeconds
+        this.retryCount = retryCount
+        this.streamResponse = streamResponse
+        this.customHeaders = customHeaders
+        this.createdAt = createdAt
+        this.updatedAt = updatedAt
+        this.lastUsedAt = lastUsedAt
+        this.usageCount = usageCount
+        this.apiKey = apiKey
+    }
+    
+    // 复制方法
+    fun copy(
+        id: String = this.id,
+        name: String = this.name,
+        description: String = this.description,
+        apiBaseUrl: String = this.apiBaseUrl,
+        modelName: String = this.modelName,
+        temperature: Double = this.temperature,
+        maxTokens: Int = this.maxTokens,
+        enabled: Boolean = this.enabled,
+        modelType: ModelType = this.modelType,
+        connectTimeoutSeconds: Int = this.connectTimeoutSeconds,
+        readTimeoutSeconds: Int = this.readTimeoutSeconds,
+        retryCount: Int = this.retryCount,
+        streamResponse: Boolean = this.streamResponse,
+        customHeaders: Map<String, String> = this.customHeaders,
+        createdAt: Long = this.createdAt,
+        updatedAt: Long = this.updatedAt,
+        lastUsedAt: Long? = this.lastUsedAt,
+        usageCount: Int = this.usageCount,
+        apiKey: String = this.apiKey
+    ): ModelConfiguration {
+        return ModelConfiguration(
+            id, name, description, apiBaseUrl, modelName, temperature, maxTokens,
+            enabled, modelType, connectTimeoutSeconds, readTimeoutSeconds, retryCount,
+            streamResponse, customHeaders, createdAt, updatedAt, lastUsedAt, usageCount, apiKey
+        )
+    }
     /**
      * 验证配置是否有效
      */
@@ -166,50 +278,6 @@ data class ModelConfiguration(
     }
     
     companion object {
-        /** 创建默认的OpenAI配置 */
-        fun createOpenAIDefault(): ModelConfiguration {
-            val config = ModelConfigConstants.AIProviderConfig.OPENAI
-            return ModelConfiguration(
-                id = config.id,
-                name = config.displayName,
-                description = config.description,
-                apiBaseUrl = config.apiBaseUrl,
-                modelName = config.defaultModelName,
-                modelType = ModelType.OPENAI_COMPATIBLE,
-                maxTokens = config.defaultMaxTokens,
-                apiKey = ""
-            )
-        }
-        
-        /** 创建默认的Claude配置 */
-        fun createClaudeDefault(): ModelConfiguration {
-            val config = ModelConfigConstants.AIProviderConfig.CLAUDE
-            return ModelConfiguration(
-                id = config.id,
-                name = config.displayName,
-                description = config.description,
-                apiBaseUrl = config.apiBaseUrl,
-                modelName = config.defaultModelName,
-                modelType = ModelType.CLAUDE,
-                maxTokens = config.defaultMaxTokens,
-                apiKey = ""
-            )
-        }
-        
-        /** 创建默认的本地模型配置 */
-        fun createLocalDefault(): ModelConfiguration {
-            val config = ModelConfigConstants.AIProviderConfig.LOCAL
-            return ModelConfiguration(
-                id = config.id,
-                name = config.displayName,
-                description = config.description,
-                apiBaseUrl = config.apiBaseUrl,
-                modelName = config.defaultModelName,
-                modelType = ModelType.LOCAL,
-                maxTokens = config.defaultMaxTokens,
-                apiKey = ""
-            )
-        }
         
         /** 创建空的配置用于新建 */
         fun createEmpty(): ModelConfiguration {
@@ -227,7 +295,6 @@ data class ModelConfiguration(
 /**
  * 模型类型枚举
  */
-@Serializable
 enum class ModelType(val displayName: String, val defaultBaseUrl: String) {
     /** OpenAI兼容API */
     OPENAI_COMPATIBLE(ModelConfigConstants.AIProviderConfig.OPENAI.typeDisplayName, ModelConfigConstants.AIProviderConfig.OPENAI.apiBaseUrl),
@@ -267,11 +334,8 @@ enum class ModelType(val displayName: String, val defaultBaseUrl: String) {
 /**
  * 验证结果
  */
-@Serializable
 sealed class ModelValidationResult {
-    @Serializable
     object Success : ModelValidationResult()
-    @Serializable
     data class Error(val errors: List<String>) : ModelValidationResult()
     
     val isValid: Boolean

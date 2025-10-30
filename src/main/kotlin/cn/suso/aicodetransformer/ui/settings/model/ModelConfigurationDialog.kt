@@ -140,20 +140,20 @@ class ModelConfigurationDialog(
             ModelType.OPENAI_COMPATIBLE -> {
                 apiBaseUrlField.text = "https://api.openai.com/v1"
                 modelNameField.text = "gpt-3.5-turbo"
-                temperatureSpinner.value = 0.7
-                maxTokensSpinner.value = 2048
+                temperatureSpinner.value = 0.2
+                maxTokensSpinner.value = 8000
             }
             ModelType.CLAUDE -> {
                 apiBaseUrlField.text = "https://api.anthropic.com"
                 modelNameField.text = "claude-3-sonnet-20240229"
-                temperatureSpinner.value = 0.7
-                maxTokensSpinner.value = 4096
+                temperatureSpinner.value = 0.2
+                maxTokensSpinner.value = 8000
             }
             ModelType.LOCAL -> {
                 apiBaseUrlField.text = "http://localhost:11434/v1"
                 modelNameField.text = "llama2"
-                temperatureSpinner.value = 0.8
-                maxTokensSpinner.value = 2048
+                temperatureSpinner.value = 0.2
+                maxTokensSpinner.value = 8000
             }
         }
     }

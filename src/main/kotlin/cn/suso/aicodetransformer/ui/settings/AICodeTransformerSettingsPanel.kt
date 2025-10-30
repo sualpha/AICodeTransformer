@@ -3,6 +3,7 @@ package cn.suso.aicodetransformer.ui.settings
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.ui.settings.model.ModelConfigurationPanel
+
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBTabbedPane
@@ -28,6 +29,7 @@ class AICodeTransformerSettingsPanel(
     private val tabbedPane = JBTabbedPane()
     private val modelConfigPanel: ModelConfigurationPanel
     private val promptTemplatePanel: PromptTemplatePanel
+    private val commitSettingsPanel: CommitSettingsPanel
     private val systemManagementPanel: SystemManagementPanel
     
     private var originalConfigurations: List<ModelConfiguration> = emptyList()
@@ -42,12 +44,16 @@ class AICodeTransformerSettingsPanel(
         // 初始化Prompt模板面板
         promptTemplatePanel = PromptTemplatePanel(project, configurationService)
         
+        // 初始化提交设置面板
+        commitSettingsPanel = CommitSettingsPanel(project, configurationService)
+        
         // 初始化配置管理面板
         systemManagementPanel = SystemManagementPanel(project)
         
         // 添加标签页 - 使用紧凑的标题
         tabbedPane.addTab("模型", modelConfigPanel)
         tabbedPane.addTab("模板", promptTemplatePanel)
+        tabbedPane.addTab("commit", commitSettingsPanel)
         tabbedPane.addTab("系统", systemManagementPanel)
         
         // 设置tab页独立性 - 允许每个tab页有独立的高度
@@ -86,7 +92,7 @@ class AICodeTransformerSettingsPanel(
      * 检查是否有修改
      */
     fun isModified(): Boolean {
-        return modelConfigPanel.isModified() || promptTemplatePanel.isModified()
+        return modelConfigPanel.isModified() || promptTemplatePanel.isModified() || commitSettingsPanel.isModified()
     }
     
     /**
@@ -94,18 +100,43 @@ class AICodeTransformerSettingsPanel(
      */
     fun apply() {
         try {
+            // 检查是否有实际修改
+            val hasModelChanges = modelConfigPanel.isModified()
+            val hasPromptChanges = promptTemplatePanel.isModified()
+            val hasCommitChanges = commitSettingsPanel.isModified()
+            
+            // 只有在有修改时才执行保存操作
+            if (!hasModelChanges && !hasPromptChanges && !hasCommitChanges) {
+                return
+            }
+            
             // 应用模型配置更改
-            modelConfigPanel.apply()
+            if (hasModelChanges) {
+                modelConfigPanel.apply()
+            }
             
             // 应用Prompt模板更改
-            promptTemplatePanel.apply()
+            if (hasPromptChanges) {
+                promptTemplatePanel.apply()
+            }
+            
+            // 应用提交设置更改
+            if (hasCommitChanges) {
+                commitSettingsPanel.apply()
+            }
             
             // 更新原始配置
             originalConfigurations = configurationService.getModelConfigurations()
             
+            // 根据修改的内容显示相应的保存消息
+            val savedItems = mutableListOf<String>()
+            if (hasModelChanges) savedItems.add("模型配置")
+            if (hasPromptChanges) savedItems.add("提示模板")
+            if (hasCommitChanges) savedItems.add("提交设置")
+            
             Messages.showInfoMessage(
                 project,
-                "配置已成功保存！",
+                "${savedItems.joinToString("、")}已成功保存！",
                 "保存成功"
             )
         } catch (e: Exception) {
@@ -131,6 +162,7 @@ class AICodeTransformerSettingsPanel(
                 // 重置各个面板
                 modelConfigPanel.reset()
                 promptTemplatePanel.reset()
+                commitSettingsPanel.reset()
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     project,

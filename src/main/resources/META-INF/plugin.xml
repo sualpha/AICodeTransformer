@@ -45,6 +45,8 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.java</depends>
+    <depends>com.intellij.modules.vcs</depends>
+    <depends>Git4Idea</depends>
     
     <!-- Dynamic plugin support - allows installation/uninstallation without IDE restart -->
     <!-- Note: Some complex dependencies may still require restart -->
@@ -82,6 +84,12 @@
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.LoggingServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.AutoUpdateService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.AutoUpdateServiceImpl"/>
+        <applicationService serviceInterface="cn.suso.aicodetransformer.service.TemplateService"
+                           serviceImplementation="cn.suso.aicodetransformer.service.impl.TemplateServiceImpl"/>
+        
+        <!-- Project-level services -->
+        <projectService serviceInterface="cn.suso.aicodetransformer.service.VCSService"
+                       serviceImplementation="cn.suso.aicodetransformer.service.impl.VCSServiceImpl"/>
         
         <!-- Project startup activity -->
         <postStartupActivity implementation="cn.suso.aicodetransformer.AICodeTransformerProjectActivity"/>
@@ -98,18 +106,14 @@
     
     <!-- Actions -->
     <actions>
-        <!-- 主要转换动作 -->
-        <action id="AICodeTransformer.PerformanceOptimization" 
-                class="cn.suso.aicodetransformer.action.PerformanceOptimizationAction"
-                text="性能优化" 
-                description="打开AI代码转换器性能优化面板">
+
+        <!-- Git提交对话框中的AI生成按钮 -->
+        <action id="AICodeTransformer.CommitDialogAI" 
+                class="cn.suso.aicodetransformer.action.CommitDialogAIAction"
+                text="🤖 AI生成" 
+                description="使用AI自动生成commit信息并填充到提交框">
+            <add-to-group group-id="Vcs.MessageActionGroup" anchor="last"/>
         </action>
-        
-        <!-- AI Code Transformer 主菜单组 -->
-        <group id="AICodeTransformer.MainGroup" text="AI代码转换器" description="AI代码转换工具" popup="true">
-            <reference ref="AICodeTransformer.PerformanceOptimization"/>
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
-        </group>
         
         <!-- 动态模板菜单组 - 显示所有可用的prompt模板 -->
         <group id="AICodeTransformer.DynamicTemplates" 

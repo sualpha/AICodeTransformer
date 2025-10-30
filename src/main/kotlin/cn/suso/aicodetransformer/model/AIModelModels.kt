@@ -26,7 +26,8 @@ data class OpenAIResponse(
 
 @Serializable
 data class OpenAIChoice(
-    val message: OpenAIMessage
+    val message: OpenAIMessage? = null,
+    @SerialName("finish_reason") val finishReason: String? = null
 )
 
 // Claude API数据类

@@ -117,7 +117,10 @@ object TemplateConstants {
     /**
      * 内置变量定义
      */
-    enum class BuiltInVariable(val variable: String, val description: String) {
+    /**
+     * 模板内置变量
+     */
+    enum class TemplateBuiltInVariable(val variable: String, val description: String) {
         SELECTED_CODE("{{selectedCode}}", "当前选中的代码"),
         FILE_NAME("{{fileName}}", "当前文件名"),
         LANGUAGE("{{language}}", "当前文件的编程语言"),
@@ -130,6 +133,17 @@ object TemplateConstants {
         RESPONSE_PARAMS("{{responseParams}}", "方法返回参数信息"),
         FIRST_REQUEST_PARAM("{{firstRequestParam}}", "第一个请求参数信息")
     }
+
+    /**
+     * Git内置变量
+     */
+    enum class GitBuiltInVariable(val variable: String, val description: String) {
+        CHANGED_FILES("{{changedFiles}}", "Git变更文件列表"),
+        FILE_DIFFS("{{fileDiffs}}", "文件差异详情"),
+        BATCH_COMMIT_MESSAGES("{{batchCommitMessages}}", "多个批次的提交信息")
+    }
+
+
     
     /**
      * 模板标签常量
@@ -159,7 +173,9 @@ object TemplateConstants {
      * 获取所有内置变量的映射
      */
     fun getBuiltInVariablesMap(): Map<String, String> {
-        return BuiltInVariable.values().associate { it.variable to it.description }
+        val templateVariables = TemplateBuiltInVariable.values().associate { it.variable to it.description }
+        val gitVariables = GitBuiltInVariable.values().associate { it.variable to it.description }
+        return templateVariables + gitVariables
     }
     
 

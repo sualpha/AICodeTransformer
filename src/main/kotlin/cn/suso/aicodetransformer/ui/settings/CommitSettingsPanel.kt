@@ -1,6 +1,8 @@
 package cn.suso.aicodetransformer.ui.settings
 
+import cn.suso.aicodetransformer.constants.TemplateConstants
 import cn.suso.aicodetransformer.model.CommitSettings
+import cn.suso.aicodetransformer.model.CommitTemplateType
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
 import com.intellij.openapi.project.Project
@@ -8,10 +10,12 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.PopupStep
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
@@ -32,6 +36,11 @@ class CommitSettingsPanel(
     // UI组件
     private val autoCommitCheckBox = JBCheckBox("启用自动提交")
     private val autoPushCheckBox = JBCheckBox("启用自动推送")
+    private val singleFileTemplateTextArea = JBTextArea()
+    private val summaryTemplateTextArea = JBTextArea()
+    
+    // 保留向后兼容
+    @Deprecated("使用 singleFileTemplateTextArea 替代")
     private val templateTextArea = JBTextArea()
     
     // 当前设置
@@ -51,26 +60,30 @@ class CommitSettingsPanel(
             .addComponent(autoCommitCheckBox)
             .addComponent(autoPushCheckBox)
             .addVerticalGap(10)
-            .addComponent(createTemplatePanel())
+            .addComponent(createSingleFileTemplatePanel())
+            .addVerticalGap(10)
+            .addComponent(createSummaryTemplatePanel())
             .panel
         
         add(formPanel, BorderLayout.NORTH)
     }
     
-    private fun createTemplatePanel(): JPanel {
+
+
+    private fun createSingleFileTemplatePanel(): JPanel {
         val panel = JPanel(BorderLayout())
         
         // 添加标签到顶部
-        val titleLabel = JBLabel("Commit 提示词:")
+        val titleLabel = JBLabel("单个文件提示词:")
         panel.add(titleLabel, BorderLayout.NORTH)
         
-        templateTextArea.rows = 8
-        templateTextArea.columns = 50
-        templateTextArea.lineWrap = true
-        templateTextArea.wrapStyleWord = true
+        singleFileTemplateTextArea.rows = 6
+        singleFileTemplateTextArea.columns = 50
+        singleFileTemplateTextArea.lineWrap = true
+        singleFileTemplateTextArea.wrapStyleWord = true
         
-        val scrollPane = JBScrollPane(templateTextArea)
-        scrollPane.preferredSize = Dimension(500, 200)
+        val scrollPane = JBScrollPane(singleFileTemplateTextArea)
+        scrollPane.preferredSize = Dimension(500, 150)
         panel.add(scrollPane, BorderLayout.CENTER)
         
         // 创建底部面板，包含按钮和说明
@@ -79,31 +92,63 @@ class CommitSettingsPanel(
         // 创建按钮面板
         val buttonPanel = JPanel(BorderLayout())
         
-        // 左侧按钮面板（Insert Variable）
+        // 左侧按钮面板（重置、Insert Variable）
         val leftButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        val resetButton = JButton("重置为默认")
+        resetButton.addActionListener { 
+            singleFileTemplateTextArea.text = CommitSettings.SIMPLE_TEMPLATE
+        }
+        leftButtonPanel.add(resetButton)
+        
         val insertVariableButton = JButton("插入内置变量")
-        insertVariableButton.addActionListener { showVariablePopup(insertVariableButton) }
+        insertVariableButton.addActionListener { showVariablePopup(insertVariableButton, singleFileTemplateTextArea, singleFileVariables) }
         leftButtonPanel.add(insertVariableButton)
         
-        // 右侧按钮面板（重置、保存）
-        val rightButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT))
-        val resetButton = JButton("重置")
-        resetButton.addActionListener { reset() }
-        val saveButton = JButton("保存")
-        saveButton.addActionListener { apply() }
-        rightButtonPanel.add(resetButton)
-        rightButtonPanel.add(saveButton)
-        
         buttonPanel.add(leftButtonPanel, BorderLayout.WEST)
-        buttonPanel.add(rightButtonPanel, BorderLayout.EAST)
-        
-        // 创建说明面板
-        val helpPanel = JPanel(BorderLayout())
-        val helpLabel = JBLabel("<html><small>此模板将作为AI提示词使用。点击\"插入变量\"按钮选择内置变量，每个变量都有详细的含义说明。</small></html>")
-        helpPanel.add(helpLabel, BorderLayout.CENTER)
         
         bottomPanel.add(buttonPanel, BorderLayout.NORTH)
-        bottomPanel.add(helpPanel, BorderLayout.CENTER)
+        panel.add(bottomPanel, BorderLayout.SOUTH)
+        
+        return panel
+    }
+    
+    private fun createSummaryTemplatePanel(): JPanel {
+        val panel = JPanel(BorderLayout())
+        
+        // 添加标签到顶部
+        val titleLabel = JBLabel("汇总提示词:")
+        panel.add(titleLabel, BorderLayout.NORTH)
+        
+        summaryTemplateTextArea.rows = 6
+        summaryTemplateTextArea.columns = 50
+        summaryTemplateTextArea.lineWrap = true
+        summaryTemplateTextArea.wrapStyleWord = true
+        
+        val scrollPane = JBScrollPane(summaryTemplateTextArea)
+        scrollPane.preferredSize = Dimension(500, 150)
+        panel.add(scrollPane, BorderLayout.CENTER)
+        
+        // 创建底部面板，包含按钮和说明
+        val bottomPanel = JPanel(BorderLayout())
+        
+        // 创建按钮面板
+        val buttonPanel = JPanel(BorderLayout())
+        
+        // 左侧按钮面板（重置、Insert Variable）
+        val leftButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT))
+        val resetButton = JButton("重置为默认")
+        resetButton.addActionListener { 
+            summaryTemplateTextArea.text = CommitSettings.SUMMARY_TEMPLATE
+        }
+        leftButtonPanel.add(resetButton)
+        
+        val insertVariableButton = JButton("插入内置变量")
+        insertVariableButton.addActionListener { showVariablePopup(insertVariableButton, summaryTemplateTextArea, summaryVariables) }
+        leftButtonPanel.add(insertVariableButton)
+        
+        buttonPanel.add(leftButtonPanel, BorderLayout.WEST)
+        
+        bottomPanel.add(buttonPanel, BorderLayout.NORTH)
         panel.add(bottomPanel, BorderLayout.SOUTH)
         
         return panel
@@ -154,6 +199,9 @@ class CommitSettingsPanel(
         autoCommitCheckBox.isSelected = currentSettings.autoCommitEnabled
         autoPushCheckBox.isSelected = currentSettings.autoPushEnabled
         autoPushCheckBox.isEnabled = currentSettings.autoCommitEnabled
+        singleFileTemplateTextArea.text = currentSettings.singleFileTemplate
+        summaryTemplateTextArea.text = currentSettings.summaryTemplate
+        // 保留向后兼容
         templateTextArea.text = currentSettings.commitTemplate
     }
     
@@ -171,23 +219,20 @@ class CommitSettingsPanel(
      * 应用更改
      */
     fun apply() {
+        // 只在有修改时才保存
+        if (!isModified()) {
+            return
+        }
+        
         try {
             currentSettings = getSettingsFromUI()
             // 保存到ConfigurationService
             configurationService.saveCommitSettings(currentSettings)
             originalSettings = currentSettings.copy()
-            
-            Messages.showInfoMessage(
-                this,
-                "Commit设置已保存！",
-                "保存成功"
-            )
+
+            // 移除单独的保存成功消息，由主面板统一显示
         } catch (e: Exception) {
-            Messages.showErrorDialog(
-                this,
-                "保存Commit设置失败: ${e.message}",
-                "保存失败"
-            )
+
         }
     }
     
@@ -203,22 +248,44 @@ class CommitSettingsPanel(
         return CommitSettings(
             autoCommitEnabled = autoCommitCheckBox.isSelected,
             autoPushEnabled = autoPushCheckBox.isSelected,
-            commitTemplate = templateTextArea.text
+            singleFileTemplate = singleFileTemplateTextArea.text,
+            summaryTemplate = summaryTemplateTextArea.text,
+            commitTemplate = templateTextArea.text,
+            templateType = CommitTemplateType.SIMPLE,
+            useBatchProcessing = currentSettings.useBatchProcessing,
+            batchSize = currentSettings.batchSize,
+            maxFileContentLength = currentSettings.maxFileContentLength,
+            maxTotalContentLength = currentSettings.maxTotalContentLength
         )
     }
     
     /**
+     * 单个文件模板专用变量
+     */
+    private val singleFileVariables = listOf(
+        "{{changedFiles}}" to "Git变更文件列表",
+        "{{fileDiffs}}" to "文件差异详情"
+    )
+    
+    /**
+     * 汇总模板专用变量
+     */
+    private val summaryVariables = listOf(
+        "{{batchCommitMessages}}" to "多个批次的提交信息"
+    )
+    
+    /**
      * 显示变量选择弹窗
      */
-    private fun showVariablePopup(component: JButton) {
-        val variables = CommitSettings.BUILT_IN_VARIABLES
+    private fun showVariablePopup(component: JButton, targetTextArea: JBTextArea = templateTextArea, customVariables: List<Pair<String, String>>? = null) {
+        val variables = customVariables ?: TemplateConstants.GitBuiltInVariable.values().map { it.variable to it.description }
         
         val popup = JBPopupFactory.getInstance().createListPopup(
-            object : BaseListPopupStep<String>("选择变量", variables.map { "${it.name} - ${it.description}" }) {
+            object : BaseListPopupStep<String>("选择变量", variables.map { "${it.first} - ${it.second}" }) {
                 override fun onChosen(selectedValue: String, finalChoice: Boolean): PopupStep<*>? {
                     if (finalChoice) {
-                        val selectedVariable = variables[values.indexOf(selectedValue)]
-                        insertVariableAtCursor(selectedVariable.name)
+                        val selectedVariable = variables.find { "${it.first} - ${it.second}" == selectedValue }?.first
+                        selectedVariable?.let { insertVariableAtCursor(it, targetTextArea) }
                     }
                     return null
                 }
@@ -239,12 +306,13 @@ class CommitSettingsPanel(
     /**
      * 在光标位置插入变量
      */
-    private fun insertVariableAtCursor(variableName: String) {
-        val caretPosition = templateTextArea.caretPosition
-        val currentText = templateTextArea.text
+    private fun insertVariableAtCursor(variableName: String, targetTextArea: JBTextArea = templateTextArea) {
+        val caretPosition = targetTextArea.caretPosition
+        val currentText = targetTextArea.text
         val newText = currentText.substring(0, caretPosition) + variableName + currentText.substring(caretPosition)
-        templateTextArea.text = newText
-        templateTextArea.caretPosition = caretPosition + variableName.length
-        templateTextArea.requestFocus()
+        targetTextArea.text = newText
+        targetTextArea.caretPosition = caretPosition + variableName.length
     }
+    
+
 }

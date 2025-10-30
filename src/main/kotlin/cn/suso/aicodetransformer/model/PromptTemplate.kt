@@ -92,7 +92,7 @@ data class PromptTemplate(
     
     companion object {
         /** 支持的内置变量列表 */
-        val BUILT_IN_VARIABLES = TemplateConstants.getBuiltInVariablesMap().toList()
+        val BUILT_IN_VARIABLES: List<Pair<String, String>> = TemplateConstants.getBuiltInVariablesMap().toList()
 
 
         /** 创建驼峰命名转换模板 */

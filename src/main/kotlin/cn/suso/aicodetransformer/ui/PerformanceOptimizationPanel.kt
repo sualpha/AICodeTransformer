@@ -6,7 +6,7 @@ import cn.suso.aicodetransformer.model.PerformanceOptimizationConfig
 import cn.suso.aicodetransformer.model.PerformanceStats
 import cn.suso.aicodetransformer.model.OptimizationSuggestion
 import cn.suso.aicodetransformer.service.impl.PerformanceOptimizationServiceImpl
-import cn.suso.aicodetransformer.utils.PerformanceOptimizer
+import cn.suso.aicodetransformer.util.PerformanceOptimizer
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -16,7 +16,6 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import kotlinx.coroutines.*
 import java.awt.*
-import java.awt.event.ActionEvent
 import java.text.DecimalFormat
 import javax.swing.*
 import javax.swing.border.TitledBorder
