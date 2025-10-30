@@ -134,6 +134,12 @@ class GlobalSettings {
         get() = field
         set(value) { field = value }
     
+    // 缓存设置
+    @com.intellij.util.xmlb.annotations.Attribute("enableCache")
+    var enableCache: Boolean = false
+        get() = field
+        set(value) { field = value }
+    
     // 默认构造函数
     constructor()
     
@@ -148,7 +154,8 @@ class GlobalSettings {
         enableAutoUpdate: Boolean = false,
         updateInterval: String = "每天一次",
         updateCheckIntervalHours: Int = 24,
-        lastUpdateCheckTime: Long = 0L
+        lastUpdateCheckTime: Long = 0L,
+        enableCache: Boolean = false
     ) {
         this.enableLogging = enableLogging
         this.logLevel = logLevel
@@ -160,6 +167,7 @@ class GlobalSettings {
         this.updateInterval = updateInterval
         this.updateCheckIntervalHours = updateCheckIntervalHours
         this.lastUpdateCheckTime = lastUpdateCheckTime
+        this.enableCache = enableCache
     }
 }
 

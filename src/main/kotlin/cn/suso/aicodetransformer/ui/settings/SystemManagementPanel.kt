@@ -52,6 +52,9 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private lateinit var cancelDownloadButton: JButton
     private lateinit var installUpdateButton: JButton
     
+    // 缓存配置相关组件
+    private lateinit var enableCacheCheckBox: JCheckBox
+    
     // 当前可用的更新信息
     private var currentUpdateInfo: UpdateInfo? = null
     
@@ -168,12 +171,6 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         logSensitiveDataCheckBox = JCheckBox("记录调用日志", false)
         configPanel.add(logSensitiveDataCheckBox)
         
-        // 添加保存按钮
-        configPanel.add(Box.createHorizontalStrut(15))
-        val saveConfigButton = JButton("保存配置")
-        saveConfigButton.addActionListener { saveConfiguration() }
-        configPanel.add(saveConfigButton)
-        
         panel.add(configPanel)
         
         // 添加日志操作按钮
@@ -226,15 +223,19 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         updateIntervalComboBox.selectedIndex = 0 // 默认选择"每天一次"
         updateConfigPanel.add(updateIntervalComboBox)
         
-        // 添加保存按钮
-        updateConfigPanel.add(Box.createHorizontalStrut(15))
-        val saveUpdateButton = JButton("保存更新设置")
-        saveUpdateButton.addActionListener { saveUpdateSettings() }
-        updateConfigPanel.add(saveUpdateButton)
-        
         panel.add(updateConfigPanel)
         
-        // 第二行：手动检查和状态显示
+        // 第二行：缓存配置
+        val cacheConfigPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
+        
+        // 缓存启用勾选框
+        enableCacheCheckBox = JCheckBox("启用缓存", true)
+        enableCacheCheckBox.toolTipText = "启用后，系统将使用缓存来提高性能。禁用后，所有缓存功能将停止工作。"
+        cacheConfigPanel.add(enableCacheCheckBox)
+        
+        panel.add(cacheConfigPanel)
+        
+        // 第三行：手动检查和状态显示
         val statusPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
         
         // 手动检查更新按钮
@@ -250,7 +251,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         
         panel.add(statusPanel)
         
-        // 第三行：下载和安装更新按钮
+        // 第四行：下载和安装更新按钮
         val updateActionPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
         
         // 下载更新按钮
@@ -565,12 +566,6 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             // 刷新日志信息
             refreshLogInfo()
             
-            Messages.showInfoMessage(
-                project,
-                "日志配置已成功保存",
-                "配置保存成功"
-            )
-            
         } catch (e: Exception) {
             Messages.showErrorDialog(
                 project,
@@ -609,7 +604,8 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                 enableAutoUpdate = enableAutoUpdateCheckBox.isSelected,
                 updateInterval = intervalString,
                 updateCheckIntervalHours = intervalHours,
-                lastUpdateCheckTime = if (enableAutoUpdateCheckBox.isSelected) System.currentTimeMillis() else 0L
+                lastUpdateCheckTime = if (enableAutoUpdateCheckBox.isSelected) System.currentTimeMillis() else 0L,
+                enableCache = enableCacheCheckBox.isSelected
             )
             
             // 保存设置
@@ -624,12 +620,6 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             
             // 更新UI状态
             updateIntervalComboBox.isEnabled = enableAutoUpdateCheckBox.isSelected
-            
-            Messages.showInfoMessage(
-                project,
-                "更新设置已成功保存",
-                "设置保存成功"
-            )
             
         } catch (e: Exception) {
             Messages.showErrorDialog(
@@ -649,6 +639,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             
             enableAutoUpdateCheckBox.isSelected = settings.enableAutoUpdate
             updateIntervalComboBox.isEnabled = settings.enableAutoUpdate
+            enableCacheCheckBox.isSelected = settings.enableCache
             
             // 根据间隔字符串设置下拉框
             val intervalIndex = when (settings.updateInterval) {
@@ -696,6 +687,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             enableAutoUpdateCheckBox.isSelected = false
             updateIntervalComboBox.selectedIndex = 0
             updateIntervalComboBox.isEnabled = false
+            enableCacheCheckBox.isSelected = false // 默认禁用缓存
             checkUpdateButton.isEnabled = true // 默认启用按钮
             downloadUpdateButton.isVisible = false // 默认隐藏
             installUpdateButton.isVisible = false // 默认隐藏
@@ -900,6 +892,59 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         }
     }
     
+    /**
+     * 检查是否有修改
+     */
+    fun isModified(): Boolean {
+        try {
+            // 检查日志配置是否有修改
+            val currentLogConfig = loggingService.getLoggingConfig()
+            
+            val selectedLevel = when (levelComboBox.selectedItem as String) {
+                "DEBUG" -> LogLevel.DEBUG
+                "INFO" -> LogLevel.INFO
+                "WARNING" -> LogLevel.WARNING
+                "ERROR" -> LogLevel.ERROR
+                else -> LogLevel.INFO
+            }
+            
+            val retentionDays = retentionSpinner.value as Int
+            val retentionTimeMs = retentionDays * 24L * 60L * 60L * 1000L
+            
+            val logConfigModified = currentLogConfig.minLevel != selectedLevel ||
+                    currentLogConfig.retentionTimeMs != retentionTimeMs ||
+                    currentLogConfig.enabled != autoCleanCheckBox.isSelected ||
+                    currentLogConfig.logSensitiveData != logSensitiveDataCheckBox.isSelected
+            
+            // 检查更新设置是否有修改
+            val currentSettings = configurationService.getGlobalSettings()
+            val intervalString = updateIntervalComboBox.selectedItem as String
+            
+            val updateSettingsModified = currentSettings.enableAutoUpdate != enableAutoUpdateCheckBox.isSelected ||
+                    currentSettings.updateInterval != intervalString ||
+                    currentSettings.enableCache != enableCacheCheckBox.isSelected
+            
+            return logConfigModified || updateSettingsModified
+        } catch (e: Exception) {
+            return false
+        }
+    }
+    
+    /**
+     * 应用更改
+     */
+    fun apply() {
+        try {
+            // 保存日志配置
+            saveConfiguration()
+            
+            // 保存更新设置
+            saveUpdateSettings()
+        } catch (e: Exception) {
+            throw e
+        }
+    }
+
     /**
      * 清理资源，取消所有正在运行的协程
      */

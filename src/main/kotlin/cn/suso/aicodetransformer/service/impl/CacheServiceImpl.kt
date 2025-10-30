@@ -4,9 +4,11 @@ import cn.suso.aicodetransformer.model.ExecutionResult
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.model.CacheConfig
 import cn.suso.aicodetransformer.service.CacheService
+import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.model.CacheStats
 import cn.suso.aicodetransformer.model.CacheEntry
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
@@ -25,6 +27,8 @@ class CacheServiceImpl : CacheService {
     companion object {
         private val logger = Logger.getInstance(CacheServiceImpl::class.java)
     }
+    
+    private val configurationService: ConfigurationService by lazy { service() }
     
     private val cache = ConcurrentHashMap<String, CacheEntry>()
     private val hitCount = AtomicLong(0)
@@ -48,8 +52,21 @@ class CacheServiceImpl : CacheService {
         )
     }
     
+    /**
+     * 检查缓存是否启用
+     * 同时检查本地配置和全局配置
+     */
+    private fun isCacheEnabled(): Boolean {
+        return try {
+            config.enabled && configurationService.getGlobalSettings().enableCache
+        } catch (e: Exception) {
+            logger.warn("Failed to check global cache settings, using local config only", e)
+            false
+        }
+    }
+    
     override fun getCachedResponse(key: String): ExecutionResult? {
-        if (!config.enabled) {
+        if (!isCacheEnabled()) {
             return null
         }
         
@@ -71,7 +88,7 @@ class CacheServiceImpl : CacheService {
     }
     
     override fun cacheResponse(key: String, result: ExecutionResult, ttlSeconds: Long) {
-        if (!config.enabled || !result.success) {
+        if (!isCacheEnabled() || !result.success) {
             return
         }
         
@@ -152,8 +169,8 @@ class CacheServiceImpl : CacheService {
         this.config = config
         logger.info("Cache configuration updated: $config")
         
-        // 如果禁用缓存，清除所有条目
-        if (!config.enabled) {
+        // 如果禁用缓存（本地或全局），清除所有条目
+        if (!isCacheEnabled()) {
             clearAllCache()
         }
     }

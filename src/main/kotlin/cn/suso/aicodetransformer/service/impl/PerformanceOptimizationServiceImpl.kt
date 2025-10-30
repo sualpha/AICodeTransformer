@@ -30,6 +30,7 @@ class PerformanceOptimizationServiceImpl : PerformanceOptimizationService {
     private var currentConfig = PerformanceOptimizationConfig()
     private val cacheService: CacheService = service()
     private val performanceMonitorService: PerformanceMonitorService = service()
+    private val configurationService = service<ConfigurationService>()
     
     override fun getConfig(): PerformanceOptimizationConfig {
         return currentConfig
@@ -154,10 +155,18 @@ class PerformanceOptimizationServiceImpl : PerformanceOptimizationService {
     }
     
     private fun applyCacheConfig(config: CacheOptimizationConfig) {
+        // 获取全局缓存配置
+        val globalCacheEnabled = try {
+            configurationService.getGlobalSettings().enableCache
+        } catch (e: Exception) {
+            logger.warn("获取全局缓存配置失败，使用默认值", e)
+            false
+        }
+        
         val cacheConfig = CacheConfig(
             maxSize = if (config.enablePredictiveCache) 8000 else 5000,
             defaultTtlSeconds = 900,
-            enabled = true,
+            enabled = globalCacheEnabled,
             cleanupIntervalSeconds = 300
         )
         

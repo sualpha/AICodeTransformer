@@ -92,7 +92,7 @@ class AICodeTransformerSettingsPanel(
      * 检查是否有修改
      */
     fun isModified(): Boolean {
-        return modelConfigPanel.isModified() || promptTemplatePanel.isModified() || commitSettingsPanel.isModified()
+        return modelConfigPanel.isModified() || promptTemplatePanel.isModified() || commitSettingsPanel.isModified() || systemManagementPanel.isModified()
     }
     
     /**
@@ -104,9 +104,10 @@ class AICodeTransformerSettingsPanel(
             val hasModelChanges = modelConfigPanel.isModified()
             val hasPromptChanges = promptTemplatePanel.isModified()
             val hasCommitChanges = commitSettingsPanel.isModified()
+            val hasSystemChanges = systemManagementPanel.isModified()
             
             // 只有在有修改时才执行保存操作
-            if (!hasModelChanges && !hasPromptChanges && !hasCommitChanges) {
+            if (!hasModelChanges && !hasPromptChanges && !hasCommitChanges && !hasSystemChanges) {
                 return
             }
             
@@ -125,6 +126,11 @@ class AICodeTransformerSettingsPanel(
                 commitSettingsPanel.apply()
             }
             
+            // 应用系统设置更改
+            if (hasSystemChanges) {
+                systemManagementPanel.apply()
+            }
+            
             // 更新原始配置
             originalConfigurations = configurationService.getModelConfigurations()
             
@@ -133,6 +139,7 @@ class AICodeTransformerSettingsPanel(
             if (hasModelChanges) savedItems.add("模型配置")
             if (hasPromptChanges) savedItems.add("提示模板")
             if (hasCommitChanges) savedItems.add("提交设置")
+            if (hasSystemChanges) savedItems.add("系统设置")
             
             Messages.showInfoMessage(
                 project,
