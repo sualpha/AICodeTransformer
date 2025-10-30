@@ -34,17 +34,6 @@ import com.intellij.openapi.ui.Messages
  */
 class VCSServiceImpl : VCSService {
 
-    override fun getGitDiff(project: Project, staged: Boolean): String {
-        val result = GitCommandExecutor.executeGitDiff(
-            project = project,
-            staged = staged,
-            progressTitle = "获取Git差异..."
-        )
-        return result.getDisplayMessage()
-    }
-    
-
-
     override fun getFileDiff(project: Project, filePath: String, staged: Boolean): String {
         val result = GitCommandExecutor.executeGitDiff(
             project = project,
@@ -100,20 +89,45 @@ class VCSServiceImpl : VCSService {
             val project = changes.firstOrNull()?.let { change ->
                 // 尝试从虚拟文件获取项目
                 val virtualFile = change.virtualFile ?: change.beforeRevision?.file?.virtualFile ?: change.afterRevision?.file?.virtualFile
-                virtualFile?.let { vf ->
-                    // 使用更安全的方式查找项目，避免在EDT中执行慢操作
+                
+                if (virtualFile != null) {
+                    // 使用虚拟文件查找项目
                     ApplicationManager.getApplication().runReadAction<Project?> {
                         ProjectManager.getInstance().openProjects.find { project ->
                             try {
                                 val projectBasePath = project.basePath
                                 if (projectBasePath != null) {
-                                    val filePath = vf.path
+                                    val filePath = virtualFile.path
                                     filePath.startsWith(projectBasePath)
                                 } else {
                                     false
                                 }
                             } catch (e: Exception) {
                                 false
+                            }
+                        }
+                    }
+                } else {
+                    // 虚拟文件为null时，尝试从revision路径获取项目
+                    val filePath = when {
+                        change.beforeRevision != null -> change.beforeRevision!!.file.path
+                        change.afterRevision != null -> change.afterRevision!!.file.path
+                        else -> null
+                    }
+                    
+                    filePath?.let { path ->
+                        ApplicationManager.getApplication().runReadAction<Project?> {
+                            ProjectManager.getInstance().openProjects.find { project ->
+                                try {
+                                    val projectBasePath = project.basePath
+                                    if (projectBasePath != null) {
+                                        path.startsWith(projectBasePath)
+                                    } else {
+                                        false
+                                    }
+                                } catch (e: Exception) {
+                                    false
+                                }
                             }
                         }
                     }
@@ -187,22 +201,47 @@ class VCSServiceImpl : VCSService {
 
             // 从Change对象中获取项目实例 - 避免慢操作
             val project = changes.firstOrNull()?.let { change ->
+                // 尝试从虚拟文件获取项目
                 val virtualFile = change.virtualFile ?: change.beforeRevision?.file?.virtualFile ?: change.afterRevision?.file?.virtualFile
-                virtualFile?.let { vf ->
-                    // 使用更安全的方式查找项目，避免在EDT中执行慢操作
+                
+                if (virtualFile != null) {
+                    // 使用虚拟文件查找项目
                     ApplicationManager.getApplication().runReadAction<Project?> {
-                        // 首先尝试通过文件路径匹配项目根目录
                         ProjectManager.getInstance().openProjects.find { project ->
                             try {
                                 val projectBasePath = project.basePath
                                 if (projectBasePath != null) {
-                                    val filePath = vf.path
+                                    val filePath = virtualFile.path
                                     filePath.startsWith(projectBasePath)
                                 } else {
                                     false
                                 }
                             } catch (e: Exception) {
                                 false
+                            }
+                        }
+                    }
+                } else {
+                    // 虚拟文件为null时，尝试从revision路径获取项目
+                    val filePath = when {
+                        change.beforeRevision != null -> change.beforeRevision!!.file.path
+                        change.afterRevision != null -> change.afterRevision!!.file.path
+                        else -> null
+                    }
+                    
+                    filePath?.let { path ->
+                        ApplicationManager.getApplication().runReadAction<Project?> {
+                            ProjectManager.getInstance().openProjects.find { project ->
+                                try {
+                                    val projectBasePath = project.basePath
+                                    if (projectBasePath != null) {
+                                        path.startsWith(projectBasePath)
+                                    } else {
+                                        false
+                                    }
+                                } catch (e: Exception) {
+                                    false
+                                }
                             }
                         }
                     }

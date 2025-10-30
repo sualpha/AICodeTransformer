@@ -148,20 +148,7 @@ object PerformanceConstants {
         const val ERROR_RATE_ACCEPTABLE_PERCENTAGE = 3.0
     }
     
-    /**
-     * 日志消息常量
-     */
-    object LogMessages {
-        const val PERFORMANCE_OPTIMIZATION_STARTED = "性能优化已启动"
-        const val PERFORMANCE_OPTIMIZATION_COMPLETED = "性能优化已完成"
-        const val CACHE_STATISTICS_UPDATED = "缓存统计信息已更新"
-        const val PERFORMANCE_STATISTICS_UPDATED = "性能统计信息已更新"
-        const val PERFORMANCE_ALERT_TRIGGERED = "性能警报已触发"
-        const val HTTP_CONNECTION_POOL_OPTIMIZED = "HTTP连接池已优化"
-        const val CACHE_CONFIGURATION_UPDATED = "缓存配置已更新"
-        const val ASYNC_PROCESSING_ENABLED = "异步处理已启用"
-        const val REQUEST_BATCHING_ENABLED = "请求批处理已启用"
-    }
+
     
     /**
      * 获取负载状态基于CPU使用率

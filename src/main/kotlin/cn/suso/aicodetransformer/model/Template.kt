@@ -80,35 +80,7 @@ data class Template(
         return rendered
     }
     
-    /**
-     * 验证变量值
-     * @param variableValues 变量值映射
-     * @return 验证结果
-     */
-    fun validateVariables(@Suppress("UNUSED_PARAMETER") variableValues: Map<String, String>): TemplateValidationResult {
-        return TemplateValidationResult(
-            isValid = true,
-            errors = emptyList()
-        )
-    }
-    
-    /**
-     * 获取所有变量名
-     */
-    fun getVariableNames(): List<String> {
-        return emptyList()
-    }
-    
-    /**
-     * 检查是否匹配搜索条件
-     */
-    fun matchesSearch(query: String): Boolean {
-        val lowerQuery = query.lowercase()
-        return name.lowercase().contains(lowerQuery) ||
-                description.lowercase().contains(lowerQuery) ||
-                tags.any { it.lowercase().contains(lowerQuery) } ||
-                category.displayName.lowercase().contains(lowerQuery)
-    }
+
 }
 
 

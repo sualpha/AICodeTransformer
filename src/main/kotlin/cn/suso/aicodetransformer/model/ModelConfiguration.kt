@@ -240,15 +240,7 @@ class ModelConfiguration {
         }
     }
     
-    /**
-     * 创建副本并更新使用统计
-     */
-    fun withUsageUpdate(): ModelConfiguration {
-        return copy(
-            lastUsedAt = System.currentTimeMillis(),
-            usageCount = usageCount + 1
-        )
-    }
+
     
     /**
      * 获取显示名称
@@ -279,16 +271,7 @@ class ModelConfiguration {
     
     companion object {
         
-        /** 创建空的配置用于新建 */
-        fun createEmpty(): ModelConfiguration {
-            return ModelConfiguration(
-                id = "",
-                name = "",
-                apiBaseUrl = "",
-                modelName = "",
-                apiKey = ""
-            )
-        }
+
     }
 }
 
@@ -305,30 +288,7 @@ enum class ModelType(val displayName: String, val defaultBaseUrl: String) {
     /** 本地模型 */
     LOCAL(ModelConfigConstants.AIProviderConfig.LOCAL.typeDisplayName, ModelConfigConstants.AIProviderConfig.LOCAL.apiBaseUrl);
     
-    /**
-     * 获取对应的AI提供商配置
-     */
-    fun getProviderConfig(): ModelConfigConstants.AIProviderConfig {
-        return when (this) {
-            OPENAI_COMPATIBLE -> ModelConfigConstants.AIProviderConfig.OPENAI
-            CLAUDE -> ModelConfigConstants.AIProviderConfig.CLAUDE
-            LOCAL -> ModelConfigConstants.AIProviderConfig.LOCAL
-        }
-    }
-    
-    /**
-     * 获取支持的模型名称列表
-     */
-    fun getSupportedModels(): List<String> {
-        return getProviderConfig().supportedModels
-    }
-    
-    /**
-     * 获取默认的最大Token数
-     */
-    fun getDefaultMaxTokens(): Int {
-        return getProviderConfig().defaultMaxTokens
-    }
+
 }
 
 /**

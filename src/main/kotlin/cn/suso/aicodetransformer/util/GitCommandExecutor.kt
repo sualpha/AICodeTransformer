@@ -160,50 +160,7 @@ object GitCommandExecutor {
         }
     }
     
-    /**
-     * 执行其他Git命令（如commit、push等）
-     */
-    fun executeGitCommand(
-        project: Project,
-        command: GitCommand,
-        parameters: List<String> = emptyList(),
-        progressTitle: String = "执行Git命令..."
-    ): GitCommandResult {
-        return try {
-            val gitRepositoryManager = GitRepositoryManager.getInstance(project)
-            val repositories = gitRepositoryManager.repositories
-            
-            if (repositories.isEmpty()) {
-                return GitCommandResult.error("当前项目不是Git仓库")
-            }
-            
-            val repository = repositories.first()
-            val root = repository.root
-            
-            var result: GitCommandResult = GitCommandResult.error("未知错误")
-            
-            ProgressManager.getInstance().runProcessWithProgressSynchronously({
-                try {
-                    val handler = GitLineHandler(project, root, command)
-                    parameters.forEach { handler.addParameters(it) }
-                    
-                    val gitResult = Git.getInstance().runCommand(handler)
-                    
-                    result = if (gitResult.success()) {
-                        GitCommandResult.success(gitResult.outputAsJoinedString)
-                    } else {
-                        GitCommandResult.error("Git命令失败: ${gitResult.errorOutputAsJoinedString}")
-                    }
-                } catch (e: Exception) {
-                    result = GitCommandResult.error("Git命令执行异常: ${e.message}")
-                }
-            }, progressTitle, true, project)
-            
-            result
-        } catch (e: Exception) {
-            GitCommandResult.error("执行Git命令异常: ${e.message}")
-        }
-    }
+
 }
 
 /**

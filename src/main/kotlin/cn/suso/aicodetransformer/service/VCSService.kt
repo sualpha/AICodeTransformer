@@ -9,17 +9,7 @@ import com.intellij.openapi.vcs.changes.Change
  */
 interface VCSService {
     
-    /**
-     * 获取当前项目的Git差异内容
-     * @param project 项目实例
-     * @param staged 是否获取暂存区差异
-     * @return Git差异内容
-     */
-    fun getGitDiff(project: Project, staged: Boolean = false): String
 
-    
-
-    
     /**
      * 检查项目是否为Git仓库
      * @param project 项目实例

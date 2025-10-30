@@ -132,12 +132,7 @@ class PromptTemplateDetailPanel : JPanel() {
     }
     
 
-    
-    private fun createButtonPanel(): JPanel {
-        // 移除保存、重置、复制按钮，简化界面
-        return JPanel()
-    }
-    
+
     private fun setupListeners() {
         val documentListener = object : DocumentListener {
             override fun insertUpdate(e: DocumentEvent?) = notifyModification()

@@ -71,11 +71,7 @@ interface PromptTemplateService {
      */
     fun processTemplate(templateId: String, variables: Map<String, String>): String
     
-    /**
-     * 从当前编辑器上下文获取变量值
-     * @return 变量映射
-     */
-    fun getContextVariables(): Map<String, String>
+
     
     /**
      * 验证模板是否有效

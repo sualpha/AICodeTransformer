@@ -215,22 +215,7 @@ class PerformanceOptimizationServiceImpl : PerformanceOptimizationService {
         cacheService.clearExpiredCache()
     }
     
-    /**
-     * 获取性能优化报告
-     */
-    fun getPerformanceReport(): PerformanceReport {
-        val cacheStats = cacheService.getCacheStats()
-        val performanceStats = performanceMonitorService.getPerformanceStats()
-        val suggestions = getOptimizationSuggestions()
-        
-        return PerformanceReport(
-            cacheHitRate = cacheStats.hitRate,
-            averageResponseTime = performanceStats.averageResponseTime.toLong(),
-            totalCacheEntries = cacheStats.totalEntries,
-            optimizationSuggestions = suggestions,
-            overallScore = calculatePerformanceScore(cacheStats, performanceStats)
-        )
-    }
+
     
     private fun calculatePerformanceScore(
         cacheStats: CacheStats,

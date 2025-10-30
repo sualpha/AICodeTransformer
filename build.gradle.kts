@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "cn.suso"
-version = "1.0.4"
+version = "1.0.5"
 
 repositories {
     //mavenCentral()
@@ -87,27 +87,4 @@ tasks {
     publishPlugin {
         token.set(System.getenv("PUBLISH_TOKEN"))
     }
-    
-    register<JavaExec>("runLoggingVerification") {
-        group = "verification"
-        description = "Run logging service verification"
-        classpath = sourceSets["main"].runtimeClasspath
-        mainClass.set("cn.suso.aicodetransformer.LoggingVerificationKt")
-    }
-    
-    register<JavaExec>("runLocalModelVerification") {
-        group = "verification"
-        description = "Run local model functionality verification"
-        classpath = sourceSets["main"].runtimeClasspath
-        mainClass.set("cn.suso.aicodetransformer.LocalModelVerificationKt")
-    }
-    
-    register<JavaExec>("runSerializationTest") {
-        group = "verification"
-        description = "运行序列化测试"
-        classpath = sourceSets["main"].runtimeClasspath
-        mainClass.set("LocalModelSerializationTestKt")
-    }
-    
-
 }

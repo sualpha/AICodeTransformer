@@ -6,7 +6,6 @@ import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.service.AIModelService
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.service.LoggingService
-import cn.suso.aicodetransformer.service.TemplateService
 import cn.suso.aicodetransformer.service.VCSService
 import cn.suso.aicodetransformer.util.TokenCounter
 import cn.suso.aicodetransformer.util.TokenThresholdManager
@@ -21,7 +20,6 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import kotlinx.coroutines.*
-import java.io.File
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -30,6 +28,8 @@ import com.intellij.openapi.vcs.ui.CommitMessage
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.VcsNotifier
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
+import java.io.File
+import java.nio.file.Paths
 import com.intellij.vcs.commit.CommitWorkflowUi
 import com.intellij.vcs.commit.AbstractCommitWorkflowHandler
 
@@ -650,7 +650,7 @@ $result
                     return
                 }
             }
-            
+
             // 使用选中的文件执行提交
             selectedChanges?.let { changes ->
                 performFallbackCommit(project, loggingService, commitSettings, commitMessage, changes.toList())
@@ -848,8 +848,25 @@ $result
             indicator.text = "正在分析文件 ${index + 1}/${changes.size}..."
             indicator.fraction = 0.2 + (0.3 * index / changes.size)
             
-            val fullPath = change.virtualFile?.path ?: continue
-            val fileName = change.virtualFile?.name ?: continue
+            // 获取文件路径，对删除文件特殊处理
+            val fullPath = when {
+                change.virtualFile != null -> change.virtualFile!!.path
+                change.beforeRevision != null -> change.beforeRevision!!.file.path
+                change.afterRevision != null -> change.afterRevision!!.file.path
+                else -> {
+                    loggingService.logWarning("无法获取文件路径，跳过此变更", "CommitDialogAIAction")
+                    continue
+                }
+            }
+            
+            // 获取文件名
+            val fileName = when {
+                change.virtualFile != null -> change.virtualFile!!.name
+                change.beforeRevision != null -> change.beforeRevision!!.file.name
+                change.afterRevision != null -> change.afterRevision!!.file.name
+                else -> File(fullPath).name
+            }
+            
             val changeType = when (change.type) {
                 Change.Type.NEW -> "新增文件"
                 Change.Type.DELETED -> "删除文件"
@@ -859,7 +876,17 @@ $result
             }
 
             val diff = try {
-                vcsService.getFileDiff(project, fullPath, staged = true)
+                if (change.type == Change.Type.DELETED) {
+                    // 对于删除文件，使用特殊的diff获取方式
+                    val relativePath = getRelativePathFromProject(project, fullPath)
+                    if (relativePath != null) {
+                        vcsService.getFileDiff(project, relativePath, staged = true)
+                    } else {
+                        "删除文件: $fileName\n无法获取文件差异内容"
+                    }
+                } else {
+                    vcsService.getFileDiff(project, fullPath, staged = true)
+                }
             } catch (e: Exception) {
                 "获取差异失败: ${e.message}"
             }
@@ -1002,5 +1029,24 @@ $result
         loggingService.logInfo("开始汇总批次结果", "CommitDialogAIAction - 共 ${batchResults.size} 个批次需要汇总")
         
         return summarizeBatchResults(batchResults, templateContent, project)
+    }
+
+    /**
+     * 获取相对于项目根目录的文件路径
+     */
+    private fun getRelativePathFromProject(project: Project, absolutePath: String): String? {
+        return try {
+            val projectBasePath = project.basePath ?: return null
+            val projectPath = Paths.get(projectBasePath)
+            val filePath = Paths.get(absolutePath)
+            
+            if (filePath.startsWith(projectPath)) {
+                projectPath.relativize(filePath).toString().replace("\\", "/")
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 }

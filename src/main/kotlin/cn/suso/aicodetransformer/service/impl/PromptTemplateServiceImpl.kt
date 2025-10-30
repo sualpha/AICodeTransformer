@@ -210,43 +210,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
         return processTemplate(template, variables)
     }
     
-    override fun getContextVariables(): Map<String, String> {
-        val variables = mutableMapOf<String, String>()
-        
-        try {
-            // 获取当前项目
-            val project = ProjectManager.getInstance().openProjects.firstOrNull()
-            if (project != null) {
-                variables["{{projectName}}"] = project.name
-                
-                // 获取当前编辑器和文件信息
-                val fileEditorManager = FileEditorManager.getInstance(project)
-                val selectedEditor = fileEditorManager.selectedTextEditor
-                
-                if (selectedEditor != null) {
-                    // 获取选中的代码
-                    val selectionModel = selectedEditor.selectionModel
-                    val selectedText = selectionModel.selectedText ?: ""
-                    variables["{{selectedCode}}"] = selectedText
-                    
-                    // 获取当前文件信息
-                    val virtualFile = fileEditorManager.selectedFiles.firstOrNull()
-                    if (virtualFile != null) {
-                        variables["{{fileName}}"] = virtualFile.name
-                        variables["{{language}}"] = getLanguageFromFile(virtualFile)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // 如果获取上下文失败，使用默认值
-            variables.putIfAbsent("{{selectedCode}}", "")
-            variables.putIfAbsent("{{fileName}}", "")
-            variables.putIfAbsent("{{language}}", "")
-            variables.putIfAbsent("{{projectName}}", "")
-        }
-        
-        return variables
-    }
+
     
     override fun validateTemplate(template: PromptTemplate): String? {
         try {

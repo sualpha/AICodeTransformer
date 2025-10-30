@@ -189,32 +189,7 @@ class TemplateVariableResolver(private val project: Project) {
             else -> "Unknown"
         }
     }
-    
-    /**
-     * 格式化字段信息
-     */
-    private fun formatFieldsInfo(fields: List<FieldInfo>, title: String): String {
-        if (fields.isEmpty()) {
-            return "// 未检测到字段信息"
-        }
-        
-        val sb = StringBuilder()
-        sb.appendLine("// $title:")
-        fields.forEach { field: FieldInfo ->
-            sb.appendLine("// - ${field.name}: ${field.type}")
-            if (field.annotations.isNotEmpty()) {
-                sb.appendLine("//   注解: ${field.annotations.joinToString(", ")}")
-            }
-            sb.appendLine("//   getter: ${if (field.hasGetter) "有" else "无"}, setter: ${if (field.hasSetter) "有" else "无"}")
-        }
-        
-        return sb.toString().trimEnd()
-    }
-    
 
-    
-
-    
     /**
      * 获取选中的文本或当前行文本
      * 注意：已在ReadAction中被调用，可以安全访问Editor组件

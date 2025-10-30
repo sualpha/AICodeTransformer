@@ -95,13 +95,7 @@ interface StatusService {
         actions: List<NotificationAction> = emptyList()
     )
     
-    /**
-     * 显示气球提示
-     * @param message 提示消息
-     * @param type 提示类型
-     * @param project 项目实例
-     */
-    fun showBalloonTip(message: String, type: BalloonType, project: Project? = null)
+
     
     /**
      * 更新执行状态
@@ -118,32 +112,7 @@ interface StatusService {
         progress: Int = 0,
         project: Project? = null
     )
-    
-    /**
-     * 清除执行状态
-     * @param executionId 执行ID
-     * @param project 项目实例
-     */
-    fun clearExecutionStatus(executionId: String, project: Project? = null)
-    
-    /**
-     * 获取当前状态信息
-     * @param project 项目实例
-     * @return 状态信息
-     */
-    fun getCurrentStatus(project: Project? = null): StatusInfo?
-    
-    /**
-     * 添加状态监听器
-     * @param listener 监听器
-     */
-    fun addStatusListener(listener: StatusListener)
-    
-    /**
-     * 移除状态监听器
-     * @param listener 监听器
-     */
-    fun removeStatusListener(listener: StatusListener)
+
 }
 
 

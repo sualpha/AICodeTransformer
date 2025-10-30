@@ -41,8 +41,6 @@ class StatusServiceImpl : StatusService, Disposable {
     companion object {
         private val logger = Logger.getInstance(StatusServiceImpl::class.java)
         private const val NOTIFICATION_GROUP_ID = "AICodeTransformer"
-        
-        fun getInstance(): StatusService = service<StatusService>()
     }
     
     private val notificationGroup: NotificationGroup by lazy {
@@ -228,38 +226,7 @@ class StatusServiceImpl : StatusService, Disposable {
             }
         }
     }
-    
-    override fun showBalloonTip(message: String, type: BalloonType, project: Project?) {
-        ApplicationManager.getApplication().invokeLater {
-            try {
-                val messageType = when (type) {
-                    BalloonType.INFO -> MessageType.INFO
-                    BalloonType.WARNING -> MessageType.WARNING
-                    BalloonType.ERROR -> MessageType.ERROR
-                    BalloonType.SUCCESS -> MessageType.INFO
-                }
-                
-                val statusBar = getStatusBar(project)
-                if (statusBar != null) {
-                    val balloon = JBPopupFactory.getInstance()
-                        .createHtmlTextBalloonBuilder(message, messageType, null)
-                        .setFadeoutTime(3000)
-                        .createBalloon()
-                    
-                    val component = statusBar.component
-                    if (component != null) {
-                        balloon.show(
-                            RelativePoint(component, Point(component.width / 2, 0)),
-                            Balloon.Position.above
-                        )
-                    }
-                }
-                
-            } catch (e: Exception) {
-                logger.error("显示气球提示失败", e)
-            }
-        }
-    }
+
     
     override fun updateExecutionStatus(
         executionId: String,
@@ -303,33 +270,7 @@ class StatusServiceImpl : StatusService, Disposable {
         // 通知监听器
         notifyExecutionStatusListeners(executionId, status, message, progress)
     }
-    
-    override fun clearExecutionStatus(executionId: String, project: Project?) {
-        activeExecutions.remove(executionId)
-        
-        // 如果没有活跃的执行，隐藏进度
-        if (activeExecutions.isEmpty()) {
-            hideProgress(project)
-        }
-    }
-    
-    override fun getCurrentStatus(project: Project?): StatusInfo {
-        return StatusInfo(
-            message = currentStatusMessage,
-            isProgressVisible = isProgressVisible,
-            progressMessage = progressMessage,
-            progressValue = progressValue,
-            activeExecutions = activeExecutions.toMap()
-        )
-    }
-    
-    override fun addStatusListener(listener: StatusListener) {
-        listeners.add(listener)
-    }
-    
-    override fun removeStatusListener(listener: StatusListener) {
-        listeners.remove(listener)
-    }
+
     
     /**
      * 设置项目关闭监听器

@@ -84,8 +84,6 @@
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.LoggingServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.AutoUpdateService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.AutoUpdateServiceImpl"/>
-        <applicationService serviceInterface="cn.suso.aicodetransformer.service.TemplateService"
-                           serviceImplementation="cn.suso.aicodetransformer.service.impl.TemplateServiceImpl"/>
         
         <!-- Project-level services -->
         <projectService serviceInterface="cn.suso.aicodetransformer.service.VCSService"

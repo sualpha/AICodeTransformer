@@ -18,7 +18,6 @@ enum class ErrorType {
     NETWORK,
     CONFIGURATION,
     MODEL,
-    CODE_REPLACEMENT,
     VALIDATION,
     AUTHENTICATION,
     PERMISSION,
