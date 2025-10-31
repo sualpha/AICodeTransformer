@@ -332,11 +332,11 @@ class PromptTemplateDetailPanel : JPanel() {
     fun isModified(): Boolean = isModified
     
     fun apply() {
-        
+
     }
     
     fun reset() {
-        // 重置功能已移除，不执行任何操作
+
     }
     
     fun addModificationListener(listener: () -> Unit) {
