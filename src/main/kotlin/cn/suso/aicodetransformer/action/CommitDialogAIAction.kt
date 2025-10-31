@@ -28,6 +28,9 @@ import com.intellij.openapi.vcs.ui.CommitMessage
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.VcsNotifier
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
+import com.intellij.notification.Notification
+import com.intellij.notification.NotificationType
+import com.intellij.notification.Notifications
 import java.io.File
 import java.nio.file.Paths
 import com.intellij.vcs.commit.CommitWorkflowUi
@@ -79,7 +82,7 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
                     commitSettings.summaryTemplate
                 }
                 
-                loggingService.logInfo("配置检查", "CommitDialogAIAction - 使用模板类型: ${commitSettings.templateType}, 模板长度: ${templateContent.length}")
+                loggingService.logInfo("配置检查", "CommitDialogAIAction - 模板长度: ${templateContent.length}")
                 
                 if (templateContent.isBlank()) {
                     loggingService.logInfo("模板检查失败", "CommitDialogAIAction - 没有可用的commit模板")
@@ -133,10 +136,9 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
             if (commitWorkflowHandler is AbstractCommitWorkflowHandler<*, *>) {
                 try {
                     val ui = commitWorkflowHandler.ui
-                    if (ui is CommitWorkflowUi) {
-                        selectedChanges = ui.getIncludedChanges()
-                        loggingService.logInfo("文件选择 - 方法2成功", "CommitDialogAIAction - 通过CommitWorkflowHandler获取到 ${selectedChanges?.size ?: 0} 个包含文件")
-                    }
+                    val includedChanges = ui.getIncludedChanges()
+                    selectedChanges = includedChanges
+                    loggingService.logInfo("文件选择 - 方法2成功", "CommitDialogAIAction - 通过CommitWorkflowHandler获取到 ${includedChanges.size} 个包含文件")
                 } catch (ex: Exception) {
                     loggingService.logError(ex, "CommitDialogAIAction - 方法2异常: ${ex.message}")
                 }
@@ -271,6 +273,7 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
     /**
      * 汇总多个批次的结果
      */
+    @Suppress("UNUSED_PARAMETER")
     private suspend fun summarizeBatchResults(batchResults: List<String>, templateContent: String, project: Project): String {
         val loggingService = service<LoggingService>()
         val configurationService = service<ConfigurationService>()
@@ -327,7 +330,7 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
             
             if (commitWorkflowUi != null) {
                 val commitMessageUi = commitWorkflowUi.commitMessageUi
-                loggingService.logInfo("方法2 - commitMessageUi", "CommitDialogAIAction - commitMessageUi: ${commitMessageUi?.javaClass?.simpleName ?: "null"}")
+                loggingService.logInfo("方法2 - commitMessageUi", "CommitDialogAIAction - commitMessageUi: ${commitMessageUi.javaClass.simpleName}")
                 
                 if (commitMessageUi is CommitMessage) {
                     commitMessageUi.setCommitMessage(cleanedMessage)
@@ -533,9 +536,7 @@ $result
             if (commitWorkflowHandler is AbstractCommitWorkflowHandler<*, *>) {
                 try {
                     val ui = commitWorkflowHandler.ui
-                    if (ui is CommitWorkflowUi) {
-                        selectedChanges = ui.getIncludedChanges()
-                    }
+                    selectedChanges = ui.getIncludedChanges()
                 } catch (ex: Exception) {
                     // 忽略异常，尝试其他方法
                 }
@@ -547,7 +548,7 @@ $result
                 selectedChanges = vcsSelectedChanges?.toList()
             }*/
             
-            hasSelectedFiles = selectedChanges != null && selectedChanges.isNotEmpty()
+            hasSelectedFiles = selectedChanges?.isNotEmpty() == true
         }
         
         // 检查是否有任何变更文件
@@ -558,8 +559,9 @@ $result
         
         // 根据是否有选中文件更新按钮文本和描述
         if (hasSelectedFiles && selectedChanges != null) {
-            e.presentation.text = "🤖 AI生成 (${selectedChanges.size}个文件)"
-            e.presentation.description = "为选中的${selectedChanges.size}个文件生成commit信息"
+            val changesSize = selectedChanges.size
+            e.presentation.text = "🤖 AI生成 (${changesSize}个文件)"
+            e.presentation.description = "为选中的${changesSize}个文件生成commit信息"
         } else if (hasAnyChanges) {
             val allChangesCount = changeListManager.defaultChangeList.changes.size
             e.presentation.text = "🤖 AI生成 (所有${allChangesCount}个文件)"
@@ -599,17 +601,15 @@ $result
             }
             
             // 方法2: 尝试通过 COMMIT_WORKFLOW_HANDLER 获取包含的文件
-            if (selectedChanges == null || selectedChanges.isEmpty()) {
+            if (selectedChanges?.isEmpty() != false) {
                 val commitWorkflowHandler = e.getData(VcsDataKeys.COMMIT_WORKFLOW_HANDLER)
                 if (commitWorkflowHandler is AbstractCommitWorkflowHandler<*, *>) {
                     try {
                         val ui = commitWorkflowHandler.ui
-                        if (ui is CommitWorkflowUi) {
-                            val includedChanges = ui.getIncludedChanges()
-                            if (includedChanges.isNotEmpty()) {
-                                selectedChanges = includedChanges
-                                loggingService.logInfo("自动提交 - 方法2成功", "CommitDialogAIAction - 通过CommitWorkflowHandler获取到 ${selectedChanges.size} 个包含文件")
-                            }
+                        val includedChanges = ui.getIncludedChanges()
+                        if (includedChanges.isNotEmpty()) {
+                            selectedChanges = includedChanges
+                            loggingService.logInfo("自动提交 - 方法2成功", "CommitDialogAIAction - 通过CommitWorkflowHandler获取到 ${includedChanges.size} 个包含文件")
                         }
                     } catch (ex: Exception) {
                         loggingService.logError(ex, "CommitDialogAIAction - 自动提交方法2异常: ${ex.message}")
@@ -618,7 +618,7 @@ $result
             }
             
             // 检查是否成功获取到选中的文件
-            if (selectedChanges == null || selectedChanges.isEmpty()) {
+            if (selectedChanges?.isEmpty() != false) {
                 // 如果没有选中文件，获取暂存区的所有文件
                 try {
                     val changeListManager = ChangeListManager.getInstance(project)
@@ -626,7 +626,7 @@ $result
                     
                     if (allChanges.isNotEmpty()) {
                         selectedChanges = allChanges
-                        loggingService.logInfo("自动提交 - 使用所有文件", "CommitDialogAIAction - 没有选中文件，使用暂存区所有 ${selectedChanges.size} 个文件")
+                        loggingService.logInfo("自动提交 - 使用所有文件", "CommitDialogAIAction - 没有选中文件，使用暂存区所有 ${allChanges.size} 个文件")
                     } else {
                         loggingService.logInfo("自动提交取消", "CommitDialogAIAction - 暂存区没有文件可提交")
                         ApplicationManager.getApplication().invokeLater {
@@ -710,9 +710,14 @@ $result
                                     loggingService.logError(ex, "CommitDialogAIAction - VCS刷新失败: ${ex.message}")
                                 }
                                 
-                                VcsNotifier.getInstance(project).notifyInfo(
-                                    "自动提交成功",
-                                    "已成功提交 $fileCount 个文件到版本控制系统"
+                                Notifications.Bus.notify(
+                                    Notification(
+                                        "VCS",
+                                        "自动提交成功",
+                                        "已成功提交 $fileCount 个文件到版本控制系统",
+                                        NotificationType.INFORMATION
+                                    ),
+                                    project
                                 )
                                 
                                 // 如果启用了自动推送，执行推送
@@ -721,9 +726,14 @@ $result
                                 }
                             } else {
                                 loggingService.logError(Exception("VCS提交失败"), "提交失败 - vcsService.commitChanges返回false")
-                                VcsNotifier.getInstance(project).notifyError(
-                                    "自动提交失败",
-                                    "提交过程中发生错误，请检查日志获取详细信息"
+                                Notifications.Bus.notify(
+                                    Notification(
+                                        "VCS",
+                                        "自动提交失败",
+                                        "提交过程中发生错误，请检查日志获取详细信息",
+                                        NotificationType.ERROR
+                                    ),
+                                    project
                                 )
                             }
                         }
@@ -732,30 +742,50 @@ $result
                         // 在EDT线程中显示错误
                         ApplicationManager.getApplication().invokeLater {
                             loggingService.logError(ex, "后台提交执行失败: ${ex.message}")
-                            VcsNotifier.getInstance(project).notifyError(
-                                "自动提交异常",
-                                "后台提交执行失败: ${ex.message}"
+                            Notifications.Bus.notify(
+                                Notification(
+                                    "VCS",
+                                    "自动提交异常",
+                                    "后台提交执行失败: ${ex.message}",
+                                    NotificationType.ERROR
+                                ),
+                                project
                             )
                         }
                     }
                 } else {
-                    VcsNotifier.getInstance(project).notifyWarning(
-                        "自动提交失败",
-                        "提交信息为空，无法执行提交"
+                    Notifications.Bus.notify(
+                        Notification(
+                            "VCS",
+                            "自动提交失败",
+                            "提交信息为空，无法执行提交",
+                            NotificationType.WARNING
+                        ),
+                        project
                     )
                 }
             } else {
-                VcsNotifier.getInstance(project).notifyInfo(
-                    "无需提交",
-                    "没有检测到需要提交的变更"
+                Notifications.Bus.notify(
+                    Notification(
+                        "VCS",
+                        "无需提交",
+                        "没有检测到需要提交的变更",
+                        NotificationType.INFORMATION
+                    ),
+                    project
                 )
             }
             
         } catch (ex: Exception) {
             loggingService.logError(ex, "备用提交方法执行失败: ${ex.message}")
-            VcsNotifier.getInstance(project).notifyError(
-                "自动提交异常",
-                "备用提交方法执行失败: ${ex.message}"
+            Notifications.Bus.notify(
+                Notification(
+                    "VCS",
+                    "自动提交异常",
+                    "备用提交方法执行失败: ${ex.message}",
+                    NotificationType.ERROR
+                ),
+                project
             )
         }
     }
@@ -773,14 +803,24 @@ $result
                 // 在EDT线程中更新UI
                 ApplicationManager.getApplication().invokeLater {
                     if (success) {
-                        VcsNotifier.getInstance(project).notifyInfo(
-                            "自动推送成功",
-                            "代码已自动推送到远程仓库"
+                        Notifications.Bus.notify(
+                            Notification(
+                                "VCS",
+                                "自动推送成功",
+                                "代码已自动推送到远程仓库",
+                                NotificationType.INFORMATION
+                            ),
+                            project
                         )
                     } else {
-                        VcsNotifier.getInstance(project).notifyWarning(
-                            "自动推送失败",
-                            "推送过程中发生错误，请手动推送"
+                        Notifications.Bus.notify(
+                            Notification(
+                                "VCS",
+                                "自动推送失败",
+                                "推送过程中发生错误，请手动推送",
+                                NotificationType.WARNING
+                            ),
+                            project
                         )
                     }
                 }
@@ -789,9 +829,14 @@ $result
                 // 在EDT线程中显示错误
                 ApplicationManager.getApplication().invokeLater {
                     loggingService.logError(ex, "自动推送失败: ${ex.message}")
-                    VcsNotifier.getInstance(project).notifyWarning(
-                        "自动推送失败",
-                        "自动推送功能暂时不可用，请手动推送。错误: ${ex.message}"
+                    Notifications.Bus.notify(
+                        Notification(
+                            "VCS",
+                            "自动推送失败",
+                            "自动推送功能暂时不可用，请手动推送。错误: ${ex.message}",
+                            NotificationType.WARNING
+                        ),
+                        project
                     )
                 }
             }

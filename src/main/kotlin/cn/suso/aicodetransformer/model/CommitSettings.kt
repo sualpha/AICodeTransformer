@@ -96,8 +96,6 @@ class CommitSettings {
         autoPushEnabled: Boolean = false,
         singleFileTemplate: String = SIMPLE_TEMPLATE,
         summaryTemplate: String = SUMMARY_TEMPLATE,
-        commitTemplate: String = DEFAULT_TEMPLATE,
-        templateType: CommitTemplateType = CommitTemplateType.SIMPLE,
         useBatchProcessing: Boolean = true,
         batchSize: Int = 5,
         maxFileContentLength: Int = 10000,
@@ -107,8 +105,6 @@ class CommitSettings {
         this.autoPushEnabled = autoPushEnabled
         this.singleFileTemplate = singleFileTemplate
         this.summaryTemplate = summaryTemplate
-        this.commitTemplate = commitTemplate
-        this.templateType = templateType
         this.useBatchProcessing = useBatchProcessing
         this.batchSize = batchSize
         this.maxFileContentLength = maxFileContentLength
@@ -121,8 +117,6 @@ class CommitSettings {
         autoPushEnabled: Boolean = this.autoPushEnabled,
         singleFileTemplate: String = this.singleFileTemplate,
         summaryTemplate: String = this.summaryTemplate,
-        commitTemplate: String = this.commitTemplate,
-        templateType: CommitTemplateType = this.templateType,
         useBatchProcessing: Boolean = this.useBatchProcessing,
         batchSize: Int = this.batchSize,
         maxFileContentLength: Int = this.maxFileContentLength,
@@ -133,8 +127,6 @@ class CommitSettings {
             autoPushEnabled,
             singleFileTemplate,
             summaryTemplate,
-            commitTemplate,
-            templateType,
             useBatchProcessing,
             batchSize,
             maxFileContentLength,
@@ -221,24 +213,11 @@ refactor(core): 优化核心业务逻辑"""
          * 从Map创建设置
          */
         fun fromMap(map: Map<String, Any>): CommitSettings {
-            val templateTypeStr = map["templateType"] as? String
-            val templateType = try {
-                if (templateTypeStr != null) {
-                    CommitTemplateType.valueOf(templateTypeStr)
-                } else {
-                    CommitTemplateType.SIMPLE
-                }
-            } catch (e: IllegalArgumentException) {
-                CommitTemplateType.SIMPLE
-            }
-            
             return CommitSettings(
                 autoCommitEnabled = map["autoCommitEnabled"] as? Boolean ?: false,
                 autoPushEnabled = map["autoPushEnabled"] as? Boolean ?: false,
                 singleFileTemplate = map["singleFileTemplate"] as? String ?: SIMPLE_TEMPLATE,
                 summaryTemplate = map["summaryTemplate"] as? String ?: SUMMARY_TEMPLATE,
-                commitTemplate = map["commitTemplate"] as? String ?: getDefaultTemplate(),
-                templateType = templateType,
                 useBatchProcessing = map["useBatchProcessing"] as? Boolean ?: true,
                 batchSize = map["batchSize"] as? Int ?: 5,
                 maxFileContentLength = map["maxFileContentLength"] as? Int ?: 10000,
@@ -254,8 +233,8 @@ refactor(core): 优化核心业务逻辑"""
         return mapOf(
             "autoCommitEnabled" to autoCommitEnabled,
             "autoPushEnabled" to autoPushEnabled,
-            "commitTemplate" to commitTemplate,
-            "templateType" to templateType.name,
+            "singleFileTemplate" to singleFileTemplate,
+            "summaryTemplate" to summaryTemplate,
             "useBatchProcessing" to useBatchProcessing,
             "batchSize" to batchSize,
             "maxFileContentLength" to maxFileContentLength,

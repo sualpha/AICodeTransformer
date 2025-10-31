@@ -201,8 +201,6 @@ class CommitSettingsPanel(
         autoPushCheckBox.isEnabled = currentSettings.autoCommitEnabled
         singleFileTemplateTextArea.text = currentSettings.singleFileTemplate
         summaryTemplateTextArea.text = currentSettings.summaryTemplate
-        // 保留向后兼容
-        templateTextArea.text = currentSettings.commitTemplate
     }
     
 
@@ -250,8 +248,6 @@ class CommitSettingsPanel(
             autoPushEnabled = autoPushCheckBox.isSelected,
             singleFileTemplate = singleFileTemplateTextArea.text,
             summaryTemplate = summaryTemplateTextArea.text,
-            commitTemplate = templateTextArea.text,
-            templateType = CommitTemplateType.SIMPLE,
             useBatchProcessing = currentSettings.useBatchProcessing,
             batchSize = currentSettings.batchSize,
             maxFileContentLength = currentSettings.maxFileContentLength,
@@ -277,7 +273,7 @@ class CommitSettingsPanel(
     /**
      * 显示变量选择弹窗
      */
-    private fun showVariablePopup(component: JButton, targetTextArea: JBTextArea = templateTextArea, customVariables: List<Pair<String, String>>? = null) {
+    private fun showVariablePopup(component: JButton, targetTextArea: JBTextArea = singleFileTemplateTextArea, customVariables: List<Pair<String, String>>? = null) {
         val variables = customVariables ?: TemplateConstants.GitBuiltInVariable.values().map { it.variable to it.description }
         
         val popup = JBPopupFactory.getInstance().createListPopup(
@@ -306,7 +302,7 @@ class CommitSettingsPanel(
     /**
      * 在光标位置插入变量
      */
-    private fun insertVariableAtCursor(variableName: String, targetTextArea: JBTextArea = templateTextArea) {
+    private fun insertVariableAtCursor(variableName: String, targetTextArea: JBTextArea = singleFileTemplateTextArea) {
         val caretPosition = targetTextArea.caretPosition
         val currentText = targetTextArea.text
         val newText = currentText.substring(0, caretPosition) + variableName + currentText.substring(caretPosition)
