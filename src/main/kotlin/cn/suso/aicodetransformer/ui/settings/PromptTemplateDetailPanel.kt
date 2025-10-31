@@ -332,7 +332,7 @@ class PromptTemplateDetailPanel : JPanel() {
     fun isModified(): Boolean = isModified
     
     fun apply() {
-        // 保存功能已移除，不执行任何操作
+        
     }
     
     fun reset() {
