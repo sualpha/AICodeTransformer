@@ -55,10 +55,10 @@ object TemplateConstants {
         TRANSLATION_CONVERTER(
             id = "translation-converter",
             displayName = "智能翻译转换",
-            description = "智能识别选中代码的语言并进行翻译转换：英文转简体中文，中文转英文，专注于计算机软件行业术语",
+            description = "智能识别选中代码的语言并进行翻译转换：英文转简体中文，中文转英文，专注于计算机软件行业术语，支持驼峰命名智能拆分",
             category = TemplateCategory.CODE_CONVERSION,
-            tags = listOf("翻译", "中英文转换", "文档翻译"),
-            content = "请对以下选中的代码内容进行智能翻译转换：\n\n```\n{{selectedCode}}\n```\n\n翻译要求：\n1. 智能识别语言：\n   - 如果是英文内容，翻译成简体中文\n   - 如果是中文内容，翻译成英文,并且用驼峰命名\n\n2. 翻译规则：\n   - 专业术语使用计算机软件行业标准翻译\n\n3. 输出格式：\n   - 直接返回翻译后的内容\n   - 不要添加任何解释说明\n\n请开始翻译：",
+            tags = listOf("翻译", "中英文转换", "文档翻译", "驼峰命名"),
+            content = "请对以下选中的代码内容进行智能翻译转换：\n\n```\n{{selectedCode}}\n```\n\n翻译要求：\n1. 智能识别语言：\n   - 如果是英文内容，翻译成简体中文\n   - 如果是中文内容，翻译成英文并使用驼峰命名\n\n2. 驼峰命名处理（重要）：\n   - 对于驼峰命名的英文（如 getUserName, createUserAccount, isValidEmail）：\n     * 先将驼峰命名拆分为独立单词\n     * 然后将每个单词翻译成中文\n     * 组合成自然的中文表达\n   - 示例：\n     * getUserName → 获取用户名\n     * createUserAccount → 创建用户账户\n     * isValidEmail → 是否为有效邮箱\n     * setDefaultValue → 设置默认值\n\n3. 翻译规则：\n   - 专业术语使用计算机软件行业标准翻译\n   - 保持代码的语义完整性\n   - 变量名、方法名、类名等标识符要准确翻译\n\n4. 输出格式：\n   - 直接返回翻译后的内容\n   - 不要添加任何解释说明\n   - 保持原有的格式结构\n\n请开始翻译：",
             supportedLanguages = listOf("java", "kotlin", "javascript", "typescript", "python", "cpp", "csharp", "go", "rust", "swift")
         );
         
