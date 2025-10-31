@@ -24,21 +24,30 @@ AICodeTransformer is a powerful IntelliJ IDEA plugin that integrates multiple AI
   - 🔄 **Object Conversion**: Generate conversion methods between Java objects with field-by-field explicit conversion based on field analysis
   - 📝 **CamelCase Conversion**: One-click variable naming format conversion, supporting arbitrary character strings
   - 📋 **JSON Formatting**: Intelligent JSON formatting tool: automatically handle special characters, complete missing symbols, fix syntax errors and beautify format
+  - 🌐 **Smart Translation**: Intelligent Chinese-English code comments and variable name conversion
 - **Custom Templates**: Support for creating personalized AI instruction templates
 - **Variable System**: Built-in variables like `{{selectedCode}}`, `{{fileName}}`, `{{language}}`, etc.
 - **Category Management**: Organized by function for easy searching and usage
 
-### ⚡ Efficient Operation Experience
-- **Shortcut Key Binding**: Set dedicated shortcuts for each template
-- **Context Menu**: Quick access to all AI functions
-- **Asynchronous Processing**: Non-blocking AI calls that don't affect IDE usage
-- **Smart Caching**: Improve response speed and reduce redundant calls
+### 📝 AI-Generated Commit Message Feature
 
-### 🛡️ Security & Performance
-- **Secure Storage**: Encrypted storage of API keys
-- **Rate Limiting**: Prevent excessive API calls
-- **Performance Monitoring**: Real-time monitoring of API call performance
-- **Error Recovery**: Intelligent retry and failover mechanisms
+**Feature Overview**:
+The AI-generated commit message feature intelligently analyzes your code changes and automatically generates standardized Git commit messages, improving development efficiency and code management quality.
+- **Intelligent Analysis**: Automatically analyze file changes and code differences
+- **Standardized Format**: Generate commit messages that comply with Git commit conventions
+- **Batch Processing**: Support intelligent summarization of multi-file changes
+- **Auto Commit**: Configurable to automatically execute commits after generation
+- **Auto Push**: Support automatic push to remote repository after commit
+
+### 🔄 Auto Update Feature
+
+**Feature Overview**:
+The auto update system ensures your AICodeTransformer plugin always stays up-to-date, automatically obtaining new features and bug fixes.
+- **Automatic Update Check**: Periodically check for available new versions
+- **Smart Download**: Support resume download to ensure download stability
+- **Secure Installation**: File integrity verification to ensure update security
+- **Backup Recovery**: Automatically backup current version with rollback support
+- **Silent Update**: Configurable to automatically complete the entire update process in background
 
 ## 🚀 Quick Start
 
@@ -112,7 +121,7 @@ Max Tokens: 4096
 ### 3. Template Variables
 
 | Variable | Description | Example |
-|----------|-------------|----------|
+|----------|-------------|---------|
 | `{{selectedCode}}` | Currently selected code | `public class Test {}` |
 | `{{fileName}}` | Current file name | `UserService.java` |
 | `{{language}}` | Programming language | `Java` |
@@ -127,28 +136,10 @@ Max Tokens: 4096
 ### Basic Operation Flow
 
 1. **Select Code**: Select the code to be processed in the editor
-2. **Trigger Function**: Use shortcuts or context menu
+2. **Trigger Function**: Use shortcut keys or right-click menu
 3. **Choose Template**: Select appropriate AI template
-4. **View Results**: Check results after AI processing
+4. **View Results**: Review results after AI processing
 5. **Apply Changes**: Confirm and apply to code
-
-### Custom Template Example
-
-```
-Please convert the following {{language}} code to a more elegant form:
-
-\`\`\`{{language}}
-{{selectedCode}}
-\`\`\`
-
-Requirements:
-1. Optimize code structure and readability
-2. Follow {{language}} best practices
-3. Add necessary comments
-4. Keep original functionality unchanged
-
-File: {{fileName}}
-```
 
 ## 🛠️ Technical Architecture
 
@@ -162,13 +153,13 @@ src/main/kotlin/cn/suso/aicodetransformer/
 │   ├── ConfigurationService      # Configuration management
 │   ├── PromptTemplateService     # Template management
 │   ├── AIModelService           # AI model invocation
-│   ├── ActionService            # Action service
+│   ├── ActionService            # Action services
 │   ├── ExecutionService         # Execution coordination
 │   ├── CodeReplacementService   # Code replacement
 │   └── StatusService            # Status management
 ├── ui/                     # User interface
 │   ├── dialog/            # Dialog components
-│   └── settings/          # Settings panel
+│   └── settings/          # Settings panels
 └── debug/                 # Debug tools
 ```
 
@@ -185,22 +176,19 @@ src/main/kotlin/cn/suso/aicodetransformer/
 ### Design Features
 
 - **Asynchronous Processing**: All AI calls are asynchronous, non-blocking UI thread
-- **Thread Safety**: Uses concurrent-safe data structures and services
+- **Thread Safety**: Use concurrent-safe data structures and services
 - **Plugin Architecture**: Modular design, easy to extend and maintain
-- **Configuration Driven**: Supports flexible configuration and customization
-
-### Usage Tips
+- **Configuration Driven**: Support flexible configuration and customization
 
 **Improve Conversion Quality**
 - Choose appropriate AI model (LongCat-Flash-Thinking usually works better)
-- Adjust Temperature parameter (0.3-0.7 range works well)
 - Provide clear code selection and context
-- Use custom templates to optimize prompts
+- Use custom templates to optimize Prompts
 
 **Performance Optimization**
-- Set reasonable Max Tokens to avoid overly long responses
+- Set Max Tokens reasonably to avoid overly long responses
 - Utilize caching mechanism to reduce redundant calls
-- Increase timeout appropriately when network is slow
+- Appropriately increase timeout when network is slow
 - Use batch processing to reduce API calls
 
 ## ❓ FAQ
@@ -220,8 +208,8 @@ Please check the following:
 <summary><strong>Q: How to improve code conversion quality?</strong></summary>
 
 Suggestions:
-- Choose appropriate AI model (GPT-4 usually works better)
-- Adjust Temperature parameter (0.3-0.7 range usually works well)
+- Choose appropriate AI model (LongCat tested to work better)
+- Adjust Temperature parameter (0.3-0.7 usually works well)
 - Provide clear conversion requirements and context
 - Use custom Prompt templates to optimize prompts
 - Select appropriate code snippets, avoid too long or too short
@@ -234,8 +222,8 @@ Please check:
 - Whether shortcut format is correct
 - Whether it conflicts with IDE built-in shortcuts
 - Whether template is enabled
-- Whether code is selected (some functions require code selection)
-- Restart IDE and try again
+- Whether code is selected (some functions require selected code)
+- Restart IDE and retry
 </details>
 
 <details>
@@ -247,24 +235,20 @@ You can use the following methods:
 - Enable verbose logging
 </details>
 
-## 🔄 Changelog
-
-For complete version update history, please refer to [CHANGELOG.md](CHANGELOG.md).
-
 ## 📞 Support & Feedback
 
-If you encounter any issues or have suggestions during usage, please contact us through:
+If you encounter any issues or have suggestions during use, please contact us through:
 
 - 📧 **Email**: www.suso@qq.com
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/sualpha/AICodeTransformer/issues)
 
 ### Getting Help
 
-1. Check the FAQ section in this document
+1. Check the FAQ section in this documentation
 2. Search for related issues in [GitHub Issues](https://github.com/sualpha/AICodeTransformer/issues)
 3. Check IDE log files (`Help` → `Show Log in Explorer`)
 4. Confirm plugin configuration is correct
-5. Submit a new Issue with detailed information
+5. Submit new Issue with detailed information
 
 ---
 
@@ -272,7 +256,7 @@ If you encounter any issues or have suggestions during usage, please contact us 
 
 **⭐ If this project helps you, please give us a Star!**
 
-**🔗 [GitHub](https://github.com/sualpha/AICodeTransformer) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/28570-aicodetransformer))**
+**🔗 [GitHub](https://github.com/sualpha/AICodeTransformer) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/28570-aicodetransformer)**
 
 **Note**: Using this plugin requires valid AI service API keys. Please ensure compliance with relevant service terms and privacy policies.
 
