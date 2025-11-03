@@ -419,8 +419,6 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
             }
             
             // 6. 完成
-            updateExecutionProgress(context, 100, "执行完成")
-            
             val executionTime = System.currentTimeMillis() - startTime
             val result = ExecutionResult(
                 success = true,
