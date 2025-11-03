@@ -39,22 +39,7 @@ The AI-generated commit message feature intelligently analyzes your code changes
 - **Auto Commit**: Configurable to automatically execute commits after generation
 - **Auto Push**: Support automatic push to remote repository after commit
 
-### 🔄 Auto Update Feature
-
-**Feature Overview**:
-The auto update system ensures your AICodeTransformer plugin always stays up-to-date, automatically obtaining new features and bug fixes.
-- **Automatic Update Check**: Periodically check for available new versions
-- **Smart Download**: Support resume download to ensure download stability
-- **Secure Installation**: File integrity verification to ensure update security
-- **Backup Recovery**: Automatically backup current version with rollback support
-- **Silent Update**: Configurable to automatically complete the entire update process in background
-
 ## 🚀 Quick Start
-
-### System Requirements
-
-- **IDE**: IntelliJ IDEA 2024.1+ / Android Studio / PyCharm / WebStorm and other JetBrains IDEs
-- **JDK**: Java 17+
 
 ### Installation Methods
 
@@ -140,56 +125,6 @@ Max Tokens: 4096
 3. **Choose Template**: Select appropriate AI template
 4. **View Results**: Review results after AI processing
 5. **Apply Changes**: Confirm and apply to code
-
-## 🛠️ Technical Architecture
-
-### Core Components
-
-```
-src/main/kotlin/cn/suso/aicodetransformer/
-├── action/                 # Actions and shortcut handling
-├── model/                  # Data models and configuration
-├── service/                # Core business services
-│   ├── ConfigurationService      # Configuration management
-│   ├── PromptTemplateService     # Template management
-│   ├── AIModelService           # AI model invocation
-│   ├── ActionService            # Action services
-│   ├── ExecutionService         # Execution coordination
-│   ├── CodeReplacementService   # Code replacement
-│   └── StatusService            # Status management
-├── ui/                     # User interface
-│   ├── dialog/            # Dialog components
-│   └── settings/          # Settings panels
-└── debug/                 # Debug tools
-```
-
-### Technology Stack
-
-- **Development Language**: Kotlin
-- **Build Tool**: Gradle
-- **UI Framework**: IntelliJ Platform SDK
-- **Network Library**: Ktor Client
-- **Serialization**: Kotlinx Serialization
-- **Logging**: Logback
-- **Testing**: JUnit 5 + Mockito
-
-### Design Features
-
-- **Asynchronous Processing**: All AI calls are asynchronous, non-blocking UI thread
-- **Thread Safety**: Use concurrent-safe data structures and services
-- **Plugin Architecture**: Modular design, easy to extend and maintain
-- **Configuration Driven**: Support flexible configuration and customization
-
-**Improve Conversion Quality**
-- Choose appropriate AI model (LongCat-Flash-Thinking usually works better)
-- Provide clear code selection and context
-- Use custom templates to optimize Prompts
-
-**Performance Optimization**
-- Set Max Tokens reasonably to avoid overly long responses
-- Utilize caching mechanism to reduce redundant calls
-- Appropriately increase timeout when network is slow
-- Use batch processing to reduce API calls
 
 ## ❓ FAQ
 

@@ -35,6 +35,12 @@ import java.io.File
 import java.nio.file.Paths
 import com.intellij.vcs.commit.CommitWorkflowUi
 import com.intellij.vcs.commit.AbstractCommitWorkflowHandler
+import git4idea.GitUtil
+import git4idea.commands.Git
+import git4idea.commands.GitCommand
+import git4idea.commands.GitLineHandler
+import git4idea.repo.GitRepositoryManager
+import com.intellij.openapi.vfs.VirtualFile
 
 
 /**
@@ -377,7 +383,7 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
             .trim()
     }
 
-    private fun buildPromptForChanges(fileChanges: List<FileChangeInfo>, templateContent: String, project: Project): String {
+    private fun buildPromptForChanges(fileChanges: List<FileChangeInfo>, templateContent: String): String {
         // 构建文件变更信息
         val changesInfo = fileChanges.joinToString("\n\n") { change ->
             """
@@ -390,44 +396,17 @@ ${change.diff}
         
         // 构建文件列表
         val filesList = fileChanges.joinToString(", ") { it.filePath }
-        
-        // 获取主要变更类型
-        val changeTypes = fileChanges.map { it.changeType }.distinct()
-        val mainChangeType = when {
-            changeTypes.size == 1 -> changeTypes.first()
-            changeTypes.contains("ADDED") && changeTypes.contains("MODIFIED") -> "ADDED, MODIFIED"
-            else -> changeTypes.joinToString(", ")
-        }
-        
-        // 获取文件数量
-        val fileCount = fileChanges.size.toString()
-        
-        // 获取项目名称
-        val projectName = project.name
-        
+
+
         // 替换所有内置变量 - 支持两种格式：{{variable}} 和 {VARIABLE}
         var result = templateContent
             // 新格式变量（双大括号）
             .replace("{{changedFiles}}", filesList)
             .replace("{{fileDiffs}}", changesInfo)
-            .replace("{{projectName}}", projectName)
-            .replace("{{fileCount}}", fileCount)
-            .replace("{{changeType}}", mainChangeType)
-            // 旧格式变量（单大括号）- 保持向后兼容
-            .replace("{CHANGES}", changesInfo)
-            .replace("{FILES}", filesList)
-            .replace("{CHANGE_TYPE}", mainChangeType)
-            .replace("{FILE_COUNT}", fileCount)
-            .replace("{PROJECT_NAME}", projectName)
         
         // 如果原始模板中没有任何变量，则在末尾添加变更信息以保持兼容性
         if (!templateContent.contains("{{changedFiles}}") && 
-            !templateContent.contains("{{fileDiffs}}") &&
-            !templateContent.contains("{CHANGES}") && 
-            !templateContent.contains("{FILES}") && 
-            !templateContent.contains("{CHANGE_TYPE}") && 
-            !templateContent.contains("{FILE_COUNT}") && 
-            !templateContent.contains("{PROJECT_NAME}")) {
+            !templateContent.contains("{{fileDiffs}}")) {
             result = """
 $templateContent
 
@@ -438,70 +417,6 @@ $changesInfo
         
         return result
     }
-
-
-    
-
-    
-    /**
-     * 为单个批次构建提示词
-     */
-    private fun buildSingleBatchPrompt(
-        batch: List<FileChangeInfo>, 
-        templateContent: String, 
-        project: Project, 
-        batchNumber: Int, 
-        totalBatches: Int
-    ): String {
-        val changesInfo = batch.joinToString("\n\n") { change ->
-            """
-文件: ${change.filePath}
-变更类型: ${change.changeType}
-差异详情:
-${change.diff}
-            """.trimIndent()
-        }
-        
-        val filesList = batch.joinToString(", ") { it.filePath }
-        val changeTypes = batch.map { it.changeType }.distinct()
-        val mainChangeType = when {
-            changeTypes.size == 1 -> changeTypes.first()
-            changeTypes.contains("ADDED") && changeTypes.contains("MODIFIED") -> "ADDED, MODIFIED"
-            else -> changeTypes.joinToString(", ")
-        }
-        
-        val fileCount = batch.size.toString()
-        val projectName = project.name
-        
-        // 替换变量
-        var result = templateContent
-            .replace("{{changedFiles}}", filesList)
-            .replace("{{fileDiffs}}", changesInfo)
-            .replace("{{projectName}}", projectName)
-            .replace("{{fileCount}}", fileCount)
-            .replace("{{changeType}}", mainChangeType)
-            .replace("{CHANGES}", changesInfo)
-            .replace("{FILES}", filesList)
-            .replace("{CHANGE_TYPE}", mainChangeType)
-            .replace("{FILE_COUNT}", fileCount)
-            .replace("{PROJECT_NAME}", projectName)
-        
-        // 添加批次信息
-        result = """
-$result
-
-注意：这是第 $batchNumber 批次（共 $totalBatches 批次），请为这批文件生成简洁的提交信息。
-        """.trimIndent()
-        
-        return result
-    }
-    
-
-    
-
-
-
-    
 
 
     override fun update(e: AnActionEvent) {
@@ -921,16 +836,17 @@ $result
             }
 
             val diff = try {
-                if (change.type == Change.Type.DELETED) {
-                    // 对于删除文件，使用特殊的diff获取方式
-                    val relativePath = getRelativePathFromProject(project, fullPath)
-                    if (relativePath != null) {
+                // 对于所有文件类型，都使用相对路径
+                val relativePath = getRelativePathFromProject(project, fullPath)
+                if (relativePath != null) {
+                    // 确保文件在暂存区中，如果不在则添加到暂存区
+                    if (ensureFileInStagingArea(project, relativePath)) {
                         vcsService.getFileDiff(project, relativePath, staged = true)
                     } else {
-                        "删除文件: $fileName\n无法获取文件差异内容"
+                        "$changeType: $fileName\n无法将文件添加到暂存区"
                     }
                 } else {
-                    vcsService.getFileDiff(project, fullPath, staged = true)
+                    "$changeType: $fileName\n无法获取文件差异内容"
                 }
             } catch (e: Exception) {
                 "获取差异失败: ${e.message}"
@@ -993,7 +909,7 @@ $result
                 // 单批处理
                 indicator.text = "正在调用AI生成提交信息..."
                 indicator.fraction = 0.8
-                val prompt = buildPromptForChanges(fileChanges, templateContent, project)
+                val prompt = buildPromptForChanges(fileChanges, templateContent)
                 loggingService.logInfo(
                     "构建的提示词",
                     "CommitDialogAIAction - prompt长度: ${prompt.length}, 内容前100字符: ${
@@ -1061,7 +977,7 @@ $result
             indicator?.text = "正在处理批次 ${batchIndex + 1}/${batches.size}..."
             indicator?.fraction = 0.7 + (0.15 * batchIndex / batches.size)
             
-            val prompt = buildPromptForChanges(batch, templateContent, project)
+            val prompt = buildPromptForChanges(batch, templateContent)
             val batchResult = generateCommitForSingleBatch(prompt, config, apiKey, aiModelService, loggingService)
             batchResults.add("批次 ${batchIndex + 1}: $batchResult")
             
@@ -1074,6 +990,56 @@ $result
         loggingService.logInfo("开始汇总批次结果", "CommitDialogAIAction - 共 ${batchResults.size} 个批次需要汇总")
         
         return summarizeBatchResults(batchResults, templateContent, project)
+    }
+
+    /**
+     * 确保文件在暂存区中，如果不在则添加到暂存区
+     */
+    private fun ensureFileInStagingArea(project: Project, relativePath: String): Boolean {
+        return try {
+            val gitRepositoryManager = GitRepositoryManager.getInstance(project)
+            val repositories = gitRepositoryManager.repositories
+            
+            if (repositories.isEmpty()) {
+                return false
+            }
+            
+            val repository = repositories.first()
+            val root = repository.root
+            
+            // 检查文件是否已在暂存区
+            if (isFileInStagingArea(project, root, relativePath)) {
+                return true
+            }
+            
+            // 如果不在暂存区，添加到暂存区
+            val handler = GitLineHandler(project, root, GitCommand.ADD)
+            handler.addParameters(relativePath)
+            
+            val result = Git.getInstance().runCommand(handler)
+            result.success()
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 检查文件是否在暂存区
+     */
+    private fun isFileInStagingArea(project: Project, root: VirtualFile, relativePath: String): Boolean {
+        return try {
+            val handler = GitLineHandler(project, root, GitCommand.DIFF)
+            handler.addParameters("--cached", "--name-only", relativePath)
+            
+            val result = Git.getInstance().runCommand(handler)
+            if (result.success()) {
+                val output = result.outputAsJoinedString.trim()
+                return output.isNotEmpty()
+            }
+            false
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**

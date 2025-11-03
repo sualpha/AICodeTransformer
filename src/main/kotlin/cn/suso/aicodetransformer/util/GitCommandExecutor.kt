@@ -66,16 +66,16 @@ object GitCommandExecutor {
     ): GitCommandResult {
         // 定义多种容错参数组合，按优先级排序
         val parameterSets = listOf(
-            // 最严格的忽略参数
-            listOf("--ignore-cr-at-eol", "--ignore-space-at-eol"),
-            // 忽略所有空白差异
-            listOf("--ignore-all-space", "--ignore-blank-lines"),
-            // 忽略空白变化
-            listOf("--ignore-space-change"),
+            // 首先尝试无参数版本，获取完整差异
+            emptyList(),
             // 只忽略行尾回车
             listOf("--ignore-cr-at-eol"),
-            // 最后尝试无参数版本
-            emptyList()
+            // 忽略空白变化
+            listOf("--ignore-space-change"),
+            // 忽略所有空白差异
+            listOf("--ignore-all-space", "--ignore-blank-lines"),
+            // 最严格的忽略参数
+            listOf("--ignore-cr-at-eol", "--ignore-space-at-eol")
         )
         
         for ((index, params) in parameterSets.withIndex()) {

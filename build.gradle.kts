@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "cn.suso"
-version = "1.0.5"
+version = "2.0.0"
 
 repositories {
     //mavenCentral()

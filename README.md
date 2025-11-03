@@ -39,22 +39,7 @@ AI生成Commit信息功能能够智能分析您的代码变更，自动生成符
 - **自动提交**：可配置为生成后自动执行提交操作
 - **自动推送**：支持提交后自动推送到远程仓库
 
-### 🔄 自动更新功能
-
-**功能概述**：
-自动更新系统确保您的AICodeTransformer插件始终保持最新版本，自动获取新功能和bug修复。
-- **自动检查更新**：定时检查是否有新版本可用
-- **智能下载**：支持断点续传，确保下载稳定性
-- **安全安装**：文件完整性校验，确保更新安全
-- **备份恢复**：自动备份当前版本，支持回滚
-- **静默更新**：可配置为后台自动完成整个更新流程
-
 ## 🚀 快速开始
-
-### 系统要求
-
-- **IDE**: IntelliJ IDEA 2024.1+ / Android Studio / PyCharm / WebStorm 等 JetBrains IDE
-- **JDK**: Java 17+
 
 ### 安装方式
 
@@ -141,56 +126,6 @@ Max Tokens: 4096
 4. **查看结果**: AI 处理完成后查看结果
 5. **应用更改**: 确认后应用到代码中
 
-## 🛠️ 技术架构
-
-### 核心组件
-
-```
-src/main/kotlin/cn/suso/aicodetransformer/
-├── action/                 # 动作和快捷键处理
-├── model/                  # 数据模型和配置
-├── service/                # 核心业务服务
-│   ├── ConfigurationService      # 配置管理
-│   ├── PromptTemplateService     # 模板管理
-│   ├── AIModelService           # AI 模型调用
-│   ├── ActionService            # 动作服务
-│   ├── ExecutionService         # 执行协调
-│   ├── CodeReplacementService   # 代码替换
-│   └── StatusService            # 状态管理
-├── ui/                     # 用户界面
-│   ├── dialog/            # 对话框组件
-│   └── settings/          # 设置面板
-└── debug/                 # 调试工具
-```
-
-### 技术栈
-
-- **开发语言**: Kotlin
-- **构建工具**: Gradle
-- **UI 框架**: IntelliJ Platform SDK
-- **网络库**: Ktor Client
-- **序列化**: Kotlinx Serialization
-- **日志**: Logback
-- **测试**: JUnit 5 + Mockito
-
-### 设计特性
-
-- **异步处理**: 所有 AI 调用均为异步，不阻塞 UI 线程
-- **线程安全**: 使用并发安全的数据结构和服务
-- **插件化架构**: 模块化设计，易于扩展和维护
-- **配置驱动**: 支持灵活的配置和自定义
-
-**提高转换质量**
-- 选择合适的 AI 模型（LongCat-Flash-Thinking 通常效果更好）
-- 提供清晰的代码选择和上下文
-- 使用自定义模板优化 Prompt
-
-**性能优化**
-- 合理设置 Max Tokens 避免过长响应
-- 利用缓存机制减少重复调用
-- 在网络较慢时适当增加超时时间
-- 使用批量处理减少 API 调用次数
-
 ## ❓ 常见问题
 
 <details>
@@ -209,7 +144,6 @@ src/main/kotlin/cn/suso/aicodetransformer/
 
 建议：
 - 选择合适的 AI 模型（亲测longcat 效果更好）
-- 调整 Temperature 参数（0.3-0.7 之间通常效果较好）
 - 提供清晰的转换要求和上下文
 - 使用自定义 Prompt 模板优化提示词
 - 选择合适的代码片段，避免过长或过短

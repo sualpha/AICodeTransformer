@@ -72,10 +72,9 @@ class ModelConfigurationDetailPanel(private val project: Project) : JPanel(Borde
         formBuilder.addLabeledComponent(JLabel("API基础URL:"), apiBaseUrlField)
         formBuilder.addLabeledComponent(JLabel("模型名称:"), modelNameField)
         
-        // 保存API key相关组件的引用
+        // API密钥字段不在界面上显示
         apiKeyLabel = JLabel("API密钥:")
         apiKeyComponent = apiKeyField
-        formBuilder.addLabeledComponent(apiKeyLabel, apiKeyComponent)
         
         formBuilder.addComponent(com.intellij.ui.TitledSeparator("参数配置"))
         formBuilder.addLabeledComponent(JLabel("温度 (Temperature):"), temperatureSpinner)
