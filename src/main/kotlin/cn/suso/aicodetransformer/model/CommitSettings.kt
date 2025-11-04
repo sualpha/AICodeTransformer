@@ -3,20 +3,11 @@ package cn.suso.aicodetransformer.model
 import kotlinx.serialization.Serializable
 
 /**
- * 内置变量定义
- */
-data class CommitVariable(
-    val name: String,
-    val description: String,
-    val example: String
-)
-
-/**
  * 提交信息模板类型
  */
-enum class CommitTemplateType(val displayName: String, val description: String) {
+enum class CommitTemplateType(val description: String) {
     /** 简洁模式 - 生成简短的提交信息 */
-    SIMPLE("简洁模式", "生成简洁的Git提交信息（30字符以内）")
+    SIMPLE("生成简洁的Git提交信息（30字符以内）")
 }
 
 /**
@@ -170,22 +161,7 @@ refactor: 优化数据库查询性能 性能优化::101112
          * 默认模板常量 - 向后兼容
          */
         const val DEFAULT_TEMPLATE = SIMPLE_TEMPLATE
-        
-        /**
-         * 获取默认模板
-         */
-        fun getDefaultTemplate(): String {
-            return DEFAULT_TEMPLATE
-        }
-        
-        /**
-         * 根据模板类型获取模板内容
-         */
-        fun getTemplateByType(type: CommitTemplateType): String {
-            return when (type) {
-                CommitTemplateType.SIMPLE -> SIMPLE_TEMPLATE
-            }
-        }
+
         
         /**
          * 创建默认设置
@@ -193,41 +169,5 @@ refactor: 优化数据库查询性能 性能优化::101112
         fun createDefault(): CommitSettings {
             return CommitSettings()
         }
-        
-
-        
-
-        
-        /**
-         * 从Map创建设置
-         */
-        fun fromMap(map: Map<String, Any>): CommitSettings {
-            return CommitSettings(
-                autoCommitEnabled = map["autoCommitEnabled"] as? Boolean ?: false,
-                autoPushEnabled = map["autoPushEnabled"] as? Boolean ?: false,
-                singleFileTemplate = map["singleFileTemplate"] as? String ?: SIMPLE_TEMPLATE,
-                summaryTemplate = map["summaryTemplate"] as? String ?: SUMMARY_TEMPLATE,
-                useBatchProcessing = map["useBatchProcessing"] as? Boolean ?: true,
-                batchSize = map["batchSize"] as? Int ?: 5,
-                maxFileContentLength = map["maxFileContentLength"] as? Int ?: 10000,
-                maxTotalContentLength = map["maxTotalContentLength"] as? Int ?: 100000
-            )
-        }
-    }
-    
-    /**
-     * 转换为Map
-     */
-    fun toMap(): Map<String, Any> {
-        return mapOf(
-            "autoCommitEnabled" to autoCommitEnabled,
-            "autoPushEnabled" to autoPushEnabled,
-            "singleFileTemplate" to singleFileTemplate,
-            "summaryTemplate" to summaryTemplate,
-            "useBatchProcessing" to useBatchProcessing,
-            "batchSize" to batchSize,
-            "maxFileContentLength" to maxFileContentLength,
-            "maxTotalContentLength" to maxTotalContentLength
-        )
     }
 }

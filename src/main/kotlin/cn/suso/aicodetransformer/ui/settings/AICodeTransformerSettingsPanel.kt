@@ -70,7 +70,7 @@ class AICodeTransformerSettingsPanel(
     
     private fun setupHeader() {
         val headerPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 0, 0))
-        headerPanel.border = EmptyBorder(JBUI.insets(0, 0, 16, 0))
+        headerPanel.border = EmptyBorder(JBUI.insetsBottom(16))
         
         val titleLabel = JBLabel("AI Code Transformer 设置")
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)

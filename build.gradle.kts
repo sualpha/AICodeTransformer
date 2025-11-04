@@ -50,6 +50,9 @@ intellij {
     // 禁用版本检查以避免网络问题
     updateSinceUntilBuild.set(false)
     
+    // 禁用插件版本检查以避免网络问题
+    instrumentCode.set(false)
+    
     plugins.set(listOf("com.intellij.java", "org.jetbrains.kotlin", "Git4Idea"))
 }
 

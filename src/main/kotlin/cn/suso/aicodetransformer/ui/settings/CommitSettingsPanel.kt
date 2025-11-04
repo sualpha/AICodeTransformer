@@ -2,7 +2,6 @@ package cn.suso.aicodetransformer.ui.settings
 
 import cn.suso.aicodetransformer.constants.TemplateConstants
 import cn.suso.aicodetransformer.model.CommitSettings
-import cn.suso.aicodetransformer.model.CommitTemplateType
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
 import com.intellij.openapi.project.Project
@@ -10,12 +9,10 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.PopupStep
 import com.intellij.openapi.ui.popup.util.BaseListPopupStep
-import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
-import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
