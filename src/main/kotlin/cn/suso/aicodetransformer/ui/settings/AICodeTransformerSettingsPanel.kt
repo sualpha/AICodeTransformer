@@ -137,7 +137,7 @@ class AICodeTransformerSettingsPanel(
             // 根据修改的内容显示相应的保存消息
             val savedItems = mutableListOf<String>()
             if (hasModelChanges) savedItems.add("模型配置")
-            if (hasPromptChanges) savedItems.add("提示模板")
+            if (hasPromptChanges) savedItems.add("模板配置")
             if (hasCommitChanges) savedItems.add("提交设置")
             if (hasSystemChanges) savedItems.add("系统设置")
             

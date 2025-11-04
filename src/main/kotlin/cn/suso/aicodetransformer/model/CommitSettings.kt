@@ -24,115 +24,52 @@ enum class CommitTemplateType(val displayName: String, val description: String) 
  */
 @Serializable
 @com.intellij.util.xmlb.annotations.Tag("CommitSettings")
-class CommitSettings {
+data class CommitSettings(
     /** 是否启用自动提交 */
     @com.intellij.util.xmlb.annotations.Attribute("autoCommitEnabled")
-    var autoCommitEnabled: Boolean = false
-        get() = field
-        set(value) { field = value }
+    var autoCommitEnabled: Boolean = false,
     
     /** 是否启用自动推送 */
     @com.intellij.util.xmlb.annotations.Attribute("autoPushEnabled")
-    var autoPushEnabled: Boolean = false
-        get() = field
-        set(value) { field = value }
+    var autoPushEnabled: Boolean = false,
     
     /** 单个文件提示词模板 */
     @com.intellij.util.xmlb.annotations.Tag("singleFileTemplate")
-    var singleFileTemplate: String = SIMPLE_TEMPLATE
-        get() = field
-        set(value) { field = value }
+    var singleFileTemplate: String = SIMPLE_TEMPLATE,
     
     /** 汇总提示词模板 */
     @com.intellij.util.xmlb.annotations.Tag("summaryTemplate")
-    var summaryTemplate: String = SUMMARY_TEMPLATE
-        get() = field
-        set(value) { field = value }
+    var summaryTemplate: String = SUMMARY_TEMPLATE,
     
     /** Commit消息模板 (已废弃，保留向后兼容) */
     @Deprecated("使用 singleFileTemplate 和 summaryTemplate 替代")
     @com.intellij.util.xmlb.annotations.Tag("commitTemplate")
-    var commitTemplate: String = DEFAULT_TEMPLATE
-        get() = field
-        set(value) { field = value }
+    var commitTemplate: String = DEFAULT_TEMPLATE,
     
     /** 提交信息模板类型 (已废弃，保留向后兼容) */
     @Deprecated("使用 singleFileTemplate 和 summaryTemplate 替代")
     @com.intellij.util.xmlb.annotations.Attribute("templateType")
-    var templateType: CommitTemplateType = CommitTemplateType.SIMPLE
-        get() = field
-        set(value) { field = value }
+    var templateType: CommitTemplateType = CommitTemplateType.SIMPLE,
     
     /** 输入长度处理策略：true=分批处理，false=智能截断 */
     @com.intellij.util.xmlb.annotations.Attribute("useBatchProcessing")
-    var useBatchProcessing: Boolean = true
-        get() = field
-        set(value) { field = value }
+    var useBatchProcessing: Boolean = true,
     
     /** 分批处理时每批次的最大文件数量 */
     @com.intellij.util.xmlb.annotations.Attribute("batchSize")
-    var batchSize: Int = 5
-        get() = field
-        set(value) { field = value }
+    var batchSize: Int = 5,
     
     /** 分批处理时单个文件的最大字符数 */
     @com.intellij.util.xmlb.annotations.Attribute("maxFileContentLength")
-    var maxFileContentLength: Int = 10000
-        get() = field
-        set(value) { field = value }
+    var maxFileContentLength: Int = 10000,
     
     /** 智能截断时的最大总字符数 */
     @com.intellij.util.xmlb.annotations.Attribute("maxTotalContentLength")
     var maxTotalContentLength: Int = 100000
-        get() = field
-        set(value) { field = value }
+) {
 
-    // 默认构造函数
-    constructor()
-
-    // 复制构造函数
-    constructor(
-        autoCommitEnabled: Boolean = false,
-        autoPushEnabled: Boolean = false,
-        singleFileTemplate: String = SIMPLE_TEMPLATE,
-        summaryTemplate: String = SUMMARY_TEMPLATE,
-        useBatchProcessing: Boolean = true,
-        batchSize: Int = 5,
-        maxFileContentLength: Int = 10000,
-        maxTotalContentLength: Int = 100000
-    ) {
-        this.autoCommitEnabled = autoCommitEnabled
-        this.autoPushEnabled = autoPushEnabled
-        this.singleFileTemplate = singleFileTemplate
-        this.summaryTemplate = summaryTemplate
-        this.useBatchProcessing = useBatchProcessing
-        this.batchSize = batchSize
-        this.maxFileContentLength = maxFileContentLength
-        this.maxTotalContentLength = maxTotalContentLength
-    }
-
-    // 复制方法
-    fun copy(
-        autoCommitEnabled: Boolean = this.autoCommitEnabled,
-        autoPushEnabled: Boolean = this.autoPushEnabled,
-        singleFileTemplate: String = this.singleFileTemplate,
-        summaryTemplate: String = this.summaryTemplate,
-        useBatchProcessing: Boolean = this.useBatchProcessing,
-        batchSize: Int = this.batchSize,
-        maxFileContentLength: Int = this.maxFileContentLength,
-        maxTotalContentLength: Int = this.maxTotalContentLength
-    ): CommitSettings {
-        return CommitSettings(
-            autoCommitEnabled,
-            autoPushEnabled,
-            singleFileTemplate,
-            summaryTemplate,
-            useBatchProcessing,
-            batchSize,
-            maxFileContentLength,
-            maxTotalContentLength
-        )
-    }
+    // 数据类会自动生成构造函数、equals、hashCode、toString和copy方法
+    
     companion object {
 
         

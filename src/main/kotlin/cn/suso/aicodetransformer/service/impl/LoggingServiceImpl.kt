@@ -6,7 +6,7 @@ import cn.suso.aicodetransformer.model.SortDirection
 import cn.suso.aicodetransformer.service.*
 import com.intellij.openapi.components.service
 import kotlinx.coroutines.*
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -452,17 +452,21 @@ class LoggingServiceImpl : LoggingService {
         }
         logInfo("符合清理条件的日志数: ${logsToRemove.size}", "日志清理任务")
         
+        // 清理内存中的日志
         logEntries.removeIf { it.timestamp < cutoffTime }
+        
+        // 清理文件系统中的日志
+        val fileCleanedCount = cleanupLogFiles(olderThanMs)
         
         val removedCount = initialSize - logEntries.size
         
-        if (removedCount > 0) {
-            logInfo("清理了 $removedCount 条旧日志记录，剩余日志数: ${logEntries.size}", "日志清理任务")
+        if (removedCount > 0 || fileCleanedCount > 0) {
+            logInfo("清理完成 - 内存: $removedCount 条, 文件: $fileCleanedCount 条旧日志记录", "日志清理任务")
         } else {
             logInfo("没有需要清理的旧日志，当前日志数: ${logEntries.size}", "日志清理任务")
         }
         
-        return removedCount
+        return removedCount + fileCleanedCount
     }
     
     override fun exportLogs(criteria: LogSearchCriteria, format: LogExportFormat): String {
@@ -860,4 +864,105 @@ class LoggingServiceImpl : LoggingService {
             PerformanceMetric.CONCURRENT_USERS -> "users"
         }
     }
+    
+    /**
+     * 清理文件系统中的旧日志
+     * 根据时间戳清理日志文件中的旧记录
+     */
+    private fun cleanupLogFiles(olderThanMs: Long): Int {
+        if (!config.logToFile) return 0
+        
+        val logFile = File(config.logFilePath)
+        if (!logFile.exists()) return 0
+        
+        return try {
+            val cutoffTime = System.currentTimeMillis() - olderThanMs
+            val tempFile = File("${config.logFilePath}.tmp")
+            var keptLines = 0
+            var removedLines = 0
+            
+            logInfo("开始清理日志文件: ${logFile.absolutePath}, 截止时间: $cutoffTime", "文件日志清理")
+            
+            logFile.useLines { lines ->
+                tempFile.bufferedWriter().use { writer ->
+                    lines.forEach { line ->
+                        if (line.isBlank()) return@forEach
+                        
+                        // 尝试解析日志行获取时间戳
+                        val logTimestamp = extractTimestampFromLogLine(line)
+                        
+                        if (logTimestamp != null && logTimestamp >= cutoffTime) {
+                            // 保留这条日志（时间较新）
+                            writer.write(line)
+                            writer.newLine()
+                            keptLines++
+                        } else if (logTimestamp == null) {
+                            // 无法解析时间戳，保守起见保留这条日志
+                            writer.write(line)
+                            writer.newLine()
+                            keptLines++
+                        } else {
+                            // 这条日志太旧了，删除
+                            removedLines++
+                        }
+                    }
+                }
+            }
+            
+            // 用清理后的文件替换原文件
+            if (logFile.delete()) {
+                if (tempFile.renameTo(logFile)) {
+                    logInfo("文件清理完成 - 保留: $keptLines 条, 删除: $removedLines 条旧日志", "文件日志清理")
+                    removedLines
+                } else {
+                    logWarning("无法重命名临时文件到原日志文件", "文件日志清理")
+                    // 尝试恢复
+                    tempFile.delete()
+                    0
+                }
+            } else {
+                logWarning("无法删除原日志文件", "文件日志清理")
+                tempFile.delete()
+                0
+            }
+            
+        } catch (e: Exception) {
+            logError(e, "清理日志文件失败")
+            0
+        }
+    }
+    
+    /**
+     * 从日志行中提取时间戳
+     * 支持 JSON、结构化和纯文本格式
+     */
+    private fun extractTimestampFromLogLine(line: String): Long? {
+        return try {
+            when (config.logFormat) {
+                LogFormat.JSON -> {
+                    // 解析JSON格式获取时间戳
+                    val jsonElement = json.parseToJsonElement(line)
+                    val timestampStr = jsonElement.jsonObject["timestamp"]?.jsonPrimitive?.content
+                    timestampStr?.let { dateFormat.parse(it).time }
+                }
+                LogFormat.STRUCTURED -> {
+                    // 解析结构化格式: [2024-01-15 10:30:45.123] 
+                    val pattern = """\[([^\]]+)\]""".toRegex()
+                    val matchResult = pattern.find(line)
+                    matchResult?.groupValues?.get(1)?.let { timestampStr ->
+                        dateFormat.parse(timestampStr).time
+                    }
+                }
+                LogFormat.PLAIN -> {
+                    // 纯文本格式无法提取时间戳，返回null
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
 }
+
+
+

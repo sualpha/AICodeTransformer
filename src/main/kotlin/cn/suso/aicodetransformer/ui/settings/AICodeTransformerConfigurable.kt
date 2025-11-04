@@ -57,7 +57,10 @@ class AICodeTransformerConfigurable : Configurable {
     
     @Throws(ConfigurationException::class)
     override fun apply() {
-        settingsPanel?.apply()
+        // 只有在有修改时才执行保存操作
+        if (isModified()) {
+            settingsPanel?.apply()
+        }
     }
     
     override fun reset() {
