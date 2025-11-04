@@ -1007,36 +1007,11 @@ $changesInfo
             val repository = repositories.first()
             val root = repository.root
             
-            // 检查文件是否已在暂存区
-            if (isFileInStagingArea(project, root, relativePath)) {
-                return true
-            }
-            
-            // 如果不在暂存区，添加到暂存区
             val handler = GitLineHandler(project, root, GitCommand.ADD)
             handler.addParameters(relativePath)
             
             val result = Git.getInstance().runCommand(handler)
             result.success()
-        } catch (e: Exception) {
-            false
-        }
-    }
-    
-    /**
-     * 检查文件是否在暂存区
-     */
-    private fun isFileInStagingArea(project: Project, root: VirtualFile, relativePath: String): Boolean {
-        return try {
-            val handler = GitLineHandler(project, root, GitCommand.DIFF)
-            handler.addParameters("--cached", "--name-only", relativePath)
-            
-            val result = Git.getInstance().runCommand(handler)
-            if (result.success()) {
-                val output = result.outputAsJoinedString.trim()
-                return output.isNotEmpty()
-            }
-            false
         } catch (e: Exception) {
             false
         }
