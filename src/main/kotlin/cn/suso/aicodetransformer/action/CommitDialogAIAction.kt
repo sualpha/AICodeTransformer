@@ -795,6 +795,17 @@ $changesInfo
         indicator.text = "正在分析文件变更..."
         indicator.fraction = 0.2
 
+           // 在分析与生成diff前，确保所有编辑内容已保存并提交到PSI
+        try {
+            ApplicationManager.getApplication().invokeAndWait {
+                com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().saveAllDocuments()
+                com.intellij.psi.PsiDocumentManager.getInstance(project).commitAllDocuments()
+            }
+            loggingService.logInfo("文档保存", "CommitDialogAIAction - 已保存并提交所有编辑文档")
+        } catch (saveEx: Exception) {
+            loggingService.logError(saveEx, "CommitDialogAIAction - 文档保存失败: ${saveEx.message}")
+        }
+
         // 详细记录传入的文件信息
         loggingService.logInfo("generateCommitForChanges开始", "CommitDialogAIAction - 接收到 ${changes.size} 个文件变更")
         changes.forEachIndexed { index, change ->
