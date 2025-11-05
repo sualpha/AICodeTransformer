@@ -3,12 +3,13 @@ package cn.suso.aicodetransformer.ui.settings
 import cn.suso.aicodetransformer.constants.UpdateStatus
 import cn.suso.aicodetransformer.model.UpdateInfo
 import cn.suso.aicodetransformer.model.GlobalSettings
+import cn.suso.aicodetransformer.model.CacheConfig
 import cn.suso.aicodetransformer.service.LoggingService
-import cn.suso.aicodetransformer.constants.LogLevel
 import cn.suso.aicodetransformer.model.LoggingConfig
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.service.AutoUpdateService
 import cn.suso.aicodetransformer.service.UpdateStatusListener
+import cn.suso.aicodetransformer.service.CacheService
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -33,12 +34,12 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private val loggingService: LoggingService = service()
     private val configurationService: ConfigurationService = service()
     private val autoUpdateService: AutoUpdateService = service()
+    private val cacheService: CacheService = service()
     private val logPathLabel = JBLabel()
     private val logSizeLabel = JBLabel()
     private val logCountLabel = JBLabel()
     
     // 日志配置UI组件
-    private lateinit var levelComboBox: JComboBox<String>
     private lateinit var retentionSpinner: JSpinner
     private lateinit var autoCleanCheckBox: JCheckBox
     private lateinit var logSensitiveDataCheckBox: JCheckBox
@@ -54,6 +55,8 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     
     // 缓存配置相关组件
     private lateinit var enableCacheCheckBox: JCheckBox
+    private lateinit var cacheTtlSpinner: JSpinner
+    private lateinit var clearCacheButton: JButton
     
     // 当前可用的更新信息
     private var currentUpdateInfo: UpdateInfo? = null
@@ -91,7 +94,12 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         // 日志配置面板
         val configPanel = createLogConfigPanel()
         mainPanel.add(configPanel)
-        mainPanel.add(Box.createVerticalStrut(12))
+        mainPanel.add(Box.createVerticalStrut(8))
+        
+        // 缓存配置面板（位于日志配置下面）
+        val cachePanel = createCacheSettingsPanel()
+        mainPanel.add(cachePanel)
+        mainPanel.add(Box.createVerticalStrut(8))
         
         // 更新设置面板
         val updatePanel = createUpdateSettingsPanel()
@@ -152,45 +160,75 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         // 将所有配置项合并到一行
         val configPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
         
-        configPanel.add(JBLabel("级别："))
-        val logLevels = arrayOf("DEBUG", "INFO", "WARNING", "ERROR")
-        levelComboBox = JComboBox(logLevels)
-        configPanel.add(levelComboBox)
-        
-        configPanel.add(Box.createHorizontalStrut(15))
+        //configPanel.add(Box.createHorizontalStrut(8))
         configPanel.add(JBLabel("保留："))
         retentionSpinner = JSpinner(SpinnerNumberModel(30, 1, 365, 1))
         configPanel.add(retentionSpinner)
         configPanel.add(JBLabel("天"))
         
         configPanel.add(Box.createHorizontalStrut(15))
-        autoCleanCheckBox = JCheckBox("自动清理", false)
-        configPanel.add(autoCleanCheckBox)
-        
-        configPanel.add(Box.createHorizontalStrut(15))
         logSensitiveDataCheckBox = JCheckBox("记录调用日志", false)
         configPanel.add(logSensitiveDataCheckBox)
-        
-        panel.add(configPanel)
-        
-        // 添加日志操作按钮
-        panel.add(Box.createVerticalStrut(8))
-        val logOperationPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
-        
-        val refreshButton = JButton("刷新")
-        refreshButton.addActionListener { refreshLogInfo() }
-        logOperationPanel.add(refreshButton)
-        
-        val viewLogsButton = JButton("查看")
-        viewLogsButton.addActionListener { viewLogs() }
-        logOperationPanel.add(viewLogsButton)
-        
+
+        configPanel.add(Box.createHorizontalStrut(15))
+        autoCleanCheckBox = JCheckBox("自动清理", false)
+        configPanel.add(autoCleanCheckBox)
+
+        configPanel.add(Box.createHorizontalStrut(10))
         val clearButton = JButton("清空")
         clearButton.addActionListener { clearLogs() }
-        logOperationPanel.add(clearButton)
+        configPanel.add(clearButton)
+
+        panel.add(configPanel)
         
-        panel.add(logOperationPanel)
-        
+        return panel
+    }
+    
+    private fun createCacheSettingsPanel(): JPanel {
+        val panel = JBPanel<JBPanel<*>>()
+        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
+        panel.border = TitledBorder("缓存配置")
+
+        val cachePanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
+
+        // 与日志配置保持一致的左侧间距
+       // cachePanel.add(Box.createHorizontalStrut(15))
+        // TTL（分钟）放第一个
+        cachePanel.add(JBLabel("TTL（分钟）："))
+        cacheTtlSpinner = JSpinner(SpinnerNumberModel(15, 1, 1440, 1))
+        cachePanel.add(cacheTtlSpinner)
+
+        // 启用缓存放第二个
+        cachePanel.add(Box.createHorizontalStrut(15))
+        enableCacheCheckBox = JCheckBox("启用缓存", true)
+        enableCacheCheckBox.toolTipText = "启用后，系统将使用缓存来提高性能。禁用后，所有缓存功能将停止工作。"
+        cachePanel.add(enableCacheCheckBox)
+
+        // 清理缓存放第三个
+        cachePanel.add(Box.createHorizontalStrut(10))
+        clearCacheButton = JButton("清理缓存")
+        clearCacheButton.toolTipText = "立即清除所有缓存条目"
+        clearCacheButton.addActionListener {
+            try {
+                val result = Messages.showOkCancelDialog(
+                    this,
+                    "确定要清除所有缓存吗？此操作不可撤销。",
+                    "清理缓存",
+                    "清理",
+                    "取消",
+                    Messages.getQuestionIcon()
+                )
+                if (result == Messages.OK) {
+                    cacheService.clearAllCache()
+                    Messages.showInfoMessage(this, "缓存已清理", "操作完成")
+                }
+            } catch (e: Exception) {
+                Messages.showErrorDialog(this, "清理缓存失败：${e.message}", "操作失败")
+            }
+        }
+        cachePanel.add(clearCacheButton)
+
+        panel.add(cachePanel)
         return panel
     }
     
@@ -225,15 +263,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         
         panel.add(updateConfigPanel)
         
-        // 第二行：缓存配置
-        val cacheConfigPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
-        
-        // 缓存启用勾选框
-        enableCacheCheckBox = JCheckBox("启用缓存", true)
-        enableCacheCheckBox.toolTipText = "启用后，系统将使用缓存来提高性能。禁用后，所有缓存功能将停止工作。"
-        cacheConfigPanel.add(enableCacheCheckBox)
-        
-        panel.add(cacheConfigPanel)
+        // 已将缓存配置移动到独立的“缓存配置”面板中
         
         // 第三行：手动检查和状态显示
         val statusPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
@@ -417,36 +447,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         }
     }
     
-    private fun viewLogs() {
-        try {
-            val logFilePath = getLogFilePath()
-            val logFile = File(logFilePath)
-            
-            if (logFile.exists()) {
-                if (Desktop.isDesktopSupported()) {
-                    Desktop.getDesktop().open(logFile)
-                } else {
-                    Messages.showInfoMessage(
-                        project,
-                        "请手动打开日志文件：${logFile.absolutePath}",
-                        "查看日志"
-                    )
-                }
-            } else {
-                Messages.showWarningDialog(
-                    project,
-                    "日志文件不存在，可能还没有API调用记录",
-                    "文件不存在"
-                )
-            }
-        } catch (e: Exception) {
-            Messages.showErrorDialog(
-                project,
-                "打开日志文件失败：${e.message}",
-                "操作失败"
-            )
-        }
-    }
+    // 移除查看日志功能，保留打开日志文件夹与清空功能
     
 
     
@@ -497,14 +498,6 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         try {
             val config = loggingService.getLoggingConfig()
             
-            // 设置日志级别
-            levelComboBox.selectedItem = when (config.minLevel) {
-                LogLevel.DEBUG -> "DEBUG"
-                LogLevel.INFO -> "INFO"
-                LogLevel.WARNING -> "WARNING"
-                LogLevel.ERROR -> "ERROR"
-            }
-            
             // 设置保留天数（从毫秒转换为天数）
             val retentionDays = (config.retentionTimeMs / (24 * 60 * 60 * 1000)).toInt()
             retentionSpinner.value = retentionDays
@@ -531,15 +524,6 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         try {
             val currentConfig = loggingService.getLoggingConfig()
             
-            // 获取选择的日志级别
-            val selectedLevel = when (levelComboBox.selectedItem as String) {
-                "DEBUG" -> LogLevel.DEBUG
-                "INFO" -> LogLevel.INFO
-                "WARNING" -> LogLevel.WARNING
-                "ERROR" -> LogLevel.ERROR
-                else -> LogLevel.INFO
-            }
-            
             // 获取保留天数（转换为毫秒）
             val retentionDays = retentionSpinner.value as Int
             val retentionTimeMs = retentionDays * 24L * 60L * 60L * 1000L
@@ -547,7 +531,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             // 创建新的配置
             val newConfig = LoggingConfig(
                 enabled = autoCleanCheckBox.isSelected,
-                minLevel = selectedLevel,
+                minLevel = currentConfig.minLevel,
                 logToFile = currentConfig.logToFile,
                 logToConsole = currentConfig.logToConsole,
                 logFilePath = currentConfig.logFilePath,
@@ -593,6 +577,9 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                 else -> 24
             }
             
+            // 获取缓存TTL（分钟）
+            val ttlMinutes = (cacheTtlSpinner.value as Int)
+            
             // 创建新的全局设置
             val newSettings = GlobalSettings(
                 enableLogging = currentSettings.enableLogging,
@@ -605,7 +592,8 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                 updateInterval = intervalString,
                 updateCheckIntervalHours = intervalHours,
                 lastUpdateCheckTime = if (enableAutoUpdateCheckBox.isSelected) System.currentTimeMillis() else 0L,
-                enableCache = enableCacheCheckBox.isSelected
+                enableCache = enableCacheCheckBox.isSelected,
+                cacheDefaultTtlMinutes = ttlMinutes
             )
             
             // 保存设置
@@ -620,6 +608,24 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             
             // 更新UI状态
             updateIntervalComboBox.isEnabled = enableAutoUpdateCheckBox.isSelected
+
+            // 应用缓存TTL到缓存服务
+            try {
+                val ttlSeconds = ttlMinutes.toLong() * 60
+                cacheService.setCacheConfig(
+                    CacheConfig(
+                        defaultTtlSeconds = ttlSeconds,
+                        enabled = enableCacheCheckBox.isSelected
+                    )
+                )
+            } catch (e: Exception) {
+                // 应用缓存配置失败不阻塞主流程，仅提示
+                Messages.showWarningDialog(
+                    project,
+                    "应用缓存配置失败：${e.message}",
+                    "缓存配置"
+                )
+            }
             
         } catch (e: Exception) {
             Messages.showErrorDialog(
@@ -640,6 +646,10 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             enableAutoUpdateCheckBox.isSelected = settings.enableAutoUpdate
             updateIntervalComboBox.isEnabled = settings.enableAutoUpdate
             enableCacheCheckBox.isSelected = settings.enableCache
+            
+            // 设置缓存TTL（分钟）
+            val ttlMinutes = if (settings.cacheDefaultTtlMinutes <= 0) 15 else settings.cacheDefaultTtlMinutes
+            cacheTtlSpinner.value = ttlMinutes
             
             // 根据间隔字符串设置下拉框
             val intervalIndex = when (settings.updateInterval) {
@@ -688,6 +698,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             updateIntervalComboBox.selectedIndex = 0
             updateIntervalComboBox.isEnabled = false
             enableCacheCheckBox.isSelected = false // 默认禁用缓存
+            cacheTtlSpinner.value = 15
             checkUpdateButton.isEnabled = true // 默认启用按钮
             downloadUpdateButton.isVisible = false // 默认隐藏
             installUpdateButton.isVisible = false // 默认隐藏
@@ -900,29 +911,22 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             // 检查日志配置是否有修改
             val currentLogConfig = loggingService.getLoggingConfig()
             
-            val selectedLevel = when (levelComboBox.selectedItem as String) {
-                "DEBUG" -> LogLevel.DEBUG
-                "INFO" -> LogLevel.INFO
-                "WARNING" -> LogLevel.WARNING
-                "ERROR" -> LogLevel.ERROR
-                else -> LogLevel.INFO
-            }
-            
             val retentionDays = retentionSpinner.value as Int
             val retentionTimeMs = retentionDays * 24L * 60L * 60L * 1000L
             
-            val logConfigModified = currentLogConfig.minLevel != selectedLevel ||
-                    currentLogConfig.retentionTimeMs != retentionTimeMs ||
+            val logConfigModified = currentLogConfig.retentionTimeMs != retentionTimeMs ||
                     currentLogConfig.enabled != autoCleanCheckBox.isSelected ||
                     currentLogConfig.logSensitiveData != logSensitiveDataCheckBox.isSelected
             
             // 检查更新设置是否有修改
             val currentSettings = configurationService.getGlobalSettings()
             val intervalString = updateIntervalComboBox.selectedItem as String
+            val ttlMinutes = cacheTtlSpinner.value as Int
             
             val updateSettingsModified = currentSettings.enableAutoUpdate != enableAutoUpdateCheckBox.isSelected ||
                     currentSettings.updateInterval != intervalString ||
-                    currentSettings.enableCache != enableCacheCheckBox.isSelected
+                    currentSettings.enableCache != enableCacheCheckBox.isSelected ||
+                    currentSettings.cacheDefaultTtlMinutes != ttlMinutes
             
             return logConfigModified || updateSettingsModified
         } catch (e: Exception) {

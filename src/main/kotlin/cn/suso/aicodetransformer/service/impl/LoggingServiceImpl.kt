@@ -174,7 +174,7 @@ class LoggingServiceImpl : LoggingService {
     }
     
     override fun logApiRequestDetails(requestId: String, config: ModelConfiguration, requestBody: String, headers: Map<String, String>, userId: String?) {
-        if (!this.config.enabled || !this.config.logSensitiveData) return
+        if (!this.config.enabled && !this.config.logSensitiveData) return
         
         val sanitizedHeaders = headers.toMutableMap()
         // 隐藏敏感信息
@@ -213,7 +213,7 @@ class LoggingServiceImpl : LoggingService {
     }
     
     override fun logApiResponseDetails(requestId: String, responseBody: String, statusCode: Int, responseHeaders: Map<String, String>, responseTimeMs: Long) {
-        if (!this.config.enabled || !this.config.logSensitiveData) return
+        if (!this.config.enabled && !this.config.logSensitiveData) return
         
         val metadata = LogMetadata(mapOf(
             "requestId" to requestId,
