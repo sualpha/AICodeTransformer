@@ -153,7 +153,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                         updateStatus(UpdateStatus.AVAILABLE, updateInfo)
                         notifyProgress(100, "发现新版本: ${updateInfo.version}")
                         logger.info("发现新版本: ${updateInfo.version}")
-                        loggingService.logInfo("发现新版本: ${updateInfo.version}", "自动更新")
                         return@withContext updateInfo
                     } else {
                         updateStatus(UpdateStatus.UP_TO_DATE)
@@ -185,7 +184,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             synchronized(downloadLock) {
                 if (isDownloading) {
                     logger.warn("下载已在进行中，跳过重复下载请求")
-                    loggingService.logInfo("下载已在进行中，跳过重复下载请求", "自动更新")
                     return@withContext false
                 }
                 updateDownloadState(DownloadState.PREPARING, "开始准备下载")
@@ -197,8 +195,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 notifyProgress(0, "开始下载更新...")
                 
                 logger.info("开始下载更新: ${updateInfo.version}")
-                loggingService.logInfo("开始下载更新: ${updateInfo.version}", "自动更新")
-                
+
                 val downloadDir = File(System.getProperty("java.io.tmpdir"), "aicodetransformer_updates")
                 if (!downloadDir.exists()) {
                     downloadDir.mkdirs()
@@ -258,7 +255,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                         updateStatus(UpdateStatus.DOWNLOADED, updateInfo)
                         notifyProgress(100, "下载完成")
                         logger.info("更新下载完成: ${downloadFile.absolutePath}")
-                        loggingService.logInfo("更新下载完成: ${downloadFile.absolutePath}", "自动更新")
                         true
                     } else {
                         updateDownloadState(DownloadState.FAILED, "文件完整性校验失败")
@@ -329,7 +325,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     }
                     val downloadDuration = System.currentTimeMillis() - downloadStartTime
                     logger.info("下载任务结束，耗时: ${downloadDuration}ms")
-                    loggingService.logInfo("下载任务结束，耗时: ${downloadDuration}ms", "自动更新")
                 }
                 // 清理下载Job
                 downloadJob = null
@@ -424,8 +419,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     updateStatus(UpdateStatus.INSTALLED, updateInfo)
                     notifyProgress(100, "安装完成")
                     logger.info("更新安装完成: ${updateInfo.version}")
-                    loggingService.logInfo("更新安装完成: ${updateInfo.version}", "自动更新")
-                    
+
                     // 9. 提示用户重启IDE
                     showRestartPrompt(updateInfo)
                     
@@ -540,8 +534,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     updateStatus(UpdateStatus.INSTALLED, updateInfo)
                     notifyProgress(100, "安装完成")
                     logger.info("自动更新安装完成: ${updateInfo.version}")
-                    loggingService.logInfo("自动更新安装完成: ${updateInfo.version}", "自动更新")
-                    
+
                     // 9. 显示简化的重启提醒（仅通知，无确认对话框）
                     showAutoUpdateRestartNotification(updateInfo)
                     
@@ -591,30 +584,31 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     
     override fun startAutoUpdate(triggerSource: String) {
         val settings = configurationService.getGlobalSettings()
-        
-        // 只有在手动启用且触发源为timer时才启动定时任务
-        if (settings.enableAutoUpdate && triggerSource == "timer") {
-            val intervalMs = when (settings.updateInterval) {
-                "每小时一次" -> 60 * 60 * 1000L
-                "每天一次" -> 24 * 60 * 60 * 1000L
-                "每周一次" -> 7 * 24 * 60 * 60 * 1000L
-                else -> 24 * 60 * 60 * 1000L // 默认每天一次
-            }
-            
-            updateTimer = Timer("AutoUpdateTimer", true)
-            updateTimer?.scheduleAtFixedRate(object : TimerTask() {
-                override fun run() {
-                    updateScope.launch {
-                        performFullAutoUpdate()
-                    }
+
+        if (triggerSource == "timer") {
+            // 先停止已有定时器，避免间隔变更后重复或旧任务残留
+            updateTimer?.cancel()
+            updateTimer = null
+
+            if (settings.enableAutoUpdate) {
+                val intervalMs = when (settings.updateInterval) {
+                    "每小时一次" -> 60 * 60 * 1000L
+                    "每天一次" -> 24 * 60 * 60 * 1000L
+                    "每周一次" -> 7 * 24 * 60 * 60 * 1000L
+                    "每月一次" -> 30 * 24 * 60 * 60 * 1000L
+                    else -> 24 * 60 * 60 * 1000L // 默认每天一次
                 }
-            }, intervalMs, intervalMs) // 修改：第一次延迟执行，不立即执行
-            
-            loggingService.logInfo("定时自动更新已启动，检查间隔：${settings.updateInterval}")
-        } else if (triggerSource == "manual") {
-            loggingService.logInfo("手动触发自动更新设置，但不启动定时任务")
-        } else {
-            loggingService.logInfo("自动更新未启用或触发源无效：$triggerSource")
+
+                updateTimer = Timer("AutoUpdateTimer", true)
+                updateTimer?.scheduleAtFixedRate(object : TimerTask() {
+                    override fun run() {
+                        updateScope.launch {
+                            performFullAutoUpdate()
+                        }
+                    }
+                }, intervalMs, intervalMs) // 第一次延迟执行，与间隔一致
+
+            }
         }
     }
     
@@ -626,12 +620,10 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         synchronized(downloadLock) {
             if (isAutoUpdateRunning) {
                 logger.warn("自动更新流程已在运行中，跳过本次执行")
-                loggingService.logInfo("自动更新流程已在运行中，跳过本次执行", "自动更新")
                 return
             }
             if (isDownloading) {
                 logger.warn("下载任务正在进行中，跳过本次自动更新")
-                loggingService.logInfo("下载任务正在进行中，跳过本次自动更新", "自动更新")
                 return
             }
             isAutoUpdateRunning = true
@@ -639,8 +631,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         
         try {
             logger.info("开始执行完整的自动更新流程")
-            loggingService.logInfo("开始执行完整的自动更新流程", "自动更新")
-            
+
             // 1. 检查更新
             val updateInfo = checkForUpdates()
             if (updateInfo == null) {
@@ -648,9 +639,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 return
             }
             
-            logger.info("发现新版本: ${updateInfo.version}，开始自动更新")
-            loggingService.logInfo("发现新版本: ${updateInfo.version}，开始自动更新", "自动更新")
-            
+
             // 2. 下载更新
             val downloadSuccess = downloadUpdate(updateInfo) { progress ->
                 logger.debug("下载进度: $progress%")
@@ -667,10 +656,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             // 3. 自动安装更新（简化版本，无用户确认）
             val installSuccess = installUpdateAutomatically(updateInfo)
             
-            if (installSuccess) {
-                logger.info("自动更新完成: ${updateInfo.version}")
-                loggingService.logInfo("自动更新完成: ${updateInfo.version}", "自动更新")
-            } else {
+            if (!installSuccess) {
                 logger.error("安装更新失败")
                 loggingService.logError(Exception("安装更新失败"), "自动更新")
             }
@@ -685,7 +671,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             synchronized(downloadLock) {
                 isAutoUpdateRunning = false
                 logger.info("自动更新流程结束")
-                loggingService.logInfo("自动更新流程结束", "自动更新")
             }
         }
     }
@@ -693,7 +678,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     override fun stopAutoUpdate() {
         updateTimer?.cancel()
         updateTimer = null
-        loggingService.logInfo("自动更新已停止")
     }
     
     override fun getUpdateStatus(): UpdateStatus {
@@ -906,8 +890,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 // 检查是否卡住
                 if (timeSinceLastProgress > downloadStuckThreshold && lastProgressTime > 0) {
                     logger.warn("下载可能卡住：${timeSinceLastProgress}ms 无进度更新")
-                    loggingService.logInfo("下载可能卡住：${timeSinceLastProgress}ms 无进度更新", "下载监控")
-                    
+
                     // 计算下载速度
                     val bytesDownloaded = currentProgressBytes - lastProgressBytes
                     val speed = if (timeSinceLastProgress > 0) {
@@ -916,7 +899,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     
                     if (speed == 0) {
                         logger.warn("下载速度为0，可能网络连接有问题")
-                        loggingService.logInfo("下载速度为0，可能网络连接有问题", "下载监控")
                     }
                 }
                 
@@ -955,8 +937,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         currentDownloadState = newState
         
         logger.info("下载状态变更: $oldState -> $newState${if (message.isNotEmpty()) " ($message)" else ""}")
-        loggingService.logInfo("下载状态变更: $oldState -> $newState${if (message.isNotEmpty()) " ($message)" else ""}", "下载状态")
-        
+
         // 根据状态更新相关标志
         when (newState) {
             DownloadState.IDLE -> {
@@ -1012,8 +993,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
              if (isDownloading) {
                  updateDownloadState(DownloadState.CANCELLED, "用户取消下载")
                  logger.info("用户取消下载")
-                 loggingService.logInfo("用户取消下载", "自动更新")
-                 
+
                  // 取消下载协程
                  downloadJob?.let { job ->
                      if (job.isActive) {
@@ -1497,7 +1477,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             
             if (checksumMatch) {
                 logger.info("文件校验成功: ${file.name}")
-                loggingService.logInfo("文件校验成功: ${file.name}", "文件校验")
             } else {
                 logger.error("文件校验失败: ${file.name}")
                 logger.error("期望校验和: $expectedChecksum")
@@ -1657,13 +1636,10 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             val redundantPath = findRedundantPluginDirectory(targetPath)
             if (redundantPath != null) {
                 logger.info("发现冗余目录结构，准备清理: ${redundantPath.absolutePath}")
-                loggingService.logInfo("发现冗余目录结构，准备清理: ${redundantPath.absolutePath}", "目录清理")
-                
                 // 将内容移动到正确位置
                 moveDirectoryContents(redundantPath, targetPath)
                 
                 logger.info("冗余目录结构清理完成")
-                loggingService.logInfo("冗余目录结构清理完成", "目录清理")
             }
         } catch (e: Exception) {
             logger.warn("目录结构清理过程中出现异常: ${e.message}", e)
@@ -1769,7 +1745,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 loggingService.logWarning("安装后目录结构验证失败，未找到必要的插件文件", "安装验证")
             } else {
                 logger.info("安装后目录结构验证通过")
-                loggingService.logInfo("安装后目录结构验证通过", "安装验证")
             }
         } catch (e: Exception) {
             logger.warn("安装后目录清理过程中出现异常: ${e.message}", e)
@@ -1782,8 +1757,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      */
     private fun installNewVersion(newVersionFile: File, targetPath: File) {
         logger.info("开始安装新版本: ${newVersionFile.absolutePath} -> ${targetPath.absolutePath}")
-        loggingService.logInfo("开始安装新版本: ${newVersionFile.absolutePath} -> ${targetPath.absolutePath}", "安装新版本")
-        
+
         // 在安装前检查并清理可能存在的重复目录结构
         cleanupRedundantDirectories(targetPath)
         
@@ -1794,19 +1768,11 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         if (isZipFile) {
             // 处理zip文件安装
             if (targetPath.isDirectory) {
-                // 目标是目录，清空目录后解压
-                logger.info("目标是目录，清空后解压zip文件")
-                loggingService.logInfo("目标是目录，清空后解压zip文件", "安装新版本")
                 targetPath.deleteRecursively()
                 targetPath.mkdirs()
                 // 使用智能解压功能
                 unzipFileIntelligent(newVersionFile, targetPath)
             } else {
-                // 目标是文件（jar），需要替换为目录
-                logger.info("目标是jar文件，替换为目录并解压zip文件")
-                loggingService.logInfo("目标是jar文件，替换为目录并解压zip文件", "安装新版本")
-                
-                // 删除原jar文件
                 if (targetPath.exists()) {
                     targetPath.delete()
                 }
@@ -1826,8 +1792,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             if (targetPath.isDirectory) {
                 // 目标是目录，需要替换为jar文件
                 logger.info("目标是目录，替换为jar文件")
-                loggingService.logInfo("目标是目录，替换为jar文件", "安装新版本")
-                
+
                 // 删除目录
                 targetPath.deleteRecursively()
                 
@@ -1836,8 +1801,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             } else {
                 // 目标是文件，直接替换
                 logger.info("目标是jar文件，直接替换")
-                loggingService.logInfo("目标是jar文件，直接替换", "安装新版本")
-                
+
                 val parentDir = targetPath.parentFile
                 if (!parentDir.exists()) {
                     parentDir.mkdirs()
@@ -1864,7 +1828,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         
         val successMsg = "新版本安装完成: ${targetPath.absolutePath}"
         logger.info(successMsg)
-        loggingService.logInfo(successMsg, "安装新版本")
     }
     
     /**
@@ -1873,12 +1836,9 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     private fun verifyInstallation(installedPath: File): Boolean {
         return try {
             logger.info("开始验证安装: ${installedPath.absolutePath}")
-            loggingService.logInfo("开始验证安装: ${installedPath.absolutePath}", "安装验证")
-            
             // 添加详细的路径信息调试
             logger.info("验证路径详情 - 存在: ${installedPath.exists()}, 是文件: ${installedPath.isFile}, 是目录: ${installedPath.isDirectory}")
-            loggingService.logInfo("验证路径详情 - 存在: ${installedPath.exists()}, 是文件: ${installedPath.isFile}, 是目录: ${installedPath.isDirectory}", "安装验证")
-            
+
             // 1. 检查文件是否存在
             if (!installedPath.exists()) {
                 val errorMsg = "安装验证失败：文件不存在 - ${installedPath.absolutePath}"
@@ -1891,8 +1851,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             if (installedPath.isFile) {
                 val fileSize = installedPath.length()
                 logger.info("检查文件大小: $fileSize bytes")
-                loggingService.logInfo("检查文件大小: $fileSize bytes", "安装验证")
-                
+
                 if (fileSize == 0L) {
                     val errorMsg = "安装验证失败：文件大小为0 - ${installedPath.absolutePath}"
                     logger.error(errorMsg)
@@ -1909,13 +1868,11 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 
                 val sizeMsg = "文件大小验证通过: ${fileSize / 1024} KB"
                 logger.info(sizeMsg)
-                loggingService.logInfo(sizeMsg, "安装验证")
             }
             
             // 3. 检查文件可读性
             logger.info("检查文件可读性: ${installedPath.canRead()}")
-            loggingService.logInfo("检查文件可读性: ${installedPath.canRead()}", "安装验证")
-            
+
             if (!installedPath.canRead()) {
                 val errorMsg = "安装验证失败：文件不可读 - ${installedPath.absolutePath}"
                 logger.error(errorMsg)
@@ -1926,8 +1883,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             // 4. 如果是JAR文件，验证JAR文件完整性
             if (installedPath.name.endsWith(".jar")) {
                 logger.info("检测到JAR文件，开始验证JAR完整性")
-                loggingService.logInfo("检测到JAR文件，开始验证JAR完整性", "安装验证")
-                
+
                 if (!verifyJarFile(installedPath)) {
                     val errorMsg = "安装验证失败：JAR文件完整性检查失败 - ${installedPath.absolutePath}"
                     logger.error(errorMsg)
@@ -1939,8 +1895,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             // 5. 如果是目录，验证目录结构
             if (installedPath.isDirectory) {
                 logger.info("检测到目录，开始验证目录结构")
-                loggingService.logInfo("检测到目录，开始验证目录结构", "安装验证")
-                
+
                 if (!verifyDirectoryStructure(installedPath)) {
                     val errorMsg = "安装验证失败：目录结构验证失败 - ${installedPath.absolutePath}"
                     logger.error(errorMsg)
@@ -1954,7 +1909,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 logger.warn("安装验证警告：文件权限可能存在问题")
             }
             
-            logger.info("安装验证成功")
             true
             
         } catch (e: Exception) {
@@ -2004,8 +1958,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     private fun verifyDirectoryStructure(directory: File): Boolean {
         return try {
             logger.info("开始验证目录结构: ${directory.absolutePath}")
-            loggingService.logInfo("开始验证目录结构: ${directory.absolutePath}", "目录结构验证")
-            
+
             if (!directory.isDirectory) {
                 val errorMsg = "路径不是目录: ${directory.absolutePath}"
                 logger.error(errorMsg)
@@ -2038,8 +1991,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 try {
                     cleanupRedundantDirectories(directory)
                     logger.info("已自动修复重复的目录结构")
-                    loggingService.logInfo("已自动修复重复的目录结构", "目录结构验证")
-                    
                     // 重新获取文件列表
                     val updatedFiles = directory.listFiles()
                     if (updatedFiles != null && updatedFiles.isNotEmpty()) {
@@ -2065,8 +2016,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     private fun verifyDirectoryStructureInternal(directory: File, files: Array<File>): Boolean {
         // 记录目录内容详情
         logger.info("验证目录 ${directory.absolutePath} 包含 ${files.size} 个项目:")
-        loggingService.logInfo("验证目录 ${directory.absolutePath} 包含 ${files.size} 个项目:", "目录结构验证")
-        
+
         var hasValidFiles = false
         var validFileCount = 0
         var totalFileSize = 0L
@@ -2086,12 +2036,10 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 "其他: ${file.name}"
             }
             logger.info("  - $fileInfo")
-            loggingService.logInfo("  - $fileInfo", "目录结构验证")
         }
         
         logger.info("统计信息 - 有效文件数: $validFileCount, 总文件大小: $totalFileSize bytes")
-        loggingService.logInfo("统计信息 - 有效文件数: $validFileCount, 总文件大小: $totalFileSize bytes", "目录结构验证")
-        
+
         // 更智能的验证逻辑
         if (!hasValidFiles) {
             // 检查是否有关键的插件文件
@@ -2103,7 +2051,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             
             if (hasPluginXml || hasJarFiles || hasLibDirectory || hasClassesDirectory || hasMetaInfDirectory) {
                 logger.info("虽然没有大文件，但发现了插件相关文件结构，验证通过")
-                loggingService.logInfo("虽然没有大文件，但发现了插件相关文件结构，验证通过", "目录结构验证")
             } else {
                 // 检查子目录中是否有插件文件
                 val hasNestedPluginFiles = files.any { file ->
@@ -2112,7 +2059,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 
                 if (hasNestedPluginFiles) {
                     logger.info("在子目录中发现了插件相关文件结构，验证通过")
-                    loggingService.logInfo("在子目录中发现了插件相关文件结构，验证通过", "目录结构验证")
                 } else {
                     val errorMsg = "目录中没有有效文件（大小 > 0 的文件）且未发现插件相关结构"
                     logger.error(errorMsg)
@@ -2123,7 +2069,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         }
         
         logger.info("目录结构验证通过")
-        loggingService.logInfo("目录结构验证通过", "目录结构验证")
         return true
     }
     
@@ -2461,7 +2406,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 com.intellij.notification.Notifications.Bus.notify(notification)
                 
                 logger.info("已显示自动更新重启通知")
-                loggingService.logInfo("已显示自动更新重启通知: ${updateInfo.version}", "自动更新")
             }
         } catch (e: Exception) {
             logger.error("显示自动更新重启通知失败", e)
@@ -2473,9 +2417,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
      */
     private fun restartIDE() {
         try {
-            logger.info("用户选择重启IDE以应用更新")
-            loggingService.logInfo("用户选择重启IDE以应用更新", "自动更新")
-            
             // 使用IntelliJ的重启API
             com.intellij.openapi.application.ApplicationManager.getApplication().restart()
         } catch (e: Exception) {
@@ -2582,7 +2523,6 @@ class AutoUpdateServiceImpl : AutoUpdateService {
 
                 updateStatus(UpdateStatus.INSTALLED)
                 com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java).info("回滚完成")
-                loggingService.logInfo("回滚到上一版本完成", "自动更新")
 
                 // 7. 提示用户重启IDE
                 showRollbackRestartPrompt()

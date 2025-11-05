@@ -167,7 +167,7 @@ data class PerformanceLogStats(
 @Serializable
 data class LoggingConfig(
     /** 是否启用日志 */
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     
     /** 最小日志级别 */
     val minLevel: LogLevel = LogLevel.INFO,

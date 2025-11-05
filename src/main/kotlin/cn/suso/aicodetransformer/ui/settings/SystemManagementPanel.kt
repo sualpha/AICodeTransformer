@@ -164,7 +164,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         configPanel.add(JBLabel("天"))
         
         configPanel.add(Box.createHorizontalStrut(15))
-        autoCleanCheckBox = JCheckBox("自动清理", true)
+        autoCleanCheckBox = JCheckBox("自动清理", false)
         configPanel.add(autoCleanCheckBox)
         
         configPanel.add(Box.createHorizontalStrut(15))

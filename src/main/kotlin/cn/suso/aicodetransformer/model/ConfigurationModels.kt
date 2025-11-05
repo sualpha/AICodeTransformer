@@ -178,7 +178,7 @@ class GlobalSettings {
 @com.intellij.util.xmlb.annotations.Tag("LoggingConfigState")
 class LoggingConfigState {
     @com.intellij.util.xmlb.annotations.Attribute("enabled")
-    var enabled: Boolean = true
+    var enabled: Boolean = false
         get() = field
         set(value) { field = value }
     
@@ -242,7 +242,7 @@ class LoggingConfigState {
     
     // 复制构造函数
     constructor(
-        enabled: Boolean = true,
+        enabled: Boolean = false,
         minLevel: String = "INFO",
         logToFile: Boolean = true,
         logToConsole: Boolean = true,

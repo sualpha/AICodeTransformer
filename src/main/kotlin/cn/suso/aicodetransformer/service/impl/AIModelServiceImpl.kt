@@ -192,7 +192,6 @@ class AIModelServiceImpl : AIModelService {
                 val smartTtl = cacheService.getSmartTtl(prompt)
                 cacheService.cacheResponse(cacheKey, result, smartTtl)
                 logger.debug("缓存结果使用智能TTL: ${smartTtl}秒, requestId: $requestId")
-                loggingService.logInfo("API调用成功并缓存响应", "requestId: $requestId, 模型: ${config.name}")
             } else {
                 loggingService.logWarning("API调用失败", "requestId: $requestId, 错误: ${result.errorMessage}")
             }
@@ -217,7 +216,6 @@ class AIModelServiceImpl : AIModelService {
             
         } catch (e: CancellationException) {
             activeRequests.remove(requestId)
-            loggingService.logInfo("API调用被取消", "requestId: $requestId")
             notifyListeners { it.onRequestCancelled(requestId) }
             val cancelResult = ExecutionResult.failure("请求已取消", ErrorType.UNKNOWN_ERROR)
             loggingService.logApiCallEnd(requestId, cancelResult, 0)

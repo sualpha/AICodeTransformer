@@ -40,14 +40,14 @@ class LoggingServiceImpl : LoggingService {
     
     // 异步日志写入协程
     private val logWriterScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var cleanupJob: kotlinx.coroutines.Job? = null
+    private var logWriterJob: kotlinx.coroutines.Job? = null
     
     init {
         // 从配置服务加载日志配置
         loadConfigurationFromService()
-        // 启动定期清理任务
-        startCleanupTask()
-        // 启动日志写入任务
-        startLogWriterTask()
+        // 根据配置决定是否启动后台任务（未启用则不启动任何线程）
+        updateBackgroundTasks()
     }
     
     /**
@@ -60,6 +60,31 @@ class LoggingServiceImpl : LoggingService {
         } catch (e: Exception) {
             // 如果加载失败，使用默认配置
             config = LoggingConfig()
+        }
+    }
+
+    /**
+     * 根据当前配置启动或停止后台任务
+     */
+    private fun updateBackgroundTasks() {
+        // 控制清理任务（绑定到 enabled）
+        if (config.enabled) {
+            if (cleanupJob == null || cleanupJob?.isActive != true) {
+                cleanupJob = startCleanupTask()
+            }
+        } else {
+            cleanupJob?.cancel()
+            cleanupJob = null
+        }
+
+        // 控制文件写入任务（绑定到 logToFile）
+        if (config.logToFile) {
+            if (logWriterJob == null || logWriterJob?.isActive != true) {
+                logWriterJob = startLogWriterTask()
+            }
+        } else {
+            logWriterJob?.cancel()
+            logWriterJob = null
         }
     }
     
@@ -440,18 +465,7 @@ class LoggingServiceImpl : LoggingService {
     override fun cleanupOldLogs(olderThanMs: Long): Int {
         val cutoffTime = System.currentTimeMillis() - olderThanMs
         val initialSize = logEntries.size
-        
-        // 统计要删除的日志
-        val logsToRemove = logEntries.filter { it.timestamp < cutoffTime }
-        val oldestLogTime = logEntries.minOfOrNull { it.timestamp }
-        val newestLogTime = logEntries.maxOfOrNull { it.timestamp }
-        
-        logInfo("日志清理详情 - 总日志数: $initialSize, 截止时间: $cutoffTime", "日志清理任务")
-        if (oldestLogTime != null && newestLogTime != null) {
-            logInfo("最旧日志时间: $oldestLogTime, 最新日志时间: $newestLogTime", "日志清理任务")
-        }
-        logInfo("符合清理条件的日志数: ${logsToRemove.size}", "日志清理任务")
-        
+
         // 清理内存中的日志
         logEntries.removeIf { it.timestamp < cutoffTime }
         
@@ -459,12 +473,6 @@ class LoggingServiceImpl : LoggingService {
         val fileCleanedCount = cleanupLogFiles(olderThanMs)
         
         val removedCount = initialSize - logEntries.size
-        
-        if (removedCount > 0 || fileCleanedCount > 0) {
-            logInfo("清理完成 - 内存: $removedCount 条, 文件: $fileCleanedCount 条旧日志记录", "日志清理任务")
-        } else {
-            logInfo("没有需要清理的旧日志，当前日志数: ${logEntries.size}", "日志清理任务")
-        }
         
         return removedCount + fileCleanedCount
     }
@@ -503,9 +511,6 @@ class LoggingServiceImpl : LoggingService {
         }
         
         File(filePath).writeText(content)
-        
-        logInfo("导出了 ${logs.size} 条日志记录到文件: $filePath", "日志导出")
-        
         return filePath
     }
     
@@ -516,10 +521,12 @@ class LoggingServiceImpl : LoggingService {
         try {
             val configState = convertToLoggingConfigState(config)
             configurationService.saveLoggingConfig(configState)
-            logInfo("日志配置已更新并保存到持久化存储", "配置管理")
         } catch (e: Exception) {
             logError(e, "保存日志配置到持久化存储时发生错误")
         }
+
+        // 根据新配置更新后台任务的启停状态
+        updateBackgroundTasks()
     }
     
     override fun getLoggingConfig(): LoggingConfig {
@@ -534,7 +541,6 @@ class LoggingServiceImpl : LoggingService {
         
         try {
             writeLogsToFile()
-            logInfo("日志已立即刷新到文件: ${config.logFilePath}", "日志刷新")
         } catch (e: Exception) {
             logError(e, "立即刷新日志到文件时发生错误")
         }
@@ -674,30 +680,13 @@ class LoggingServiceImpl : LoggingService {
         }
     }
     
-    private fun startCleanupTask() {
-        logWriterScope.launch {
-            logInfo("日志清理任务已启动，每小时执行一次", "日志清理任务")
+    private fun startCleanupTask(): kotlinx.coroutines.Job {
+        return logWriterScope.launch {
             while (true) {
-                delay(3600000) // 每小时执行一次
+                delay(1000) // 每小时执行一次
                 try {
                     if (config.enabled) {
-                        val currentTime = System.currentTimeMillis()
-                        val cutoffTime = currentTime - config.retentionTimeMs
-                        val retentionDays = config.retentionTimeMs / (24 * 60 * 60 * 1000)
-                        
-                        logInfo("开始执行日志清理任务，保留时间: ${retentionDays}天 (${config.retentionTimeMs}ms)", "日志清理任务")
-                        logInfo("当前时间: $currentTime, 清理截止时间: $cutoffTime", "日志清理任务")
-                        logInfo("清理前日志总数: ${logEntries.size}", "日志清理任务")
-                        
-                        val removedCount = cleanupOldLogs(config.retentionTimeMs)
-                        
-                        if (removedCount > 0) {
-                            logInfo("日志清理完成，清理了 $removedCount 条旧日志记录", "日志清理任务")
-                        } else {
-                            logInfo("日志清理完成，没有需要清理的旧日志", "日志清理任务")
-                        }
-                    } else {
-                        logInfo("日志功能已禁用，跳过清理任务", "日志清理任务")
+                        cleanupOldLogs(config.retentionTimeMs)
                     }
                 } catch (e: Exception) {
                     val errorMsg = "日志清理任务失败: ${e.message}"
@@ -708,10 +697,9 @@ class LoggingServiceImpl : LoggingService {
         }
     }
     
-    private fun startLogWriterTask() {
-        if (!config.logToFile) return
-        
-        logWriterScope.launch {
+    private fun startLogWriterTask(): kotlinx.coroutines.Job {
+        return logWriterScope.launch {
+            if (!config.logToFile) return@launch
             while (true) {
                 delay(5000) // 每5秒写入一次
                 try {
@@ -880,9 +868,7 @@ class LoggingServiceImpl : LoggingService {
             val tempFile = File("${config.logFilePath}.tmp")
             var keptLines = 0
             var removedLines = 0
-            
-            logInfo("开始清理日志文件: ${logFile.absolutePath}, 截止时间: $cutoffTime", "文件日志清理")
-            
+
             logFile.useLines { lines ->
                 tempFile.bufferedWriter().use { writer ->
                     lines.forEach { line ->
@@ -912,7 +898,6 @@ class LoggingServiceImpl : LoggingService {
             // 用清理后的文件替换原文件
             if (logFile.delete()) {
                 if (tempFile.renameTo(logFile)) {
-                    logInfo("文件清理完成 - 保留: $keptLines 条, 删除: $removedLines 条旧日志", "文件日志清理")
                     removedLines
                 } else {
                     logWarning("无法重命名临时文件到原日志文件", "文件日志清理")
