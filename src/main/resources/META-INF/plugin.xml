@@ -32,8 +32,14 @@
         <li>🤖 <strong>AI-Generated Commit Messages</strong>: Intelligently analyze code changes and automatically generate standardized Git commit messages</li>
         <li>Create custom prompt templates with variables</li>
         <li>Bind keyboard shortcuts to AI actions</li>
-        <li>One-click code transformation and optimization</li>
     </ul>
+    <br>
+    <strong>Prompt Expansion:</strong>
+    <p>
+        Get additional prompt templates from the GitHub source repository's
+        <a href="https://github.com/sualpha/AICodeTransformer/tree/main/prompts">prompts</a> folder.
+        Download the JSON files and import them via <em>Settings → Tools → AI Code Transformer</em> using <em>Import Templates</em>.
+    </p>
     <br>
     <strong>🙌 Feedback & Contributions</strong>
     <p>
@@ -62,8 +68,13 @@
         <li>🤖 <strong>AI生成Commit信息</strong>：智能分析代码变更，自动生成规范化的Git提交信息</li>
         <li>创建带变量的自定义提示模板</li>
         <li>绑定键盘快捷键到AI操作</li>
-        <li>一键代码转换和优化</li>
     </ul>
+    <br>
+    <strong>Prompt 扩展：</strong>
+    <p>
+        可从 GitHub 源码仓库的 <a href="https://github.com/sualpha/AICodeTransformer/tree/main/prompts">prompts</a> 目录获取更多模板，
+        下载 JSON 文件后进入 <em>设置 → 工具 → AI Code Transformer</em> 点击 <em>导入模板</em> 即可加载。
+    </p>
     <br>
     <strong>🙌 反馈与贡献</strong>
     <p>

@@ -13,6 +13,11 @@ import com.intellij.ui.components.*
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Font
@@ -32,6 +37,7 @@ class PromptTemplatePanel(
 ) : JPanel(), TemplateChangeListener {
     
     private val promptTemplateService: PromptTemplateService = PromptTemplateServiceImpl.getInstance()
+    private val json = Json { ignoreUnknownKeys = true }
     
     // 主要UI组件
     private val tabbedPane = JBTabbedPane()
@@ -233,7 +239,6 @@ class PromptTemplatePanel(
         panel.border = EmptyBorder(JBUI.insets(12, 0, 0, 0))
         
         statusLabel.foreground = UIUtil.getLabelDisabledForeground()
-        panel.add(statusLabel, BorderLayout.WEST)
         
         val buttonPanel = JBPanel<JBPanel<*>>()
         buttonPanel.layout = BoxLayout(buttonPanel, BoxLayout.X_AXIS)
@@ -257,7 +262,10 @@ class PromptTemplatePanel(
         resetButton.addActionListener { resetToDefaults() }
         buttonPanel.add(resetButton)
         
-        panel.add(buttonPanel, BorderLayout.EAST)
+        // 将操作按钮放置在最左侧，便于用户操作
+        panel.add(buttonPanel, BorderLayout.WEST)
+        // 状态文本居中显示
+        panel.add(statusLabel, BorderLayout.CENTER)
         return panel
     }
     
@@ -445,17 +453,52 @@ class PromptTemplatePanel(
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             try {
                 val file = fileChooser.selectedFile
-                val imported = promptTemplateService.importTemplatesFromFile(file.absolutePath, false)
-                
+                // 读取文件内容并预解析，只有在存在相同ID时才弹出覆盖提示
+                val content = java.io.File(file.absolutePath).readText()
+                val root: JsonElement = json.parseToJsonElement(content)
+                val importCandidates: List<PromptTemplate> = when (root) {
+                    is JsonObject -> {
+                        val templatesElem = root["templates"]
+                        if (templatesElem != null) {
+                            when (templatesElem) {
+                                is JsonArray -> templatesElem.map { json.decodeFromJsonElement<PromptTemplate>(it) }
+                                is JsonObject -> listOf(json.decodeFromJsonElement<PromptTemplate>(templatesElem))
+                                else -> emptyList()
+                            }
+                        } else {
+                            listOf(json.decodeFromJsonElement<PromptTemplate>(root))
+                        }
+                    }
+                    is JsonArray -> root.map { json.decodeFromJsonElement<PromptTemplate>(it) }
+                    else -> emptyList()
+                }
+
+                val existingIds = promptTemplateService.getTemplates().map { it.id }.toSet()
+                val hasConflict = importCandidates.any { it.id in existingIds }
+                val overwrite = if (hasConflict) {
+                    Messages.showYesNoDialog(
+                        this,
+                        "检测到相同ID的模板，是否覆盖同名模板？",
+                        "导入选项",
+                        null
+                    ) == Messages.YES
+                } else {
+                    false
+                }
+
+                // 进行导入
+                val importedCount = promptTemplateService.importTemplates(content, overwrite)
+
+                val suffix = if (overwrite) "（已覆盖同名模板）" else ""
                 Messages.showInfoMessage(
                     this,
-                    "成功导入 ${imported.size} 个模板",
+                    "成功导入 ${importedCount} 个模板$suffix",
                     "导入成功"
                 )
                 
                 loadTemplates()
                 notifyModification()
-                updateStatus("成功导入 ${imported.size} 个模板")
+                updateStatus("成功导入 ${importedCount} 个模板$suffix")
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     this,

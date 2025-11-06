@@ -126,6 +126,12 @@ Max Tokens: 4096
 4. **View Results**: Review results after AI processing
 5. **Apply Changes**: Confirm and apply to code
 
+### Get More Templates from `prompts` Directory
+
+- You can also get sample templates from the GitHub source repository's [prompts folder](https://github.com/sualpha/AICodeTransformer/tree/main/prompts) and import them.
+- In IDE: `Settings` → `Tools` → `AI Code Transformer`, click the `Import Templates` button (bottom-left) to load them.
+
+
 ## ❓ FAQ
 
 <details>
@@ -176,14 +182,6 @@ If you encounter any issues or have suggestions during use, please contact us th
 
 - 📧 **Email**: www.suso@qq.com
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/sualpha/AICodeTransformer/issues)
-
-### Getting Help
-
-1. Check the FAQ section in this documentation
-2. Search for related issues in [GitHub Issues](https://github.com/sualpha/AICodeTransformer/issues)
-3. Check IDE log files (`Help` → `Show Log in Explorer`)
-4. Confirm plugin configuration is correct
-5. Submit new Issue with detailed information
 
 ## 🧭 Contribute Prompts and Suggestions
 

@@ -128,6 +128,11 @@ Max Tokens: 4096
 4. **查看结果**: AI 处理完成后查看结果
 5. **应用更改**: 确认后应用到代码中
 
+### 从 `prompts` 目录获取更多模板
+
+- 也可从 GitHub 源码仓库的 [prompts 目录](https://github.com/sualpha/AICodeTransformer/tree/main/prompts) 获取示例模板，下载后导入使用。
+- 在 IDE 中打开：`设置` → `工具` → `AI Code Transformer`，点击左下角的 `导入模板` 按钮导入。
+
 ## ❓ 常见问题
 
 <details>
@@ -178,13 +183,6 @@ Max Tokens: 4096
 - 📧 **邮箱**: www.suso@qq.com
 - 🐛 **Bug 报告**: [GitHub Issues](https://github.com/sualpha/AICodeTransformer/issues)
 
-### 获取帮助
-
-1. 查看本文档的常见问题部分
-2. 搜索 [GitHub Issues](https://github.com/sualpha/AICodeTransformer/issues) 中的相关问题
-3. 检查 IDE 的日志文件（`Help` → `Show Log in Explorer`）
-4. 确认插件配置是否正确
-5. 提交新的 Issue 并提供详细信息
 
 ## 🧭 贡献与建议 / Prompt 模板分享
 

@@ -14,6 +14,10 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
@@ -354,22 +358,31 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
     
     override fun importTemplates(templateJson: String, overwrite: Boolean): Int {
         return try {
-            // 尝试使用新的数据结构解析
-            val importedTemplates = try {
-                val importData = json.decodeFromString<TemplateExportData>(templateJson)
-                importData.templates
-            } catch (e: Exception) {
-                // 如果新格式失败，尝试旧格式
-                val importData = json.decodeFromString<Map<String, Any>>(templateJson)
-                val templatesData = importData["templates"] as? List<*> ?: throw IllegalArgumentException("无效的导入数据格式")
-
-                templatesData.mapNotNull { templateData ->
-                    try {
-                        json.decodeFromString<PromptTemplate>(json.encodeToString(templateData))
-                    } catch (e: Exception) {
-                        null
+            // 支持三种导入格式：
+            // 1) 新格式：{"templates": [ ... ]}
+            // 2) 旧包装格式：Map 包含 "templates"
+            // 3) 最小格式：单对象 { id, name, description, content } 或数组 [ { ... }, ... ]
+            val root: JsonElement = json.parseToJsonElement(templateJson)
+            val importedTemplates: List<PromptTemplate> = when (root) {
+                is JsonObject -> {
+                    // 新格式：带 templates 字段
+                    val templatesElem = root["templates"]
+                    if (templatesElem != null) {
+                        when (templatesElem) {
+                            is JsonArray -> templatesElem.map { json.decodeFromJsonElement<PromptTemplate>(it) }
+                            is JsonObject -> listOf(json.decodeFromJsonElement<PromptTemplate>(templatesElem))
+                            else -> emptyList()
+                        }
+                    } else {
+                        // 最小格式：单对象
+                        listOf(json.decodeFromJsonElement<PromptTemplate>(root))
                     }
                 }
+                is JsonArray -> {
+                    // 最小格式：数组
+                    root.map { json.decodeFromJsonElement<PromptTemplate>(it) }
+                }
+                else -> emptyList()
             }
 
             if (importedTemplates.isEmpty()) {
@@ -758,24 +771,24 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
          return try {
              val content = java.io.File(filePath).readText()
              importTemplates(content, overwrite)
-             
-             // 返回导入的模板列表
-             val templates = try {
-                 // 尝试使用新的数据结构解析
-                 val importData = json.decodeFromString<TemplateExportData>(content)
-                 importData.templates
-             } catch (e: Exception) {
-                 // 如果新格式失败，尝试旧格式
-                 val importData = json.decodeFromString<Map<String, Any>>(content)
-                 val templatesData = importData["templates"] as? List<*> ?: emptyList<Any>()
-                 
-                 templatesData.mapNotNull { templateData ->
-                     try {
-                         json.decodeFromString<PromptTemplate>(json.encodeToString(templateData as Any))
-                     } catch (e: Exception) {
-                         null
+
+             // 统一解析逻辑，支持三种格式
+             val root: JsonElement = json.parseToJsonElement(content)
+             val templates: List<PromptTemplate> = when (root) {
+                 is JsonObject -> {
+                     val templatesElem = root["templates"]
+                     if (templatesElem != null) {
+                         when (templatesElem) {
+                             is JsonArray -> templatesElem.map { json.decodeFromJsonElement<PromptTemplate>(it) }
+                             is JsonObject -> listOf(json.decodeFromJsonElement<PromptTemplate>(templatesElem))
+                             else -> emptyList()
+                         }
+                     } else {
+                         listOf(json.decodeFromJsonElement<PromptTemplate>(root))
                      }
                  }
+                 is JsonArray -> root.map { json.decodeFromJsonElement<PromptTemplate>(it) }
+                 else -> emptyList()
              }
              templates
          } catch (e: Exception) {
