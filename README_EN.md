@@ -185,7 +185,12 @@ If you encounter any issues or have suggestions during use, please contact us th
 4. Confirm plugin configuration is correct
 5. Submit new Issue with detailed information
 
----
+## 🧭 Contribute Prompts and Suggestions
+
+We welcome your feature suggestions, bug reports, and field-tested Prompt templates via GitHub Issues.
+
+- Entry: GitHub Issues → https://github.com/sualpha/AICodeTransformer/issues
+- Aggregation: High-quality templates will be periodically curated into `prompts` and made easier to use in the plugin
 
 <div align="center">
 

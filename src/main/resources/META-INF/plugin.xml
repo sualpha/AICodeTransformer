@@ -35,6 +35,13 @@
         <li>One-click code transformation and optimization</li>
     </ul>
     <br>
+    <strong>🙌 Feedback & Contributions</strong>
+    <p>
+        We welcome feature suggestions, bug reports, and field-tested Prompt templates via
+        <a href="https://github.com/sualpha/AICodeTransformer/issues">GitHub Issues</a>.
+        High-quality templates will be periodically curated into <code>prompts</code>.
+    </p>
+    <br>
     <hr>
     <br>
     AI代码转换器让开发者能够通过简单的键盘快捷键触发自定义AI指令，智能地重构、优化、解释或生成代码。<br>
@@ -57,6 +64,13 @@
         <li>绑定键盘快捷键到AI操作</li>
         <li>一键代码转换和优化</li>
     </ul>
+    <br>
+    <strong>🙌 反馈与贡献</strong>
+    <p>
+        欢迎通过 <a href="https://github.com/sualpha/AICodeTransformer/issues">GitHub Issues</a>
+        提交使用建议、问题反馈以及你在实际开发中验证有效的 Prompt 模板。
+        我们会不定期将优质模板汇总到 <code>prompts</code> 目录。
+    </p>
   ]]></description>
 
     <!-- Product and plugin compatibility requirements.

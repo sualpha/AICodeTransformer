@@ -186,7 +186,12 @@ Max Tokens: 4096
 4. 确认插件配置是否正确
 5. 提交新的 Issue 并提供详细信息
 
----
+## 🧭 贡献与建议 / Prompt 模板分享
+
+欢迎通过 GitHub Issues 提交使用建议、功能需求、Bug 反馈，以及分享你在实际开发中验证有效的 Prompt 模板。
+
+- 提交入口：GitHub Issues → https://github.com/sualpha/AICodeTransformer/issues
+- 模板聚合：我们会不定期将优质模板汇总到 `src/main/resources/prompts/` 目录，并在插件中提供更便捷的使用入口
 
 <div align="center">
 
