@@ -53,7 +53,7 @@ class AICodeTransformerSettingsPanel(
         // 添加标签页 - 使用紧凑的标题
         tabbedPane.addTab("模型", modelConfigPanel)
         tabbedPane.addTab("模板", promptTemplatePanel)
-        tabbedPane.addTab("commit", commitSettingsPanel)
+        tabbedPane.addTab("提交", commitSettingsPanel)
         tabbedPane.addTab("系统", systemManagementPanel)
         
         // 设置tab页独立性 - 允许每个tab页有独立的高度

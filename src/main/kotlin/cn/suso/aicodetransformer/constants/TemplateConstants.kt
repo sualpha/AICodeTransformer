@@ -23,6 +23,15 @@ object TemplateConstants {
         val version: String = "1.0.0",
         val isBuiltIn: Boolean = true
     ) {
+        VARIABLE_NAME_GENERATOR(
+            id = "variable-name-generator",
+            displayName = "变量命名生成",
+            description = "输入中文描述，按语言仅生成一种规范、易读的变量名",
+            category = TemplateCategory.CODE_CONVERSION,
+            tags = listOf("变量命名", "命名建议", "驼峰", "蛇形", "可读性", "规范"),
+            content = "你是资深代码命名专家。请基于以下中文描述与当前文件语言 {{language}}，仅生成一种变量名（不要返回多种风格，也不要附加解释）。\n\n命名规范选择：\n- 若语言为 Java/Kotlin/TypeScript/JavaScript/Swift/C#/C++/Go → 使用 camelCase\n- 若语言为 Python/Rust → 使用 snake_case\n\n命名要求：\n1. 简洁明确，使用行业通用术语，避免拼音与冗长词\n2. 1–4 个英文单词为佳；避免不明缩写\n3. 布尔语义（如‘是否/可否/拥有/需要’）使用 is/has/should 前缀\n4. 只包含字母与数字，不含其他符号\n\n输出格式：\n- 仅返回变量名字符串（例如 userName 或 user_name），不得包含任何前后缀、标点或解释\n\n中文描述：\n{{selectedCode}}",
+            supportedLanguages = listOf("java", "kotlin", "javascript", "typescript", "python", "go", "rust", "csharp", "swift")
+        ),
         CAMEL_CASE_CONVERT(
             id = "camel-case-convert",
             displayName = "驼峰命名转换",

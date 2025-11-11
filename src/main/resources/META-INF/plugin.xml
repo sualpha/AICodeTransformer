@@ -27,6 +27,7 @@
                 <li>📝 <strong>CamelCase Conversion</strong>: One-click variable naming format conversion, supporting arbitrary character strings</li>
                 <li>📋 <strong>JSON Formatting</strong>: Intelligent JSON formatting tool: automatically handle special characters, complete missing symbols, fix syntax errors and beautify format</li>
                 <li>🌐 <strong>Smart Translation</strong>: Intelligent Chinese-English code comments and variable name conversion</li>
+                <li>🧩 <strong>Variable Name Generator</strong>: Input Chinese description to generate a single, clean variable name based on language (e.g., Java → camelCase; Python → snake_case)</li>
             </ul>
         </li>
         <li>🤖 <strong>AI-Generated Commit Messages</strong>: Intelligently analyze code changes and automatically generate standardized Git commit messages</li>
@@ -64,6 +65,7 @@
                 <li>📝 <strong>驼峰命名转换</strong>：一键转换变量命名格式，支持任意字符长串的格式</li>
                 <li>📋 <strong>JSON格式化</strong>：智能JSON格式化工具：自动处理特殊字符、补全缺失符号、修复语法错误并美化格式</li>
                 <li>🌐 <strong>智能翻译</strong>：中英文代码注释、变量名智能转换</li>
+                <li>🧩 <strong>变量命名生成</strong>：输入中文描述，按语言仅生成一种规范、易读的变量名（如 Java → camelCase，Python → snake_case）</li>
             </ul>
         </li>
         <li>🤖 <strong>AI生成Commit信息</strong>：智能分析代码变更，自动生成规范化的Git提交信息</li>

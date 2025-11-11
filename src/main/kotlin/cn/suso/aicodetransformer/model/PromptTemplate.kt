@@ -109,6 +109,21 @@ data class PromptTemplate(
                 isBuiltIn = config.isBuiltIn
             )
         }
+
+        /** 创建变量命名生成模板 */
+        fun createVariableNameGeneratorTemplate(): PromptTemplate {
+            val config = TemplateConstants.TemplateConfig.VARIABLE_NAME_GENERATOR
+            return PromptTemplate(
+                id = config.id,
+                name = config.displayName,
+                content = config.content,
+                description = config.description,
+                category = config.category.displayName,
+                tags = config.tags,
+                shortcutKey = null,
+                isBuiltIn = config.isBuiltIn
+            )
+        }
         
         /** 创建对象转换模板 */
         fun createObjectConvertTemplate(): PromptTemplate {
@@ -162,6 +177,7 @@ data class PromptTemplate(
          */
         fun getBuiltInTemplates(): List<PromptTemplate> {
             return listOf(
+                createVariableNameGeneratorTemplate(),
                 createCamelCaseConvertTemplate(),
                 createObjectConvertTemplate(),
                 createJsonFormatterTemplate(),
