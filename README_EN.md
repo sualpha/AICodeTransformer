@@ -77,7 +77,7 @@ cd AICodeTransformer
 
 ### 1. Basic Configuration
 
-Open settings: `File` → `Settings` → `Tools` → `AI Code Transformer`
+Open settings: `File` → `Settings` → `Other Settings` → `AI Code Transformer`
 
 ### 2. AI Model Configuration
 
@@ -129,7 +129,7 @@ Max Tokens: 4096
 ### Get More Templates from `prompts` Directory
 
 - You can also get sample templates from the GitHub source repository's [prompts folder](https://github.com/sualpha/AICodeTransformer/tree/main/prompts) and import them.
-- In IDE: `Settings` → `Tools` → `AI Code Transformer`, click the `Import Templates` button (bottom-left) to load them.
+- In IDE: `Settings` → `Other Settings` → `AI Code Transformer`, click the `Import Templates` button (bottom-left) to load them.
 
 
 ## ❓ FAQ

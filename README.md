@@ -79,7 +79,7 @@ cd AICodeTransformer
 
 ### 1. 基本配置
 
-打开设置页面：`File` → `Settings` → `Tools` → `AI Code Transformer`
+打开设置页面：`File` → `Settings` → `Other Settings` → `AI Code Transformer`
 
 ### 2. AI 模型配置
 
@@ -131,7 +131,7 @@ Max Tokens: 4096
 ### 从 `prompts` 目录获取更多模板
 
 - 也可从 GitHub 源码仓库的 [prompts 目录](https://github.com/sualpha/AICodeTransformer/tree/main/prompts) 获取示例模板，下载后导入使用。
-- 在 IDE 中打开：`设置` → `工具` → `AI Code Transformer`，点击左下角的 `导入模板` 按钮导入。
+- 在 IDE 中打开：`设置` → `Other Settings` → `AI Code Transformer`，点击左下角的 `导入模板` 按钮导入。
 
 ## ❓ 常见问题
 
