@@ -20,7 +20,7 @@ AICodeTransformer is a powerful IntelliJ IDEA plugin that integrates multiple AI
 - **Custom API**: Support for local models compatible with OpenAI API
 
 ### 📝 Intelligent Template System
-- **Built-in Templates**: CamelCase conversion, object transformation, JSON formatting, etc.
+- **Built-in Templates**: CamelCase conversion, object transformation, JSON formatting, Smart Translation,etc.
   - 🔄 **Object Conversion**: Generate conversion methods between Java objects with field-by-field explicit conversion based on field analysis
   - 📝 **CamelCase Conversion**: One-click variable naming format conversion, supporting arbitrary character strings
   - 📋 **JSON Formatting**: Intelligent JSON formatting tool: automatically handle special characters, complete missing symbols, fix syntax errors and beautify format
@@ -51,27 +51,13 @@ The AI-generated commit message feature intelligently analyzes your code changes
 4. Click `Install`
 5. Restart IDE
 
-#### Method 2: Build from Source
+#### Method 2: Install from GitHub Releases (Recommended)
 
-```bash
-# Clone the project
-git clone https://github.com/sualpha/AICodeTransformer.git
-cd AICodeTransformer
-
-# Build the plugin
-./gradlew buildPlugin
-
-# Install the plugin
-# In IDE: File → Settings → Plugins → Gear icon → Install Plugin from Disk
-# Select build/distributions/AICodeTransformer-1.0.0-SNAPSHOT.zip
-```
-
-#### Method 3: Development Mode
-
-```bash
-# Start development environment
-./gradlew runIde
-```
+1. Open Releases page: `https://github.com/sualpha/AICodeTransformer/releases`
+2. Download the latest plugin file (`AICodeTransformer-<version>.zip` or `.jar`)
+3. In IDE: `File → Settings → Plugins` → click the gear icon → `Install Plugin from Disk...`
+4. Select the downloaded file and confirm installation
+5. Restart IDE
 
 ## ⚙️ Configuration Guide
 
@@ -121,7 +107,7 @@ Max Tokens: 4096
 ### Basic Operation Flow
 
 1. **Select Code**: Select the code to be processed in the editor
-2. **Trigger Function**: Use shortcut keys or right-click menu
+2. **Trigger Function**: Use shortcut keys or the editor right-click menu (Editor → Right-click → `AI Code Transformer` → `Dynamic Templates`)
 3. **Choose Template**: Select appropriate AI template
 4. **View Results**: Review results after AI processing
 5. **Apply Changes**: Confirm and apply to code

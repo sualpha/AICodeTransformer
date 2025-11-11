@@ -20,7 +20,7 @@ AICodeTransformer 是一个功能强大的 IntelliJ IDEA 插件，通过集成�
 - **自定义 API**: 支持兼容 OpenAI API 的本地模型
 
 ### 📝 智能模板系统
-- **内置模板**: 驼峰命名转换、对象转换、JSON 格式化等常用开发工具
+- **内置模板**: 驼峰命名转换、对象转换、JSON 格式化、智能翻译等常用开发工具
 - **自定义模板**: 支持创建个性化 AI 指令模板
 - **变量系统**: 内置 `{{selectedCode}}`、`{{fileName}}`、`{{language}}` 等变量
 - **分类管理**: 按功能分类，便于查找和使用
@@ -53,27 +53,13 @@ AICodeTransformer 是一个功能强大的 IntelliJ IDEA 插件，通过集成�
 4. 点击 `Install` 安装
 5. 重启 IDE
 
-#### 方式二：从源码构建
+#### 方式二：从 GitHub Releases 安装（推荐）
 
-```bash
-# 克隆项目
-git clone https://github.com/sualpha/AICodeTransformer.git
-cd AICodeTransformer
-
-# 构建插件
-./gradlew buildPlugin
-
-# 安装插件
-# 在 IDE 中：File → Settings → Plugins → 齿轮图标 → Install Plugin from Disk
-# 选择 build/distributions/AICodeTransformer-1.0.0-SNAPSHOT.zip
-```
-
-#### 方式三：开发模式运行
-
-```bash
-# 启动开发环境
-./gradlew runIde
-```
+1. 打开 Releases 页面：`https://github.com/sualpha/AICodeTransformer/releases`
+2. 下载最新版本的插件文件（`AICodeTransformer-<version>.zip` 或 `.jar`）
+3. 在 IDE 中：`File → Settings → Plugins` → 点击齿轮图标 → `Install Plugin from Disk...`
+4. 选择刚下载的插件文件并确认安装
+5. 重启 IDE
 
 ## ⚙️ 配置指南
 
@@ -123,7 +109,7 @@ Max Tokens: 4096
 ### 基本操作流程
 
 1. **选择代码**: 在编辑器中选中要处理的代码
-2. **触发功能**: 使用快捷键或右键菜单
+2. **触发功能**: 使用快捷键或右键菜单（编辑器 → 右键 → `AI Code Transformer` → `动态模板`）
 3. **选择模板**: 选择合适的 AI 模板
 4. **查看结果**: AI 处理完成后查看结果
 5. **应用更改**: 确认后应用到代码中
