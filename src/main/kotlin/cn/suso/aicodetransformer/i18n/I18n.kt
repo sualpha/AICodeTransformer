@@ -27,9 +27,9 @@ object LanguageManager {
         locale = newLocale
         ResourceBundle.clearCache()
         listeners.forEach {
-            kotlin.runCatching { 
-                it() 
-            }.onFailure { e ->
+            kotlin.runCatching {
+                it()
+            }.onFailure { _ ->
             }
         }
     }

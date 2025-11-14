@@ -133,6 +133,7 @@ data class CommitSettings(
         fun matchesGeneralTemplateDefault(value: String): Boolean =
             matchesTemplateDefault(value, "commit.template.simple")
 
+        @Suppress("DEPRECATION")
         fun normalizeTemplates(settings: CommitSettings): CommitSettings {
             val normalized = settings.copy()
             if (matchesSimpleTemplateDefault(normalized.singleFileTemplate)) {
