@@ -63,46 +63,9 @@ AICodeTransformer 是一个功能强大的 IntelliJ IDEA 插件，通过集成�
 
 ## ⚙️ 配置指南
 
-### 1. 基本配置
+###  基本配置
 
 打开设置页面：`File` → `Settings` → `Other Settings` → `AI Code Transformer`
-
-### 2. AI 模型配置
-
-#### OpenAI 配置示例
-```
-配置名称: GPT-4
-模型类型: OpenAI
-API Base URL: https://api.openai.com/v1
-API Key: sk-your-api-key-here
-模型名称: gpt-4
-Temperature: 0.7
-Max Tokens: 4096
-```
-
-#### Claude 配置示例
-```
-配置名称: Claude-3-Sonnet
-模型类型: Claude
-API Base URL: https://api.anthropic.com
-API Key: your-claude-api-key
-模型名称: claude-3-sonnet-20240229
-Temperature: 0.7
-Max Tokens: 4096
-```
-
-### 3. 模板变量说明
-
-| 变量 | 描述 | 示例 |
-|------|------|------|
-| `{{selectedCode}}` | 当前选中的代码 | `public class Test {}` |
-| `{{fileName}}` | 当前文件名 | `UserService.java` |
-| `{{language}}` | 编程语言 | `Java` |
-| `{{projectName}}` | 项目名称 | `MyProject` |
-| `{{filePath}}` | 文件路径 | `src/main/java/User.java` |
-| `{{className}}` | 当前类名 | `UserService` |
-| `{{methodName}}` | 当前方法名 | `getUserById` |
-| `{{packageName}}` | 包名 | `com.example.service` |
 
 ## 🎯 使用方法
 

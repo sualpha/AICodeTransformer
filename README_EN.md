@@ -61,46 +61,9 @@ The AI-generated commit message feature intelligently analyzes your code changes
 
 ## ⚙️ Configuration Guide
 
-### 1. Basic Configuration
+###  Basic Configuration
 
 Open settings: `File` → `Settings` → `Other Settings` → `AI Code Transformer`
-
-### 2. AI Model Configuration
-
-#### OpenAI Configuration Example
-```
-Configuration Name: GPT-4
-Model Type: OpenAI
-API Base URL: https://api.openai.com/v1
-API Key: sk-your-api-key-here
-Model Name: gpt-4
-Temperature: 0.7
-Max Tokens: 4096
-```
-
-#### Claude Configuration Example
-```
-Configuration Name: Claude-3-Sonnet
-Model Type: Claude
-API Base URL: https://api.anthropic.com
-API Key: your-claude-api-key
-Model Name: claude-3-sonnet-20240229
-Temperature: 0.7
-Max Tokens: 4096
-```
-
-### 3. Template Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `{{selectedCode}}` | Currently selected code | `public class Test {}` |
-| `{{fileName}}` | Current file name | `UserService.java` |
-| `{{language}}` | Programming language | `Java` |
-| `{{projectName}}` | Project name | `MyProject` |
-| `{{filePath}}` | File path | `src/main/java/User.java` |
-| `{{className}}` | Current class name | `UserService` |
-| `{{methodName}}` | Current method name | `getUserById` |
-| `{{packageName}}` | Package name | `com.example.service` |
 
 ## 🎯 Usage
 
