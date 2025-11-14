@@ -298,75 +298,6 @@ class LoggingServiceImpl : LoggingService {
         )
     }
     
-    override fun logDebug(message: String, context: String?, userId: String?) {
-        if (!this.config.enabled || this.config.minLevel.priority > LogLevel.DEBUG.priority) return
-        
-        addLogEntry(
-            level = LogLevel.DEBUG,
-            type = LogType.SYSTEM,
-            message = message,
-            context = context,
-            userId = userId
-        )
-    }
-    
-    override fun logUserAction(action: UserAction, details: String?, userId: String?) {
-        if (!this.config.enabled) return
-        
-        val metadata = LogMetadata(mapOf(
-            "action" to action.name,
-            "details" to (details ?: "")
-        ))
-        
-        addLogEntry(
-            level = LogLevel.INFO,
-            type = LogType.USER_ACTION,
-            message = "用户操作: ${action.name}",
-            context = details,
-            userId = userId,
-            metadata = metadata
-        )
-    }
-    
-    override fun logPerformanceMetric(metric: PerformanceMetric, value: Double, context: String?) {
-        if (!this.config.enabled || !this.config.enablePerformanceLogging) return
-        
-        val metadata = LogMetadata(mapOf(
-            "metric" to metric.name,
-            "value" to value.toString(),
-            "unit" to getMetricUnit(metric)
-        ))
-        
-        addLogEntry(
-            level = LogLevel.DEBUG,
-            type = LogType.PERFORMANCE,
-            message = "性能指标: ${metric.name} = $value ${getMetricUnit(metric)}",
-            context = context,
-            metadata = metadata
-        )
-        
-        // 缓存性能数据用于统计
-        performanceCache.computeIfAbsent(metric.name) { ArrayList() }.add(value)
-    }
-    
-    override fun logSecurityEvent(event: SecurityEvent, details: String?, userId: String?) {
-        if (!this.config.enabled || !this.config.enableSecurityLogging) return
-        
-        val metadata = LogMetadata(mapOf(
-            "event" to event.name,
-            "details" to (details ?: "")
-        ))
-        
-        addLogEntry(
-            level = LogLevel.WARNING,
-            type = LogType.SECURITY,
-            message = "安全事件: ${event.name}",
-            context = details,
-            userId = userId,
-            metadata = metadata
-        )
-    }
-    
     override fun getLogs(criteria: LogSearchCriteria): List<LogEntry> {
         return logEntries.filter { entry ->
             // 时间范围过滤
@@ -393,77 +324,6 @@ class LoggingServiceImpl : LoggingService {
          .take(criteria.pageSize)
     }
     
-    override fun getErrorStats(timeRangeMs: Long): ErrorStats {
-        val cutoffTime = System.currentTimeMillis() - timeRangeMs
-        val errorLogs = logEntries.filter { 
-            it.level == LogLevel.ERROR && it.timestamp >= cutoffTime 
-        }
-        
-        val totalErrors = errorLogs.size
-        val totalLogs = logEntries.count { it.timestamp >= cutoffTime }
-        val errorRate = if (totalLogs > 0) totalErrors.toDouble() / totalLogs else 0.0
-        
-        // 按错误类型分组
-        val errorsByType = errorLogs.groupBy { 
-            it.metadata["errorClass"] ?: "Unknown"
-        }.mapValues { it.value.size }.toMap()
-        
-        // 按小时分组
-        val errorsByHour = errorLogs.groupBy { 
-            Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.HOUR_OF_DAY)
-        }.mapValues { it.value.size }.toMap()
-        
-        // 最常见的错误
-        val topErrors = errorsByType.entries
-            .sortedByDescending { it.value }
-            .take(10)
-            .map { (errorType, count) ->
-                val lastOccurrence = errorLogs
-                    .filter { it.metadata["errorClass"] == errorType }
-                    .maxByOrNull { it.timestamp }?.timestamp ?: 0
-                ErrorSummary(errorType, count, lastOccurrence)
-            }
-        
-        return ErrorStats(
-            totalErrors = totalErrors,
-            errorRate = errorRate,
-            errorsByType = errorsByType,
-            errorsByHour = errorsByHour,
-            topErrors = topErrors,
-            timeRangeMs = timeRangeMs
-        )
-    }
-    
-    override fun getPerformanceStats(timeRangeMs: Long): PerformanceLogStats {
-        val cutoffTime = System.currentTimeMillis() - timeRangeMs
-        val apiLogs = logEntries.filter { 
-            it.type == LogType.API_CALL && it.timestamp >= cutoffTime 
-        }
-
-        val responseTimes = apiLogs.mapNotNull {
-            it.metadata["responseTimeMs"]?.toDoubleOrNull()
-        }.map { it }
-        
-        val successfulRequests = apiLogs.count {
-            it.metadata["success"]?.toBoolean() == true
-        }
-        
-        // 按小时分组
-        val requestsByHour = apiLogs.groupBy { 
-            Calendar.getInstance().apply { timeInMillis = it.timestamp }.get(Calendar.HOUR_OF_DAY)
-        }.mapValues { it.value.size }
-        
-        return PerformanceLogStats(
-            averageResponseTime = if (responseTimes.isNotEmpty()) responseTimes.average() else 0.0,
-            maxResponseTime = responseTimes.maxOrNull()?.toLong() ?: 0,
-            minResponseTime = responseTimes.minOrNull()?.toLong() ?: 0,
-            totalRequests = apiLogs.size,
-            successfulRequests = successfulRequests,
-            requestsByHour = requestsByHour,
-            timeRangeMs = timeRangeMs
-        )
-    }
-    
     override fun cleanupOldLogs(olderThanMs: Long): Int {
         val cutoffTime = System.currentTimeMillis() - olderThanMs
         val initialSize = logEntries.size
@@ -477,43 +337,6 @@ class LoggingServiceImpl : LoggingService {
         val removedCount = initialSize - logEntries.size
         
         return removedCount + fileCleanedCount
-    }
-    
-    override fun exportLogs(criteria: LogSearchCriteria, format: LogExportFormat): String {
-        val logs = getLogs(criteria)
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        val fileName = "logs_export_$timestamp.${format.name.lowercase()}"
-        val filePath = "exports/$fileName"
-        
-        // 确保导出目录存在
-        File("exports").mkdirs()
-        
-        val content = when (format) {
-            LogExportFormat.JSON -> {
-                // 手动构建JSON避免LinkedHashMap序列化问题
-                val logsJson = logs.joinToString(",\n", "[\n", "\n]") { entry ->
-                    buildJsonString(mapOf(
-                        "id" to entry.id,
-                        "timestamp" to entry.timestamp.toString(),
-                        "level" to entry.level.name,
-                        "type" to entry.type.name,
-                        "message" to entry.message,
-                        "context" to (entry.context ?: ""),
-                        "userId" to (entry.userId ?: ""),
-                        "requestId" to (entry.requestId ?: ""),
-                        "stackTrace" to (entry.stackTrace ?: ""),
-                        "metadata" to entry.metadata.data.entries.joinToString(",") { "\"${it.key}\":\"${it.value}\"" }
-                    ))
-                }
-                logsJson
-            }
-            LogExportFormat.CSV -> exportToCsv(logs)
-            LogExportFormat.XML -> exportToXml(logs)
-            LogExportFormat.TXT -> exportToText(logs)
-        }
-        
-        File(filePath).writeText(content)
-        return filePath
     }
     
     override fun setLoggingConfig(config: LoggingConfig) {
@@ -533,19 +356,6 @@ class LoggingServiceImpl : LoggingService {
     
     override fun getLoggingConfig(): LoggingConfig {
         return config
-    }
-    
-    override fun flushLogsToFile() {
-        if (!config.logToFile) {
-            logWarning("日志文件写入功能已禁用，无法刷新日志到文件", "日志刷新")
-            return
-        }
-        
-        try {
-            writeLogsToFile()
-        } catch (e: Exception) {
-            logError(e, "立即刷新日志到文件时发生错误")
-        }
     }
     
     private fun addLogEntry(

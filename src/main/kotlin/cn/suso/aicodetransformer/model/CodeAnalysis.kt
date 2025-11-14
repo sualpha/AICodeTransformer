@@ -41,14 +41,3 @@ data class ParameterInfo(
     val type: String,
     val annotations: List<String> = emptyList()
 )
-
-/**
- * 方法分析结果
- */
-data class MethodAnalysisResult(
-    val isMethod: Boolean,
-    val methodInfo: MethodInfo?,
-    val hasRequestParameters: Boolean,
-    val hasResponseParameters: Boolean,
-    val errorMessage: String? = null
-)

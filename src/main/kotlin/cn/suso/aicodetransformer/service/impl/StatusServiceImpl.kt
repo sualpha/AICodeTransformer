@@ -3,11 +3,9 @@ package cn.suso.aicodetransformer.service.impl
 import cn.suso.aicodetransformer.service.*
 import cn.suso.aicodetransformer.model.NotificationAction
 import cn.suso.aicodetransformer.model.ErrorContext
-import cn.suso.aicodetransformer.model.StatusInfo
 import cn.suso.aicodetransformer.model.ExecutionStatusInfo
 import cn.suso.aicodetransformer.constants.ExecutionStatus
 import cn.suso.aicodetransformer.constants.NotificationType
-import cn.suso.aicodetransformer.constants.BalloonType
 import cn.suso.aicodetransformer.i18n.I18n
 import com.intellij.notification.*
 import com.intellij.notification.NotificationType as IntellijNotificationType

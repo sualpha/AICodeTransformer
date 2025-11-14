@@ -1,6 +1,5 @@
 package cn.suso.aicodetransformer.service.impl
 
-import cn.suso.aicodetransformer.constants.SecurityEvent
 import cn.suso.aicodetransformer.constants.RequestStatusConstants
 import cn.suso.aicodetransformer.model.*
 import cn.suso.aicodetransformer.service.AIModelService
@@ -11,7 +10,6 @@ import cn.suso.aicodetransformer.service.LoggingService
 import cn.suso.aicodetransformer.service.PerformanceMonitorService
 import cn.suso.aicodetransformer.service.RateLimitService
 import cn.suso.aicodetransformer.service.RequestListener
-import cn.suso.aicodetransformer.util.TokenCounter
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import io.ktor.client.*
@@ -108,31 +106,6 @@ class AIModelServiceImpl : AIModelService {
         
         // 开始性能跟踪
         val performanceTracker = performanceMonitorService.startTracking(requestId, config, prompt)
-        
-        // 检查限流
-/*        if (!rateLimitService.isAllowed(config, apiKey)) {
-            val nextAllowedTime = rateLimitService.getNextAllowedTime(config, apiKey)
-            val waitTime = if (nextAllowedTime > 0) {
-                (nextAllowedTime - System.currentTimeMillis()) / 1000
-            } else 0
-            
-            val errorMessage = if (waitTime > 0) {
-                "API调用频率超限，请等待 ${waitTime} 秒后重试"
-            } else {
-                "API调用频率超限，请稍后重试"
-            }
-            
-            logger.warn("API调用被限流，requestId: $requestId, 模型: ${config.name}")
-            loggingService.logSecurityEvent(
-                SecurityEvent.RATE_LIMIT_EXCEEDED,
-                "API调用频率超限: ${config.name}"
-            )
-            
-            val rateLimitResult = ExecutionResult.failure(errorMessage, ErrorType.RATE_LIMIT_ERROR)
-            performanceMonitorService.endTracking(performanceTracker, rateLimitResult)
-            loggingService.logApiCallEnd(requestId, rateLimitResult, 0)
-            return rateLimitResult
-        }*/
         
         // 检查缓存
         val cacheKey = cacheService.generateCacheKey(config, prompt, config.temperature, config.maxTokens)

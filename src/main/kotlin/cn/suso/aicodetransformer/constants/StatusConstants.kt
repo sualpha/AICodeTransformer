@@ -11,16 +11,6 @@ enum class NotificationType {
 }
 
 /**
- * 气球提示类型
- */
-enum class BalloonType {
-    INFO,
-    WARNING,
-    ERROR,
-    SUCCESS
-}
-
-/**
  * 执行状态枚举
  */
 enum class ExecutionStatus {

@@ -12,7 +12,6 @@ import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.util.PsiTreeUtil
-import cn.suso.aicodetransformer.model.FieldInfo
 
 /**
  * 模板变量解析器，用于解析和替换模板中的内置变量

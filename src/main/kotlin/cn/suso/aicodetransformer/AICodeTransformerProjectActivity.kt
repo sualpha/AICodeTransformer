@@ -424,5 +424,30 @@ class AICodeTransformerProjectActivity : ProjectActivity {
             logger.error("清理资源时发生错误", e)
         }
     }
+
+    /**
+     * 自动恢复快捷键
+     */
+    private fun autoRecoverShortcuts() {
+        try {
+            val recoveredCount = shortcutRecoveryService.autoRecoverShortcuts()
+            if (recoveredCount > 0) {
+                logger.info("自动恢复了 $recoveredCount 个快捷键")
+                // 刷新模板动作以应用恢复的快捷键
+                refreshTemplateActions()
+                // 显示恢复成功通知
+                shortcutNotificationService.showRecoverySuccessNotification(null, recoveredCount)
+            }
+
+            // 验证快捷键配置并显示相关通知
+            shortcutNotificationService.validateAndNotify(null)
+
+            // 备份当前快捷键配置
+            shortcutRecoveryService.backupShortcuts()
+
+        } catch (e: Exception) {
+            logger.error("自动恢复快捷键失败", e)
+        }
+    }
     
 }

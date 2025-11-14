@@ -5,6 +5,7 @@ import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.ui.settings.model.ModelConfigurationPanel
 import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.i18n.LanguageManager
+import cn.suso.aicodetransformer.service.LanguageSettingsService
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -25,7 +26,8 @@ import javax.swing.border.EmptyBorder
  */
 class AICodeTransformerSettingsPanel(
     private val project: Project,
-    private val configurationService: ConfigurationService
+    private val configurationService: ConfigurationService,
+    private val languageController: LanguageSettingsService
 ) : JPanel(BorderLayout()) {
     
     private var tabbedPane = JBTabbedPane()
@@ -44,7 +46,7 @@ class AICodeTransformerSettingsPanel(
         modelConfigPanel = ModelConfigurationPanel(project, configurationService)
         promptTemplatePanel = PromptTemplatePanel(project, configurationService)
         commitSettingsPanel = CommitSettingsPanel(project, configurationService)
-        systemManagementPanel = SystemManagementPanel(project)
+        systemManagementPanel = SystemManagementPanel(project, configurationService, languageController)
 
         configureTabbedPane(tabbedPane)
         add(tabbedPane, BorderLayout.CENTER)
@@ -54,6 +56,7 @@ class AICodeTransformerSettingsPanel(
         // 监听语言变化以刷新页签文本
         LanguageManager.addChangeListener {
             SwingUtilities.invokeLater {
+                languageController.syncLanguageDependentDefaults()
                 val selectedIndex = tabbedPane.selectedIndex
                 remove(tabbedPane)
                 tabbedPane = JBTabbedPane()

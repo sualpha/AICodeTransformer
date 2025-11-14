@@ -10,7 +10,6 @@ import cn.suso.aicodetransformer.model.FieldInfo
 import cn.suso.aicodetransformer.model.ClassInfo
 import cn.suso.aicodetransformer.model.MethodInfo
 import cn.suso.aicodetransformer.model.ParameterInfo
-import cn.suso.aicodetransformer.model.MethodAnalysisResult
 
 /**
  * 代码分析服务，用于解析Java类的字段信息

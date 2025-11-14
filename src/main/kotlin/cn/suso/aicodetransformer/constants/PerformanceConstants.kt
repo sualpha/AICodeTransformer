@@ -10,17 +10,7 @@ object PerformanceConstants {
      * HTTP优化配置默认值
      */
     object HttpOptimization {
-        const val MAX_CONNECTIONS = 50
-        const val MAX_CONNECTIONS_PER_ROUTE = 20
-        const val CONNECTION_TIMEOUT_MS = 5000
-        const val SOCKET_TIMEOUT_MS = 30000
-        const val CONNECTION_REQUEST_TIMEOUT_MS = 3000
-        const val KEEP_ALIVE_DURATION_MS = 60000L
-        const val VALIDATE_AFTER_INACTIVITY_MS = 2000
-        const val ENABLE_COMPRESSION = true
-        const val ENABLE_RETRY = true
-        const val MAX_RETRY_COUNT = 3
-        
+
         // PerformanceOptimizationConfig 需要的常量
         const val MAX_CONNECTIONS_POOL = 200
         const val MAX_CONNECTIONS_PER_ROUTE_POOL = 50
@@ -37,16 +27,7 @@ object PerformanceConstants {
      * 缓存优化配置默认值
      */
     object CacheOptimization {
-        const val ENABLE_RESPONSE_CACHE = true
-        const val MAX_CACHE_SIZE = 100
-        const val CACHE_EXPIRE_MINUTES = 30L
-        const val ENABLE_TEMPLATE_CACHE = true
-        const val TEMPLATE_CACHE_SIZE = 50
-        const val TEMPLATE_CACHE_EXPIRE_MINUTES = 60L
-        const val ENABLE_CONFIG_CACHE = true
-        const val CONFIG_CACHE_SIZE = 20
-        const val CONFIG_CACHE_EXPIRE_MINUTES = 120L
-        
+
         // PerformanceOptimizationConfig 需要的常量
         const val ENABLE_SMART_TTL = true
         const val ENABLE_PREDICTIVE_CACHE = false
@@ -58,34 +39,13 @@ object PerformanceConstants {
      * 请求优化配置默认值
      */
     object RequestOptimization {
-        const val ENABLE_REQUEST_BATCHING = false
-        const val BATCH_SIZE = 5
-        const val BATCH_TIMEOUT_MS = 1000L
         const val ENABLE_REQUEST_DEDUPLICATION = true
-        const val DEDUPLICATION_WINDOW_MS = 5000L
-        const val ENABLE_ASYNC_PROCESSING = true
-        const val ASYNC_THREAD_POOL_SIZE = 10
-        const val ASYNC_QUEUE_CAPACITY = 100
-        
+
         // PerformanceOptimizationConfig 需要的常量
         const val ENABLE_BATCH_MERGING = false
         const val BATCH_MERGE_WAIT_TIME_MS = 100L
         const val BATCH_MERGE_MAX_REQUESTS = 5
         const val ENABLE_STREAM_RESPONSE = false
-    }
-    
-    /**
-     * 性能监控配置默认值
-     */
-    object MonitorConfig {
-        const val ENABLE_PERFORMANCE_MONITORING = true
-        const val METRICS_COLLECTION_INTERVAL_MS = 5000L
-        const val MEMORY_THRESHOLD_PERCENTAGE = 80.0
-        const val CPU_THRESHOLD_PERCENTAGE = 85.0
-        const val RESPONSE_TIME_THRESHOLD_MS = 10000L
-        const val ERROR_RATE_THRESHOLD_PERCENTAGE = 5.0
-        const val ENABLE_ALERTS = true
-        const val ALERT_COOLDOWN_MINUTES = 10L
     }
     
     /**
@@ -128,61 +88,5 @@ object PerformanceConstants {
         NORMAL("正常", "系统负载正常"),
         BUSY("繁忙", "系统负载较高"),
         OVERLOADED("过载", "系统负载过高")
-    }
-    
-    /**
-     * 性能指标阈值
-     */
-    object PerformanceThresholds {
-        const val RESPONSE_TIME_EXCELLENT_MS = 1000L
-        const val RESPONSE_TIME_GOOD_MS = 3000L
-        const val RESPONSE_TIME_ACCEPTABLE_MS = 5000L
-        const val MEMORY_USAGE_LOW_PERCENTAGE = 50.0
-        const val MEMORY_USAGE_NORMAL_PERCENTAGE = 70.0
-        const val MEMORY_USAGE_HIGH_PERCENTAGE = 85.0
-        const val CPU_USAGE_LOW_PERCENTAGE = 30.0
-        const val CPU_USAGE_NORMAL_PERCENTAGE = 60.0
-        const val CPU_USAGE_HIGH_PERCENTAGE = 80.0
-        const val ERROR_RATE_EXCELLENT_PERCENTAGE = 0.1
-        const val ERROR_RATE_GOOD_PERCENTAGE = 1.0
-        const val ERROR_RATE_ACCEPTABLE_PERCENTAGE = 3.0
-    }
-    
-
-    
-    /**
-     * 获取负载状态基于CPU使用率
-     */
-    fun getLoadStatusByCpuUsage(cpuUsage: Double): LoadStatus {
-        return when {
-            cpuUsage < PerformanceThresholds.CPU_USAGE_LOW_PERCENTAGE -> LoadStatus.IDLE
-            cpuUsage < PerformanceThresholds.CPU_USAGE_NORMAL_PERCENTAGE -> LoadStatus.NORMAL
-            cpuUsage < PerformanceThresholds.CPU_USAGE_HIGH_PERCENTAGE -> LoadStatus.BUSY
-            else -> LoadStatus.OVERLOADED
-        }
-    }
-    
-    /**
-     * 获取负载状态基于内存使用率
-     */
-    fun getLoadStatusByMemoryUsage(memoryUsage: Double): LoadStatus {
-        return when {
-            memoryUsage < PerformanceThresholds.MEMORY_USAGE_LOW_PERCENTAGE -> LoadStatus.IDLE
-            memoryUsage < PerformanceThresholds.MEMORY_USAGE_NORMAL_PERCENTAGE -> LoadStatus.NORMAL
-            memoryUsage < PerformanceThresholds.MEMORY_USAGE_HIGH_PERCENTAGE -> LoadStatus.BUSY
-            else -> LoadStatus.OVERLOADED
-        }
-    }
-    
-    /**
-     * 获取响应时间等级
-     */
-    fun getResponseTimeLevel(responseTimeMs: Long): String {
-        return when {
-            responseTimeMs <= PerformanceThresholds.RESPONSE_TIME_EXCELLENT_MS -> "优秀"
-            responseTimeMs <= PerformanceThresholds.RESPONSE_TIME_GOOD_MS -> "良好"
-            responseTimeMs <= PerformanceThresholds.RESPONSE_TIME_ACCEPTABLE_MS -> "可接受"
-            else -> "需要优化"
-        }
     }
 }

@@ -139,22 +139,3 @@ data class PerformanceRecord(
     val networkLatency: Long?,
     val customMetrics: Map<String, Any>
 )
-
-/**
- * 性能报告
- */
-data class PerformanceReport(
-    val cacheHitRate: Double,
-    val averageResponseTime: Long,
-    val totalCacheEntries: Int,
-    val optimizationSuggestions: List<OptimizationSuggestion>,
-    val overallScore: Int
-) {
-    val performanceLevel: String
-        get() = when {
-            overallScore >= 90 -> "优秀"
-            overallScore >= 75 -> "良好"
-            overallScore >= 60 -> "一般"
-            else -> "需要优化"
-        }
-}

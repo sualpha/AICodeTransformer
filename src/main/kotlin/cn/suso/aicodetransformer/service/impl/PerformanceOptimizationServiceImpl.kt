@@ -9,7 +9,6 @@ import cn.suso.aicodetransformer.model.CacheOptimizationConfig
 import cn.suso.aicodetransformer.model.RequestOptimizationConfig
 import cn.suso.aicodetransformer.model.OptimizationSuggestion
 import cn.suso.aicodetransformer.model.PerformanceStats
-import cn.suso.aicodetransformer.model.PerformanceReport
 import cn.suso.aicodetransformer.constants.OptimizationType
 import cn.suso.aicodetransformer.constants.ImpactLevel
 import cn.suso.aicodetransformer.constants.DifficultyLevel

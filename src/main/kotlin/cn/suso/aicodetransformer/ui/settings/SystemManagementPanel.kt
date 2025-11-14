@@ -2,8 +2,6 @@ package cn.suso.aicodetransformer.ui.settings
 
 import cn.suso.aicodetransformer.constants.UpdateStatus
 import cn.suso.aicodetransformer.model.UpdateInfo
-import cn.suso.aicodetransformer.model.CommitSettings
-import cn.suso.aicodetransformer.model.GlobalSettings
 import cn.suso.aicodetransformer.model.CacheConfig
 import cn.suso.aicodetransformer.service.LoggingService
 import cn.suso.aicodetransformer.model.LoggingConfig
@@ -13,6 +11,7 @@ import cn.suso.aicodetransformer.service.UpdateStatusListener
 import cn.suso.aicodetransformer.service.CacheService
 import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.i18n.LanguageManager
+import cn.suso.aicodetransformer.service.LanguageSettingsService
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -33,10 +32,13 @@ import java.text.MessageFormat
 /**
  * 系统设置面板 - 整合日志管理和更新设置
  */
-class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout()) {
+class SystemManagementPanel(
+    private val project: Project,
+    private val configurationService: ConfigurationService,
+    private val languageController: LanguageSettingsService
+) : JPanel(BorderLayout()) {
     
     private val loggingService: LoggingService = service()
-    private val configurationService: ConfigurationService = service()
     private val autoUpdateService: AutoUpdateService = service()
     private val cacheService: CacheService = service()
     private val logPathLabel = JBLabel()
@@ -83,6 +85,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private var downloadJob: Job? = null
 
     // 语言设置控件
+    private var suppressLanguageEvents = false
     private lateinit var languageZhRadio: JRadioButton
     private lateinit var languageEnRadio: JRadioButton
     private lateinit var languageButtonGroup: ButtonGroup
@@ -109,6 +112,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private val languageChangeListener: () -> Unit = {
         SwingUtilities.invokeLater {
             refreshAllTexts()
+            updateLanguageSelection(LanguageManager.getLanguageCode())
         }
     }
     
@@ -647,25 +651,20 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             val selectedLanguage = when {
                 languageZhRadio.isSelected -> "zh_CN"
                 languageEnRadio.isSelected -> "en_US"
-                else -> "zh_CN" // 默认简体中文
+                else -> LanguageManager.getLanguageCode()
             }
+            val normalizedLanguage = languageController.normalizeLanguageCode(selectedLanguage)
             
             // 创建新的全局设置
-            val newSettings = GlobalSettings(
-                enableLogging = currentSettings.enableLogging,
-                logLevel = currentSettings.logLevel,
-                connectionTimeoutMs = currentSettings.connectionTimeoutMs,
-                readTimeoutMs = currentSettings.readTimeoutMs,
-                retryAttempts = currentSettings.retryAttempts,
-                retryDelayMs = currentSettings.retryDelayMs,
-                enableAutoUpdate = enableAutoUpdateCheckBox.isSelected,
-                updateInterval = intervalString,
-                updateCheckIntervalHours = intervalHours,
-                lastUpdateCheckTime = if (enableAutoUpdateCheckBox.isSelected) System.currentTimeMillis() else 0L,
-                enableCache = enableCacheCheckBox.isSelected,
-                cacheDefaultTtlMinutes = ttlMinutes,
-                displayLanguage = selectedLanguage
-            )
+            val newSettings = languageController.cloneSettings(currentSettings).apply {
+                enableAutoUpdate = enableAutoUpdateCheckBox.isSelected
+                updateInterval = intervalString
+                updateCheckIntervalHours = intervalHours
+                lastUpdateCheckTime = if (enableAutoUpdateCheckBox.isSelected) System.currentTimeMillis() else 0L
+                enableCache = enableCacheCheckBox.isSelected
+                cacheDefaultTtlMinutes = ttlMinutes
+                displayLanguage = normalizedLanguage
+            }
             
             // 保存设置
             configurationService.updateGlobalSettings(newSettings)
@@ -732,12 +731,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             updateIntervalComboBox.selectedIndex = intervalIndex
 
             // 加载语言选择
-            when (settings.displayLanguage) {
-                "zh_CN" -> languageZhRadio.isSelected = true
-                "en_US" -> languageEnRadio.isSelected = true
-                "system" -> languageZhRadio.isSelected = true // 系统默认映射到简体中文
-                else -> languageZhRadio.isSelected = true // 默认简体中文
-            }
+            updateLanguageSelection(settings.displayLanguage)
             
             // 设置按钮初始状态
             val currentStatus = autoUpdateService.getUpdateStatus()
@@ -1166,47 +1160,24 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
 
         // 切换语言后实时刷新部分文案并立即保存
         val onChange: () -> Unit = onChange@{
-            val code = when {
+            if (suppressLanguageEvents) {
+                return@onChange
+            }
+            val requestedCode = when {
                 languageZhRadio.isSelected -> "zh_CN"
                 languageEnRadio.isSelected -> "en_US"
                 else -> LanguageManager.getLanguageCode()
             }
 
-            if (code == LanguageManager.getLanguageCode()) {
+            if (languageController.isCurrentLanguage(requestedCode)) {
+                updateLanguageSelection(requestedCode)
                 return@onChange
             }
 
             SwingUtilities.invokeLater {
-                LanguageManager.setLanguage(code)
+                languageController.applyLanguage(requestedCode)
                 refreshAllTexts()
-                try {
-                    val currentSettings = configurationService.getGlobalSettings()
-                    val newSettings = GlobalSettings(
-                        enableLogging = currentSettings.enableLogging,
-                        logLevel = currentSettings.logLevel,
-                        connectionTimeoutMs = currentSettings.connectionTimeoutMs,
-                        readTimeoutMs = currentSettings.readTimeoutMs,
-                        retryAttempts = currentSettings.retryAttempts,
-                        retryDelayMs = currentSettings.retryDelayMs,
-                        enableAutoUpdate = currentSettings.enableAutoUpdate,
-                        updateInterval = currentSettings.updateInterval,
-                        updateCheckIntervalHours = currentSettings.updateCheckIntervalHours,
-                        lastUpdateCheckTime = currentSettings.lastUpdateCheckTime,
-                        enableCache = currentSettings.enableCache,
-                        cacheDefaultTtlMinutes = currentSettings.cacheDefaultTtlMinutes,
-                        displayLanguage = code
-                    )
-                    configurationService.updateGlobalSettings(newSettings)
-
-                    kotlin.runCatching {
-                        val commitSettings = configurationService.getCommitSettings()
-                        val normalized = CommitSettings.normalizeTemplates(commitSettings)
-                        if (normalized != commitSettings) {
-                            configurationService.saveCommitSettings(normalized)
-                        }
-                    }
-                } catch (_: Exception) {
-                }
+                updateLanguageSelection(requestedCode)
             }
         }
 
@@ -1217,7 +1188,33 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         panel.add(languageDisplayStaticLabel)
         panel.add(languageZhRadio)
         panel.add(languageEnRadio)
+        updateLanguageSelection(LanguageManager.getLanguageCode())
         return panel
+    }
+
+    private fun updateLanguageSelection(languageCode: String) {
+        if (!::languageZhRadio.isInitialized || !::languageEnRadio.isInitialized) {
+            return
+        }
+
+        val normalized = languageController.normalizeLanguageCode(languageCode)
+        suppressLanguageEvents = true
+        try {
+            when (normalized) {
+                "en_US" -> {
+                    if (!languageEnRadio.isSelected) {
+                        languageEnRadio.isSelected = true
+                    }
+                }
+                else -> {
+                    if (!languageZhRadio.isSelected) {
+                        languageZhRadio.isSelected = true
+                    }
+                }
+            }
+        } finally {
+            suppressLanguageEvents = false
+        }
     }
 
     /**

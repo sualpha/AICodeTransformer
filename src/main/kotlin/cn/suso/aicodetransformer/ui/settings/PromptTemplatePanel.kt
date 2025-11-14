@@ -203,7 +203,8 @@ class PromptTemplatePanel(
     }
 
     private fun setupLanguageListener() {
-        val refreshTexts = {
+        val refreshTexts: () -> Unit = {
+            val selectedId = templateList.selectedValue?.id
             titleLabel.text = I18n.t("prompt.management.title")
             descLabel.text = I18n.t("prompt.management.desc")
             tabbedPane.setTitleAt(0, I18n.t("prompt.tab.templates"))
@@ -222,6 +223,8 @@ class PromptTemplatePanel(
             resetButton.text = I18n.t("prompt.reset")
             resetButton.toolTipText = I18n.t("prompt.reset.tooltip")
             detailPanel.refreshTexts()
+            loadTemplates()
+            selectedId?.let { selectTemplate(it) }
         }
         LanguageManager.addChangeListener(refreshTexts)
     }

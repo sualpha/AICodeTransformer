@@ -2,9 +2,7 @@ package cn.suso.aicodetransformer.service
 
 import cn.suso.aicodetransformer.constants.ExecutionStatus
 import cn.suso.aicodetransformer.constants.NotificationType
-import cn.suso.aicodetransformer.constants.BalloonType
 import cn.suso.aicodetransformer.model.NotificationAction
-import cn.suso.aicodetransformer.model.StatusInfo
 import com.intellij.openapi.project.Project
 
 /**

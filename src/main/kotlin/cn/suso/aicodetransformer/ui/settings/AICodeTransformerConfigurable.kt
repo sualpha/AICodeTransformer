@@ -1,8 +1,7 @@
 package cn.suso.aicodetransformer.ui.settings
 
-import cn.suso.aicodetransformer.model.CommitSettings
 import cn.suso.aicodetransformer.service.ConfigurationService
-import cn.suso.aicodetransformer.i18n.LanguageManager
+import cn.suso.aicodetransformer.service.LanguageSettingsService
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.options.Configurable
@@ -25,6 +24,7 @@ class AICodeTransformerConfigurable : Configurable {
     
     private var settingsPanel: AICodeTransformerSettingsPanel? = null
     private val configurationService = ApplicationManager.getApplication().service<ConfigurationService>()
+    private val languageController = LanguageSettingsService(configurationService)
     
     override fun getDisplayName(): String = "AI Code Transformer"
     
@@ -36,15 +36,9 @@ class AICodeTransformerConfigurable : Configurable {
                 val currentProject = project ?: ProjectManager.getInstance().defaultProject
                 // 初始化显示语言
                 kotlin.runCatching {
-                    val settings = configurationService.getGlobalSettings()
-                    LanguageManager.setLanguage(settings.displayLanguage)
-                    val commitSettings = configurationService.getCommitSettings()
-                    val normalized = CommitSettings.normalizeTemplates(commitSettings)
-                    if (normalized != commitSettings) {
-                        configurationService.saveCommitSettings(normalized)
-                    }
+                    languageController.initializeLanguageFromSettings()
                 }
-                settingsPanel = AICodeTransformerSettingsPanel(currentProject, configurationService)
+                settingsPanel = AICodeTransformerSettingsPanel(currentProject, configurationService, languageController)
             }
             settingsPanel
         } catch (e: Exception) {
