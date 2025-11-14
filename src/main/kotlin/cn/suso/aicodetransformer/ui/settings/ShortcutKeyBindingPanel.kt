@@ -5,6 +5,8 @@ import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
 import cn.suso.aicodetransformer.service.ActionService
 import cn.suso.aicodetransformer.service.TemplateChangeListener
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import com.intellij.openapi.actionSystem.KeyboardShortcut
 import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.keymap.KeymapUtil
@@ -42,13 +44,16 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
     private val scrollPane = JBScrollPane(table)
     
     private val searchField = JBTextField()
-    private val enabledOnlyCheckBox = JBCheckBox("仅显示启用的模板")
+    private val enabledOnlyCheckBox = JBCheckBox(I18n.t("template.enabledOnly"))
+    private lateinit var searchLabel: JLabel
+    private lateinit var clearButton: JButton
     
     init {
         layout = BorderLayout()
         setupUI()
         setupTable()
         loadData()
+        setupLanguageListener()
         
         // 注册模板变更监听器
         templateService.addTemplateChangeListener(this)
@@ -70,7 +75,8 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         val panel = JPanel(BorderLayout())
         
         val leftPanel = JPanel()
-        leftPanel.add(JLabel("搜索:"))
+        searchLabel = JLabel(I18n.t("shortcut.search.label"))
+        leftPanel.add(searchLabel)
         leftPanel.add(searchField)
         searchField.preferredSize = Dimension(200, searchField.preferredSize.height)
         
@@ -78,9 +84,9 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         centerPanel.add(enabledOnlyCheckBox)
         
         val rightPanel = JPanel()
-        val clearButton = JButton("清除选中快捷键")
+        clearButton = JButton(I18n.t("shortcut.clearSelected"))
         clearButton.addActionListener { clearSelectedShortcuts() }
-        clearButton.toolTipText = "清除选中模板的快捷键设置"
+        clearButton.toolTipText = I18n.t("shortcut.clearSelected.tooltip")
         rightPanel.add(clearButton)
         
         panel.add(leftPanel, BorderLayout.WEST)
@@ -92,6 +98,26 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         enabledOnlyCheckBox.addActionListener { filterData() }
         
         return panel
+    }
+
+    private fun setupLanguageListener() {
+        val refreshTexts = {
+            searchLabel.text = I18n.t("shortcut.search.label")
+            enabledOnlyCheckBox.text = I18n.t("prompt.enabledOnly")
+            clearButton.text = I18n.t("shortcut.clearSelected")
+            clearButton.toolTipText = I18n.t("shortcut.clearSelected.tooltip")
+
+            val columnModel = table.columnModel
+            if (columnModel.columnCount >= 4) {
+                columnModel.getColumn(0).headerValue = I18n.t("shortcut.table.col.name")
+                columnModel.getColumn(1).headerValue = I18n.t("shortcut.table.col.desc")
+                columnModel.getColumn(2).headerValue = I18n.t("shortcut.table.col.shortcut")
+                columnModel.getColumn(3).headerValue = I18n.t("shortcut.table.col.enabled")
+            }
+            table.tableHeader.revalidate()
+            table.tableHeader.repaint()
+        }
+        LanguageManager.addChangeListener(refreshTexts)
     }
     
     private fun createButtonPanel(): JPanel? {
@@ -144,14 +170,14 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
     private fun clearSelectedShortcuts() {
         val selectedRows = table.selectedRows
         if (selectedRows.isEmpty()) {
-            Messages.showInfoMessage(this, "请先选择要清除快捷键的模板", "提示")
+            Messages.showInfoMessage(this, I18n.t("shortcut.clear.selectFirst"), I18n.t("notice"))
             return
         }
         
         val result = Messages.showYesNoDialog(
             this,
-            "确定要清除选中模板的快捷键吗？",
-            "确认清除",
+            I18n.t("shortcut.clear.confirm.message"),
+            I18n.t("shortcut.clear.confirm.title"),
             Messages.getQuestionIcon()
         )
         
@@ -171,7 +197,6 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
      * 快捷键表格模型
      */
     private class ShortcutTableModel : AbstractTableModel() {
-        private val columnNames = arrayOf("模板名称", "描述", "快捷键", "启用")
         private var templates = listOf<PromptTemplate>()
         
         fun setData(templates: List<PromptTemplate>) {
@@ -185,9 +210,15 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         
         override fun getRowCount(): Int = templates.size
         
-        override fun getColumnCount(): Int = columnNames.size
+        override fun getColumnCount(): Int = 4
         
-        override fun getColumnName(column: Int): String = columnNames[column]
+        override fun getColumnName(column: Int): String = when (column) {
+            0 -> I18n.t("shortcut.table.col.name")
+            1 -> I18n.t("shortcut.table.col.desc")
+            2 -> I18n.t("shortcut.table.col.shortcut")
+            3 -> I18n.t("shortcut.table.col.enabled")
+            else -> ""
+        }
         
         override fun getValueAt(rowIndex: Int, columnIndex: Int): Any? {
             val template = templates[rowIndex]
@@ -290,7 +321,7 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         
         init {
             isEditable = false
-            text = "<点击设置快捷键，按ESC清除>"
+            text = I18n.t("shortcut.input.placeholder")
             
             // 添加右键菜单
             setupContextMenu()
@@ -298,16 +329,16 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
             addFocusListener(object : java.awt.event.FocusListener {
                 override fun focusGained(e: java.awt.event.FocusEvent?) {
                     isCapturing = true
-                    text = "按下快捷键组合或ESC清除..."
+                    text = I18n.t("shortcut.input.capturing")
                     background = java.awt.Color(255, 255, 200) // 淡黄色背景表示正在捕获
-                    toolTipText = "按下快捷键组合进行设置，或按ESC键清除快捷键"
+                    toolTipText = I18n.t("shortcut.input.capturing.tooltip")
                 }
                 
                 override fun focusLost(e: java.awt.event.FocusEvent?) {
                     isCapturing = false
                     // 恢复到正确的背景色（根据冲突状态）
                     val currentShortcut = text
-                    if (currentShortcut.isNotEmpty() && currentShortcut != "按下快捷键组合...") {
+                    if (currentShortcut.isNotBlank()) {
                         val conflictInfo = checkShortcutConflict(currentShortcut)
                         background = if (conflictInfo != null) {
                             java.awt.Color(255, 200, 200) // 红色背景表示冲突
@@ -365,32 +396,21 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         private fun setupContextMenu() {
             val popupMenu = JPopupMenu()
             
-            val clearItem = JMenuItem("清除快捷键")
+            val clearItem = JMenuItem(I18n.t("shortcut.menu.clear"))
             clearItem.addActionListener {
                 setShortcut("")
                 onShortcutChanged?.invoke("")
             }
             popupMenu.add(clearItem)
             
-            val helpItem = JMenuItem("使用帮助")
+            val helpItem = JMenuItem(I18n.t("shortcut.menu.help"))
             helpItem.addActionListener {
-                val helpText = """
-                    快捷键设置方法：
-                    
-                    1. 点击此输入框
-                    2. 按下您想要的快捷键组合
-                    3. 按ESC键可清除快捷键
-                    4. 右键菜单可快速清除
-                    
-                    建议使用组合键如：
-                    • Ctrl+Alt+字母
-                    • Ctrl+Shift+字母
-                """.trimIndent()
+                val helpText = I18n.t("shortcut.help.text")
                 
                 Messages.showInfoMessage(
                     this@ShortcutInputField,
                     helpText,
-                    "快捷键设置帮助"
+                    I18n.t("shortcut.help.title")
                 )
             }
             popupMenu.add(helpItem)
@@ -399,21 +419,21 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         }
         
         fun setShortcut(shortcut: String) {
-            text = if (shortcut.isEmpty()) "<点击设置快捷键，按ESC清除>" else shortcut
+            text = if (shortcut.isEmpty()) I18n.t("shortcut.input.placeholder") else shortcut
             
             // 如果有快捷键，检查冲突状态来设置背景色
             if (shortcut.isNotEmpty()) {
                 val conflictInfo = checkShortcutConflict(shortcut)
                 if (conflictInfo != null) {
                     background = java.awt.Color(255, 200, 200) // 红色背景表示冲突
-                    toolTipText = "警告：快捷键与 '$conflictInfo' 冲突。按ESC键清除快捷键"
+                    toolTipText = I18n.t("shortcut.tooltip.conflict").replace("{info}", conflictInfo)
                 } else {
                     background = java.awt.Color(200, 255, 200) // 浅绿色背景表示无冲突
-                    toolTipText = "快捷键设置成功。按ESC键可清除快捷键"
+                    toolTipText = I18n.t("shortcut.tooltip.ok")
                 }
             } else {
                 background = java.awt.Color(245, 245, 245) // 浅灰色背景表示未设置
-                toolTipText = "点击此处设置快捷键，按ESC键清除快捷键"
+                toolTipText = I18n.t("shortcut.tooltip.hint")
             }
         }
         
@@ -480,19 +500,19 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
         private fun showConflictWarning(shortcut: String, conflictInfo: String) {
             // 设置警告背景色
             background = java.awt.Color(255, 200, 200) // 淡红色
-            text = "$shortcut (冲突: $conflictInfo)"
+            text = "$shortcut (" + I18n.t("shortcut.conflict") + ": $conflictInfo)"
             
             // 显示工具提示
-            toolTipText = "快捷键冲突: $conflictInfo\n按ESC清除或选择其他快捷键"
+            toolTipText = I18n.t("shortcut.tooltip.conflictLine").replace("{info}", conflictInfo)
             
             // 可选：显示确认对话框
              SwingUtilities.invokeLater {
                  val result = Messages.showYesNoDialog(
                      null,
-                     "快捷键 '$shortcut' 与 '$conflictInfo' 冲突。\n\n是否仍要使用此快捷键？",
-                     "快捷键冲突警告",
-                     "仍要使用",
-                     "取消",
+                     I18n.t("shortcut.conflict.dialog.message").replace("{shortcut}", shortcut).replace("{info}", conflictInfo),
+                     I18n.t("shortcut.conflict.dialog.title"),
+                     I18n.t("shortcut.conflict.dialog.useAnyway"),
+                     I18n.t("action.cancel"),
                      Messages.getWarningIcon()
                  )
                 
@@ -564,7 +584,7 @@ class ShortcutKeyBindingPanel : JPanel(), TemplateChangeListener {
             
             val shortcut = value?.toString()
             if (shortcut.isNullOrBlank()) {
-                text = "<未设置>"
+                text = I18n.t("shortcut.notSet")
                 foreground = java.awt.Color.GRAY
             } else {
                 text = shortcut

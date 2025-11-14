@@ -2,6 +2,7 @@ package cn.suso.aicodetransformer.ui.settings
 
 import cn.suso.aicodetransformer.constants.UpdateStatus
 import cn.suso.aicodetransformer.model.UpdateInfo
+import cn.suso.aicodetransformer.model.CommitSettings
 import cn.suso.aicodetransformer.model.GlobalSettings
 import cn.suso.aicodetransformer.model.CacheConfig
 import cn.suso.aicodetransformer.service.LoggingService
@@ -10,6 +11,8 @@ import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.service.AutoUpdateService
 import cn.suso.aicodetransformer.service.UpdateStatusListener
 import cn.suso.aicodetransformer.service.CacheService
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -25,6 +28,7 @@ import java.io.File
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 import javax.swing.border.TitledBorder
+import java.text.MessageFormat
 
 /**
  * 系统设置面板 - 整合日志管理和更新设置
@@ -58,20 +62,62 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private lateinit var cacheTtlSpinner: JSpinner
     private lateinit var clearCacheButton: JButton
     
+    // 日志面板中的按钮
+    private lateinit var openFolderButton: JButton
+    private lateinit var clearLogButton: JButton
+    
+    // 更新频率下拉框
+    private lateinit var updateIntervalItems: Array<String>
+    
     // 当前可用的更新信息
     private var currentUpdateInfo: UpdateInfo? = null
+    private var currentUpdateStatus: UpdateStatus = UpdateStatus.IDLE
+    private var currentProgressMessage: String? = null
+    private var currentProgressValue: Int? = null
+    private var currentErrorMessage: String? = null
     
     // 协程作用域，用于管理后台任务
     private val coroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     
     // 当前下载任务的Job
     private var downloadJob: Job? = null
+
+    // 语言设置控件
+    private lateinit var languageZhRadio: JRadioButton
+    private lateinit var languageEnRadio: JRadioButton
+    private lateinit var languageButtonGroup: ButtonGroup
+    private lateinit var updateSettingsPanel: JPanel
+    private lateinit var systemTitleLabel: JBLabel
+    
+    // 面板引用，用于语言切换时更新标题
+    private lateinit var logInfoPanel: JPanel
+    private lateinit var logConfigPanel: JPanel
+    private lateinit var cacheSettingsPanel: JPanel
+    private lateinit var languageSettingsPanel: JPanel
+    
+    // 静态标签引用，用于语言切换时更新文本
+    private lateinit var logPathStaticLabel: JBLabel
+    private lateinit var logSizeStaticLabel: JBLabel
+    private lateinit var logCountStaticLabel: JBLabel
+    private lateinit var logRetentionStaticLabel: JBLabel
+    private lateinit var logDaysStaticLabel: JBLabel
+    private lateinit var cacheTtlStaticLabel: JBLabel
+    private lateinit var updateFrequencyStaticLabel: JBLabel
+    private lateinit var languageDisplayStaticLabel: JBLabel
+    
+    // 语言变化监听器引用，用于在dispose时移除
+    private val languageChangeListener: () -> Unit = {
+        SwingUtilities.invokeLater {
+            refreshAllTexts()
+        }
+    }
     
     init {
         setupUI()
         refreshLogInfo()
         loadConfiguration()
         loadUpdateSettings()
+        setupLanguageChangeListener()
     }
     
     private fun setupUI() {
@@ -87,23 +133,27 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         mainPanel.add(Box.createVerticalStrut(8))
         
         // 日志信息面板
-        val infoPanel = createLogInfoPanel()
-        mainPanel.add(infoPanel)
+        logInfoPanel = createLogInfoPanel()
+        mainPanel.add(logInfoPanel)
         mainPanel.add(Box.createVerticalStrut(8))
         
         // 日志配置面板
-        val configPanel = createLogConfigPanel()
-        mainPanel.add(configPanel)
+        logConfigPanel = createLogConfigPanel()
+        mainPanel.add(logConfigPanel)
         mainPanel.add(Box.createVerticalStrut(8))
         
         // 缓存配置面板（位于日志配置下面）
-        val cachePanel = createCacheSettingsPanel()
-        mainPanel.add(cachePanel)
+        cacheSettingsPanel = createCacheSettingsPanel()
+        mainPanel.add(cacheSettingsPanel)
         mainPanel.add(Box.createVerticalStrut(8))
         
         // 更新设置面板
-        val updatePanel = createUpdateSettingsPanel()
-        mainPanel.add(updatePanel)
+        updateSettingsPanel = createUpdateSettingsPanel()
+        mainPanel.add(updateSettingsPanel)
+
+        // 显示语言设置面板
+        languageSettingsPanel = createLanguageSettingsPanel()
+        mainPanel.add(languageSettingsPanel)
         
         // 添加垂直间距，将内容推到顶部
         mainPanel.add(Box.createVerticalGlue())
@@ -115,7 +165,8 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         val headerPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 0, 0))
         headerPanel.border = EmptyBorder(JBUI.insets(0, 0, 8, 0))
         
-        val titleLabel = JBLabel("系统设置")
+        val titleLabel = JBLabel(I18n.t("header.systemSettings"))
+        systemTitleLabel = titleLabel
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 14f)
         titleLabel.foreground = UIUtil.getLabelForeground()
         
@@ -128,23 +179,26 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private fun createLogInfoPanel(): JPanel {
         val panel = JBPanel<JBPanel<*>>()
         panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-        panel.border = TitledBorder("日志信息")
+        panel.border = TitledBorder(I18n.t("log.info"))
         
         // 日志文件路径和统计信息合并到一行
         val infoPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
-        infoPanel.add(JBLabel("路径："))
+        logPathStaticLabel = JBLabel(I18n.t("log.path"))
+        infoPanel.add(logPathStaticLabel)
         logPathLabel.foreground = UIUtil.getLabelForeground()
         infoPanel.add(logPathLabel)
         
-        val openFolderButton = JButton("打开")
+        openFolderButton = JButton(I18n.t("log.open"))
         openFolderButton.addActionListener { openLogFolder() }
         infoPanel.add(openFolderButton)
         
         infoPanel.add(Box.createHorizontalStrut(15))
-        infoPanel.add(JBLabel("大小："))
+        logSizeStaticLabel = JBLabel(I18n.t("log.size"))
+        infoPanel.add(logSizeStaticLabel)
         infoPanel.add(logSizeLabel)
         infoPanel.add(Box.createHorizontalStrut(15))
-        infoPanel.add(JBLabel("条目："))
+        logCountStaticLabel = JBLabel(I18n.t("log.count"))
+        infoPanel.add(logCountStaticLabel)
         infoPanel.add(logCountLabel)
         
         panel.add(infoPanel)
@@ -155,29 +209,31 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private fun createLogConfigPanel(): JPanel {
         val panel = JBPanel<JBPanel<*>>()
         panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-        panel.border = TitledBorder("日志配置")
+        panel.border = TitledBorder(I18n.t("log.config"))
         
         // 将所有配置项合并到一行
         val configPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
         
         //configPanel.add(Box.createHorizontalStrut(8))
-        configPanel.add(JBLabel("保留："))
+        logRetentionStaticLabel = JBLabel(I18n.t("log.retention"))
+        configPanel.add(logRetentionStaticLabel)
         retentionSpinner = JSpinner(SpinnerNumberModel(30, 1, 365, 1))
         configPanel.add(retentionSpinner)
-        configPanel.add(JBLabel("天"))
+        logDaysStaticLabel = JBLabel(I18n.t("log.days"))
+        configPanel.add(logDaysStaticLabel)
         
         configPanel.add(Box.createHorizontalStrut(15))
-        logSensitiveDataCheckBox = JCheckBox("记录调用日志", false)
+        logSensitiveDataCheckBox = JCheckBox(I18n.t("log.record.calls"), false)
         configPanel.add(logSensitiveDataCheckBox)
 
         configPanel.add(Box.createHorizontalStrut(15))
-        autoCleanCheckBox = JCheckBox("自动清理", false)
+        autoCleanCheckBox = JCheckBox(I18n.t("log.auto.clean"), false)
         configPanel.add(autoCleanCheckBox)
 
         configPanel.add(Box.createHorizontalStrut(10))
-        val clearButton = JButton("清空")
-        clearButton.addActionListener { clearLogs() }
-        configPanel.add(clearButton)
+        clearLogButton = JButton(I18n.t("log.clear"))
+        clearLogButton.addActionListener { clearLogs() }
+        configPanel.add(clearLogButton)
 
         panel.add(configPanel)
         
@@ -187,43 +243,44 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private fun createCacheSettingsPanel(): JPanel {
         val panel = JBPanel<JBPanel<*>>()
         panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-        panel.border = TitledBorder("缓存配置")
+        panel.border = TitledBorder(I18n.t("cache.settings"))
 
         val cachePanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
 
         // 与日志配置保持一致的左侧间距
        // cachePanel.add(Box.createHorizontalStrut(15))
         // TTL（分钟）放第一个
-        cachePanel.add(JBLabel("TTL（分钟）："))
+        cacheTtlStaticLabel = JBLabel(I18n.t("cache.ttl"))
+        cachePanel.add(cacheTtlStaticLabel)
         cacheTtlSpinner = JSpinner(SpinnerNumberModel(15, 1, 1440, 1))
         cachePanel.add(cacheTtlSpinner)
 
         // 启用缓存放第二个
         cachePanel.add(Box.createHorizontalStrut(15))
-        enableCacheCheckBox = JCheckBox("启用缓存", true)
-        enableCacheCheckBox.toolTipText = "启用后，系统将使用缓存来提高性能。禁用后，所有缓存功能将停止工作。"
+        enableCacheCheckBox = JCheckBox(I18n.t("cache.enable"), true)
+        enableCacheCheckBox.toolTipText = I18n.t("cache.enable.tooltip")
         cachePanel.add(enableCacheCheckBox)
 
         // 清理缓存放第三个
         cachePanel.add(Box.createHorizontalStrut(10))
-        clearCacheButton = JButton("清理缓存")
-        clearCacheButton.toolTipText = "立即清除所有缓存条目"
+        clearCacheButton = JButton(I18n.t("cache.clear"))
+        clearCacheButton.toolTipText = I18n.t("cache.clear.tooltip")
         clearCacheButton.addActionListener {
             try {
                 val result = Messages.showOkCancelDialog(
                     this,
-                    "确定要清除所有缓存吗？此操作不可撤销。",
-                    "清理缓存",
-                    "清理",
-                    "取消",
+                    I18n.t("cache.clear.confirm.message"),
+                    I18n.t("cache.clear.confirm.title"),
+                    I18n.t("cache.clear.ok"),
+                    I18n.t("cache.clear.cancel"),
                     Messages.getQuestionIcon()
                 )
                 if (result == Messages.OK) {
                     cacheService.clearAllCache()
-                    Messages.showInfoMessage(this, "缓存已清理", "操作完成")
+                    Messages.showInfoMessage(this, I18n.t("cache.cleared"), I18n.t("action.done"))
                 }
             } catch (e: Exception) {
-                Messages.showErrorDialog(this, "清理缓存失败：${e.message}", "操作失败")
+                Messages.showErrorDialog(this, MessageFormat.format(I18n.t("cache.clear.fail"), e.message ?: ""), I18n.t("action.fail"))
             }
         }
         cachePanel.add(clearCacheButton)
@@ -235,13 +292,13 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private fun createUpdateSettingsPanel(): JPanel {
         val panel = JBPanel<JBPanel<*>>()
         panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-        panel.border = TitledBorder("更新设置")
+        panel.border = TitledBorder(I18n.t("update.settings"))
         
         // 第一行：自动更新配置
         val updateConfigPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
         
         // 自动更新勾选框
-        enableAutoUpdateCheckBox = JCheckBox("启用自动更新检查", false)
+        enableAutoUpdateCheckBox = JCheckBox(I18n.t("update.enable.auto"), false)
         enableAutoUpdateCheckBox.addActionListener { 
             updateIntervalComboBox.isEnabled = enableAutoUpdateCheckBox.isSelected
             if (enableAutoUpdateCheckBox.isSelected) {
@@ -253,12 +310,13 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         updateConfigPanel.add(enableAutoUpdateCheckBox)
         
         updateConfigPanel.add(Box.createHorizontalStrut(15))
-        updateConfigPanel.add(JBLabel("检查频率："))
+        updateFrequencyStaticLabel = JBLabel(I18n.t("update.frequency"))
+        updateConfigPanel.add(updateFrequencyStaticLabel)
         
         // 检查频率下拉框
-        val updateIntervals = arrayOf("每天一次", "每周一次", "每月一次")
-        updateIntervalComboBox = JComboBox(updateIntervals)
-        updateIntervalComboBox.selectedIndex = 0 // 默认选择"每天一次"
+        updateIntervalItems = arrayOf(I18n.t("update.daily"), I18n.t("update.weekly"), I18n.t("update.monthly"))
+        updateIntervalComboBox = JComboBox(updateIntervalItems)
+        updateIntervalComboBox.selectedIndex = 0 // 默认选择
         updateConfigPanel.add(updateIntervalComboBox)
         
         panel.add(updateConfigPanel)
@@ -269,14 +327,14 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         val statusPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
         
         // 手动检查更新按钮
-        checkUpdateButton = JButton("立即检查更新")
+        checkUpdateButton = JButton(I18n.t("update.check.now"))
         checkUpdateButton.addActionListener { checkForUpdatesManually() }
         statusPanel.add(checkUpdateButton)
         
         statusPanel.add(Box.createHorizontalStrut(15))
         
         // 更新状态显示
-        updateStatusLabel = JBLabel("状态：未检查")
+        updateStatusLabel = JBLabel(I18n.t("status.unchecked"))
         statusPanel.add(updateStatusLabel)
         
         panel.add(statusPanel)
@@ -285,7 +343,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         val updateActionPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
         
         // 下载更新按钮
-        downloadUpdateButton = JButton("下载更新")
+        downloadUpdateButton = JButton(I18n.t("update.download"))
         downloadUpdateButton.isVisible = false // 初始隐藏
         downloadUpdateButton.addActionListener { downloadUpdateManually() }
         updateActionPanel.add(downloadUpdateButton)
@@ -293,7 +351,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         updateActionPanel.add(Box.createHorizontalStrut(10))
         
         // 取消下载按钮
-        cancelDownloadButton = JButton("取消下载")
+        cancelDownloadButton = JButton(I18n.t("update.cancel"))
         cancelDownloadButton.isVisible = false // 初始隐藏
         cancelDownloadButton.addActionListener { cancelDownloadManually() }
         updateActionPanel.add(cancelDownloadButton)
@@ -301,7 +359,7 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         updateActionPanel.add(Box.createHorizontalStrut(10))
         
         // 安装更新按钮
-        installUpdateButton = JButton("安装更新")
+        installUpdateButton = JButton(I18n.t("update.install"))
         installUpdateButton.isVisible = false // 初始隐藏
         installUpdateButton.addActionListener { installUpdateManually() }
         updateActionPanel.add(installUpdateButton)
@@ -315,18 +373,11 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                     // 保存当前更新信息
                     currentUpdateInfo = updateInfo
                     
-                    updateStatusLabel.text = when (newStatus) {
-                        UpdateStatus.IDLE -> "状态：空闲"
-                        UpdateStatus.CHECKING -> "状态：检查中..."
-                        UpdateStatus.AVAILABLE -> "状态：发现新版本 ${updateInfo?.version ?: ""}"
-                        UpdateStatus.DOWNLOADING -> "状态：下载中..."
-                        UpdateStatus.DOWNLOADED -> "状态：下载完成"
-                        UpdateStatus.INSTALLING -> "状态：安装中..."
-                        UpdateStatus.INSTALLED -> "状态：安装完成"
-                        UpdateStatus.UP_TO_DATE -> "状态：已是最新版本"
-                        UpdateStatus.ERROR -> "状态：操作失败 - 请重新尝试"
-                    }
-                    
+                    currentUpdateStatus = newStatus
+                    currentProgressMessage = null
+                    currentProgressValue = null
+                    currentErrorMessage = null
+
                     // 控制按钮状态
                     checkUpdateButton.isEnabled = newStatus == UpdateStatus.IDLE || newStatus == UpdateStatus.ERROR || newStatus == UpdateStatus.UP_TO_DATE
                     
@@ -341,7 +392,9 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                     // 控制安装按钮
                     installUpdateButton.isVisible = newStatus == UpdateStatus.DOWNLOADED
                     installUpdateButton.isEnabled = newStatus == UpdateStatus.DOWNLOADED
-                    
+
+                    refreshStatusLabelText()
+
                     // 重新布局以适应按钮的显示/隐藏
                     revalidate()
                     repaint()
@@ -350,22 +403,26 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             
             override fun onProgressChanged(progress: Int, message: String) {
                 SwingUtilities.invokeLater {
-                    if (progress > 0) {
-                        updateStatusLabel.text = "状态：$message ${progress}%"
-                    } else {
-                        updateStatusLabel.text = "状态：$message"
-                    }
+                    currentProgressMessage = message
+                    currentProgressValue = progress.takeIf { it > 0 }
+                    currentErrorMessage = null
+                    refreshStatusLabelText()
                 }
             }
-            
+
             override fun onError(error: String) {
                 SwingUtilities.invokeLater {
-                    updateStatusLabel.text = "状态：错误 - $error"
+                    currentUpdateStatus = UpdateStatus.ERROR
+                    currentErrorMessage = error
+                    currentProgressMessage = null
+                    currentProgressValue = null
+                    refreshStatusLabelText()
                     checkUpdateButton.isEnabled = true
                 }
             }
         })
         
+        updateSettingsPanel = panel
         return panel
     }
     
@@ -454,10 +511,10 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private fun clearLogs() {
         val result = Messages.showOkCancelDialog(
             project,
-            "确定要清空所有日志吗？此操作不可恢复。",
-            "确认清空",
-            "确定",
-            "取消",
+            I18n.t("log.clear.confirm.message"),
+            I18n.t("log.clear.confirm.title"),
+            I18n.t("log.clear.confirm.ok"),
+            I18n.t("log.clear.confirm.cancel"),
             Messages.getQuestionIcon()
         )
         
@@ -471,21 +528,21 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                     refreshLogInfo()
                     Messages.showInfoMessage(
                         project,
-                        "日志已成功清空",
-                        "操作成功"
+                        I18n.t("log.clear.success.message"),
+                        I18n.t("log.clear.success.title")
                     )
                 } else {
                     Messages.showInfoMessage(
                         project,
-                        "日志文件不存在，无需清空",
-                        "提示"
+                        I18n.t("log.clear.noFile.message"),
+                        I18n.t("log.clear.noFile.title")
                     )
                 }
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     project,
-                    "清空日志失败：${e.message}",
-                    "操作失败"
+                    I18n.t("log.clear.error.message", e.message ?: ""),
+                    I18n.t("log.clear.error.title")
                 )
             }
         }
@@ -567,7 +624,13 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             val currentSettings = configurationService.getGlobalSettings()
             
             // 获取检查间隔字符串
-            val intervalString = updateIntervalComboBox.selectedItem as String
+            val intervalIndex = updateIntervalComboBox.selectedIndex
+            val intervalString = when (intervalIndex) {
+                0 -> "每天一次"
+                1 -> "每周一次"
+                2 -> "每月一次"
+                else -> "每天一次"
+            }
             
             // 获取检查间隔（小时）
             val intervalHours = when (intervalString) {
@@ -579,6 +642,13 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             
             // 获取缓存TTL（分钟）
             val ttlMinutes = (cacheTtlSpinner.value as Int)
+            
+            // 语言选择
+            val selectedLanguage = when {
+                languageZhRadio.isSelected -> "zh_CN"
+                languageEnRadio.isSelected -> "en_US"
+                else -> "zh_CN" // 默认简体中文
+            }
             
             // 创建新的全局设置
             val newSettings = GlobalSettings(
@@ -593,7 +663,8 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                 updateCheckIntervalHours = intervalHours,
                 lastUpdateCheckTime = if (enableAutoUpdateCheckBox.isSelected) System.currentTimeMillis() else 0L,
                 enableCache = enableCacheCheckBox.isSelected,
-                cacheDefaultTtlMinutes = ttlMinutes
+                cacheDefaultTtlMinutes = ttlMinutes,
+                displayLanguage = selectedLanguage
             )
             
             // 保存设置
@@ -659,9 +730,21 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                 else -> 0 // 默认每天一次
             }
             updateIntervalComboBox.selectedIndex = intervalIndex
+
+            // 加载语言选择
+            when (settings.displayLanguage) {
+                "zh_CN" -> languageZhRadio.isSelected = true
+                "en_US" -> languageEnRadio.isSelected = true
+                "system" -> languageZhRadio.isSelected = true // 系统默认映射到简体中文
+                else -> languageZhRadio.isSelected = true // 默认简体中文
+            }
             
             // 设置按钮初始状态
             val currentStatus = autoUpdateService.getUpdateStatus()
+            currentUpdateStatus = currentStatus
+            currentProgressMessage = null
+            currentProgressValue = null
+            currentErrorMessage = null
             checkUpdateButton.isEnabled = currentStatus == UpdateStatus.IDLE || currentStatus == UpdateStatus.ERROR || currentStatus == UpdateStatus.UP_TO_DATE
             
             // 获取当前更新信息
@@ -677,17 +760,8 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             installUpdateButton.isVisible = currentStatus == UpdateStatus.DOWNLOADED
             installUpdateButton.isEnabled = currentStatus == UpdateStatus.DOWNLOADED
             
-            updateStatusLabel.text = when (currentStatus) {
-                UpdateStatus.IDLE -> "状态：空闲"
-                UpdateStatus.CHECKING -> "状态：检查中..."
-                UpdateStatus.AVAILABLE -> "状态：发现新版本"
-                UpdateStatus.DOWNLOADING -> "状态：下载中..."
-                UpdateStatus.DOWNLOADED -> "状态：下载完成"
-                UpdateStatus.INSTALLING -> "状态：安装中..."
-                UpdateStatus.INSTALLED -> "状态：安装完成"
-                UpdateStatus.UP_TO_DATE -> "状态：已是最新版本"
-                UpdateStatus.ERROR -> "状态：操作失败 - 可重新尝试"
-            }
+            refreshStatusLabelText()
+            refreshAllTexts()
             
             // 注意：不在这里自动启动更新服务
             // 自动更新服务只应该通过用户手动操作或定时任务触发
@@ -702,7 +776,11 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             checkUpdateButton.isEnabled = true // 默认启用按钮
             downloadUpdateButton.isVisible = false // 默认隐藏
             installUpdateButton.isVisible = false // 默认隐藏
-            updateStatusLabel.text = "状态：未检查"
+            currentUpdateStatus = UpdateStatus.IDLE
+            currentProgressMessage = null
+            currentProgressValue = null
+            currentErrorMessage = null
+            refreshStatusLabelText()
         }
     }
     
@@ -711,7 +789,11 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
      */
     private fun checkForUpdatesManually() {
         checkUpdateButton.isEnabled = false
-        updateStatusLabel.text = "状态：检查中..."
+        currentUpdateStatus = UpdateStatus.CHECKING
+        currentProgressMessage = null
+        currentProgressValue = null
+        currentErrorMessage = null
+        refreshStatusLabelText()
         
         // 使用协程在后台执行更新检查
         coroutineScope.launch {
@@ -726,7 +808,11 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                         else -> "检查更新失败: ${e.message}"
                     }
                     
-                    updateStatusLabel.text = "状态：检查失败 - $errorMessage"
+                    currentUpdateStatus = UpdateStatus.ERROR
+                    currentErrorMessage = errorMessage
+                    currentProgressMessage = null
+                    currentProgressValue = null
+                    refreshStatusLabelText()
                     checkUpdateButton.isEnabled = true
                     
                     // 显示详细的错误对话框，并提供重试选项
@@ -736,10 +822,10 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                         "2. 确认防火墙未阻止网络访问\n" +
                         "3. 稍后重试检查更新\n" +
                         "4. 如问题持续，请联系技术支持\n\n" +
-                        "是否立即重试检查更新？",
-                        "检查更新失败",
-                        "重试",
-                        "取消",
+                        I18n.t("update.retry.prompt"),
+                        I18n.t("update.check.fail.title"),
+                        I18n.t("update.retry"),
+                        I18n.t("action.cancel"),
                         Messages.getQuestionIcon()
                     )
                     
@@ -758,46 +844,61 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private fun downloadUpdateManually() {
         val updateInfo = currentUpdateInfo
         if (updateInfo == null) {
-            Messages.showErrorDialog(this, "没有可用的更新信息", "下载失败")
+            Messages.showErrorDialog(this, I18n.t("update.no.info"), I18n.t("update.download.fail"))
             return
         }
         
         downloadUpdateButton.isEnabled = false
-        updateStatusLabel.text = "状态：准备下载..."
+        currentUpdateStatus = UpdateStatus.DOWNLOADING
+        currentProgressMessage = null
+        currentProgressValue = null
+        currentErrorMessage = null
+        refreshStatusLabelText()
         
         // 使用协程在后台执行下载
         downloadJob = coroutineScope.launch {
             try {
                 val success = autoUpdateService.downloadUpdate(updateInfo) { progress ->
                     SwingUtilities.invokeLater {
-                        updateStatusLabel.text = "状态：下载中... $progress%"
+                        currentProgressMessage = I18n.t("status.downloading")
+                        currentProgressValue = progress
+                        currentErrorMessage = null
+                        refreshStatusLabelText()
                     }
                 }
                 
                 if (!success) {
                     SwingUtilities.invokeLater {
-                        Messages.showErrorDialog(this@SystemManagementPanel, "下载失败，请检查网络连接", "下载失败")
+                        Messages.showErrorDialog(this@SystemManagementPanel, I18n.t("update.download.fail.network"), I18n.t("update.download.fail"))
                         // 下载失败时，恢复按钮状态，允许用户重新尝试
                         downloadUpdateButton.isEnabled = true
                         checkUpdateButton.isEnabled = true
-                        updateStatusLabel.text = "状态：下载失败 - 请重新检查更新或重试下载"
+                        currentUpdateStatus = UpdateStatus.ERROR
+                        currentErrorMessage = I18n.t("update.download.fail.status")
+                        currentProgressMessage = null
+                        currentProgressValue = null
+                        refreshStatusLabelText()
                     }
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {
                     val errorMessage = when (e) {
-                        is java.util.concurrent.CancellationException -> "下载已取消"
-                        is java.net.UnknownHostException -> "网络连接失败，请检查网络连接"
-                        is java.net.SocketTimeoutException -> "连接超时，请稍后重试"
-                        is java.net.ConnectException -> "无法连接到下载服务器"
-                        else -> "下载失败: ${e.message}"
+                        is java.util.concurrent.CancellationException -> I18n.t("update.download.canceled")
+                        is java.net.UnknownHostException -> I18n.t("network.fail")
+                        is java.net.SocketTimeoutException -> I18n.t("network.timeout")
+                        is java.net.ConnectException -> I18n.t("network.connect.fail")
+                        else -> MessageFormat.format(I18n.t("update.download.fail.msg"), e.message ?: "")
                     }
                     
-                    Messages.showErrorDialog(this@SystemManagementPanel, errorMessage, "下载失败")
+                    Messages.showErrorDialog(this@SystemManagementPanel, errorMessage, I18n.t("update.download.fail"))
                     // 下载异常时，恢复按钮状态，允许用户重新尝试
                     downloadUpdateButton.isEnabled = true
                     checkUpdateButton.isEnabled = true
-                    updateStatusLabel.text = "状态：下载失败 - $errorMessage"
+                    currentUpdateStatus = UpdateStatus.ERROR
+                    currentErrorMessage = errorMessage
+                    currentProgressMessage = null
+                    currentProgressValue = null
+                    refreshStatusLabelText()
                 }
             } finally {
                 downloadJob = null
@@ -811,17 +912,17 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
     private fun installUpdateManually() {
         val updateInfo = currentUpdateInfo
         if (updateInfo == null) {
-            Messages.showErrorDialog(this, "没有可用的更新信息", "安装失败")
+            Messages.showErrorDialog(this, I18n.t("update.no.info"), I18n.t("update.install.fail"))
             return
         }
         
         // 确认安装对话框
         val result = Messages.showOkCancelDialog(
             this,
-            "确定要安装更新到版本 ${updateInfo.version} 吗？\n安装完成后需要重启 IntelliJ IDEA。",
-            "确认安装更新",
-            "安装",
-            "取消",
+            MessageFormat.format(I18n.t("update.install.confirm"), updateInfo.version),
+            I18n.t("update.install.confirm.title"),
+            I18n.t("update.install"),
+            I18n.t("action.cancel"),
             Messages.getQuestionIcon()
         )
         
@@ -830,7 +931,11 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         }
         
         installUpdateButton.isEnabled = false
-        updateStatusLabel.text = "状态：准备安装..."
+        currentUpdateStatus = UpdateStatus.INSTALLING
+        currentProgressMessage = null
+        currentProgressValue = null
+        currentErrorMessage = null
+        refreshStatusLabelText()
         
         // 使用协程在后台执行安装
         coroutineScope.launch {
@@ -841,17 +946,17 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
                     if (success) {
                         Messages.showInfoMessage(
                             this@SystemManagementPanel,
-                            "更新安装完成！请重启 IntelliJ IDEA 以使用新版本。",
-                            "安装完成"
+                            I18n.t("update.install.done.msg"),
+                            I18n.t("update.install.done.title")
                         )
                     } else {
-                        Messages.showErrorDialog(this@SystemManagementPanel, "安装失败，请稍后重试", "安装失败")
+                        Messages.showErrorDialog(this@SystemManagementPanel, I18n.t("update.install.fail.retry"), I18n.t("update.install.fail"))
                         installUpdateButton.isEnabled = true
                     }
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {
-                    Messages.showErrorDialog(this@SystemManagementPanel, "安装失败: ${e.message}", "安装失败")
+                    Messages.showErrorDialog(this@SystemManagementPanel, MessageFormat.format(I18n.t("update.install.fail.msg"), e.message ?: ""), I18n.t("update.install.fail"))
                     installUpdateButton.isEnabled = true
                 }
             }
@@ -878,27 +983,31 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
             SwingUtilities.invokeLater {
                 downloadUpdateButton.isEnabled = true
                 checkUpdateButton.isEnabled = true
-                updateStatusLabel.text = "状态：下载已取消 - 可重新尝试"
+                currentUpdateStatus = UpdateStatus.ERROR
+                currentErrorMessage = I18n.t("update.download.canceled.status")
+                currentProgressMessage = null
+                currentProgressValue = null
+                refreshStatusLabelText()
             }
             
             if (success) {
                 Messages.showInfoMessage(
                     this,
-                    "下载已取消",
-                    "取消下载"
+                    I18n.t("update.download.canceled"),
+                    I18n.t("update.cancel")
                 )
             } else {
                 Messages.showWarningDialog(
                     this,
-                    "没有正在进行的下载任务",
-                    "取消下载"
+                    I18n.t("update.download.none"),
+                    I18n.t("update.cancel")
                 )
             }
         } catch (e: Exception) {
             Messages.showErrorDialog(
                 this,
-                "取消下载失败: ${e.message}",
-                "取消下载失败"
+                MessageFormat.format(I18n.t("update.cancel.fail.msg"), e.message ?: ""),
+                I18n.t("update.cancel.fail.title")
             )
         }
     }
@@ -949,10 +1058,175 @@ class SystemManagementPanel(private val project: Project) : JPanel(BorderLayout(
         }
     }
 
+    private fun setupLanguageChangeListener() {
+        LanguageManager.addChangeListener(languageChangeListener)
+    }
+    
+    private fun refreshAllTexts() {
+        // 刷新标题
+        systemTitleLabel.text = I18n.t("header.systemSettings")
+        
+        // 刷新面板边框标题
+        logInfoPanel.border = TitledBorder(I18n.t("log.info"))
+        logConfigPanel.border = TitledBorder(I18n.t("log.config"))
+        cacheSettingsPanel.border = TitledBorder(I18n.t("cache.settings"))
+        updateSettingsPanel.border = TitledBorder(I18n.t("update.settings"))
+        languageSettingsPanel.border = TitledBorder(I18n.t("language.display"))
+        
+        // 刷新按钮文本
+        checkUpdateButton.text = I18n.t("update.check.now")
+        downloadUpdateButton.text = I18n.t("update.download")
+        cancelDownloadButton.text = I18n.t("update.cancel")
+        installUpdateButton.text = I18n.t("update.install")
+        clearCacheButton.text = I18n.t("cache.clear")
+        openFolderButton.text = I18n.t("log.open")
+        clearLogButton.text = I18n.t("log.clear")
+        
+        // 刷新复选框文本
+        enableAutoUpdateCheckBox.text = I18n.t("update.enable.auto")
+        enableCacheCheckBox.text = I18n.t("cache.enable")
+        autoCleanCheckBox.text = I18n.t("log.auto.clean")
+        logSensitiveDataCheckBox.text = I18n.t("log.record.calls")
+        
+        // 刷新语言选项文本
+        languageZhRadio.text = I18n.t("language.zh")
+        languageEnRadio.text = I18n.t("language.en")
+        
+        // 刷新静态标签文本
+        logPathStaticLabel.text = I18n.t("log.path")
+        logSizeStaticLabel.text = I18n.t("log.size")
+        logCountStaticLabel.text = I18n.t("log.count")
+        logRetentionStaticLabel.text = I18n.t("log.retention")
+        logDaysStaticLabel.text = I18n.t("log.days")
+        cacheTtlStaticLabel.text = I18n.t("cache.ttl")
+        updateFrequencyStaticLabel.text = I18n.t("update.frequency")
+        languageDisplayStaticLabel.text = I18n.t("language.display.label")
+        
+        // 刷新下拉框选项
+        val currentIndex = updateIntervalComboBox.selectedIndex
+        updateIntervalComboBox.removeAllItems()
+        updateIntervalComboBox.addItem(I18n.t("update.daily"))
+        updateIntervalComboBox.addItem(I18n.t("update.weekly"))
+        updateIntervalComboBox.addItem(I18n.t("update.monthly"))
+        updateIntervalComboBox.selectedIndex = currentIndex
+        
+        refreshStatusLabelText()
+
+        // 重新布局
+        revalidate()
+        repaint()
+    }
+
+    private fun refreshStatusLabelText() {
+        if (!::updateStatusLabel.isInitialized) {
+            return
+        }
+
+        val newText = when {
+            currentErrorMessage != null -> MessageFormat.format(I18n.t("status.error.details"), currentErrorMessage)
+            currentProgressMessage != null -> {
+                val baseMessage = currentProgressMessage!!
+                val progressValue = currentProgressValue
+                val hasStatusPrefix = baseMessage.startsWith("Status:") || baseMessage.startsWith("状态：")
+                val progressSuffix = progressValue?.takeIf { it > 0 }?.let { "${it}%" }
+
+                when {
+                    hasStatusPrefix && progressSuffix != null -> "$baseMessage ${progressSuffix}"
+                    hasStatusPrefix -> baseMessage
+                    progressSuffix != null -> MessageFormat.format(I18n.t("status.progress"), baseMessage, progressSuffix)
+                    else -> MessageFormat.format(I18n.t("status.progress"), baseMessage, "")
+                }
+            }
+            else -> when (currentUpdateStatus) {
+                UpdateStatus.IDLE -> I18n.t("status.idle")
+                UpdateStatus.CHECKING -> I18n.t("status.checking")
+                UpdateStatus.AVAILABLE -> MessageFormat.format(I18n.t("status.available"), currentUpdateInfo?.version ?: "")
+                UpdateStatus.DOWNLOADING -> I18n.t("status.downloading")
+                UpdateStatus.DOWNLOADED -> I18n.t("status.downloaded")
+                UpdateStatus.INSTALLING -> I18n.t("status.installing")
+                UpdateStatus.INSTALLED -> I18n.t("status.installed")
+                UpdateStatus.UP_TO_DATE -> I18n.t("status.up_to_date")
+                UpdateStatus.ERROR -> I18n.t("status.error")
+            }
+        }
+
+        updateStatusLabel.text = newText
+    }
+    
+    private fun createLanguageSettingsPanel(): JPanel {
+        val panel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
+        panel.border = TitledBorder(I18n.t("language.display"))
+
+        languageZhRadio = JRadioButton(I18n.t("language.zh"))
+        languageEnRadio = JRadioButton(I18n.t("language.en"))
+
+        languageButtonGroup = ButtonGroup()
+        languageButtonGroup.add(languageZhRadio)
+        languageButtonGroup.add(languageEnRadio)
+
+        // 切换语言后实时刷新部分文案并立即保存
+        val onChange: () -> Unit = onChange@{
+            val code = when {
+                languageZhRadio.isSelected -> "zh_CN"
+                languageEnRadio.isSelected -> "en_US"
+                else -> LanguageManager.getLanguageCode()
+            }
+
+            if (code == LanguageManager.getLanguageCode()) {
+                return@onChange
+            }
+
+            SwingUtilities.invokeLater {
+                LanguageManager.setLanguage(code)
+                refreshAllTexts()
+                try {
+                    val currentSettings = configurationService.getGlobalSettings()
+                    val newSettings = GlobalSettings(
+                        enableLogging = currentSettings.enableLogging,
+                        logLevel = currentSettings.logLevel,
+                        connectionTimeoutMs = currentSettings.connectionTimeoutMs,
+                        readTimeoutMs = currentSettings.readTimeoutMs,
+                        retryAttempts = currentSettings.retryAttempts,
+                        retryDelayMs = currentSettings.retryDelayMs,
+                        enableAutoUpdate = currentSettings.enableAutoUpdate,
+                        updateInterval = currentSettings.updateInterval,
+                        updateCheckIntervalHours = currentSettings.updateCheckIntervalHours,
+                        lastUpdateCheckTime = currentSettings.lastUpdateCheckTime,
+                        enableCache = currentSettings.enableCache,
+                        cacheDefaultTtlMinutes = currentSettings.cacheDefaultTtlMinutes,
+                        displayLanguage = code
+                    )
+                    configurationService.updateGlobalSettings(newSettings)
+
+                    kotlin.runCatching {
+                        val commitSettings = configurationService.getCommitSettings()
+                        val normalized = CommitSettings.normalizeTemplates(commitSettings)
+                        if (normalized != commitSettings) {
+                            configurationService.saveCommitSettings(normalized)
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        languageZhRadio.addActionListener { onChange() }
+        languageEnRadio.addActionListener { onChange() }
+
+        languageDisplayStaticLabel = JBLabel(I18n.t("language.display.label"))
+        panel.add(languageDisplayStaticLabel)
+        panel.add(languageZhRadio)
+        panel.add(languageEnRadio)
+        return panel
+    }
+
     /**
      * 清理资源，取消所有正在运行的协程
      */
     fun dispose() {
+        // 移除语言变化监听器
+        LanguageManager.removeChangeListener(languageChangeListener)
+
         // 如果有正在进行的下载，先取消下载
         downloadJob?.let { job ->
             if (job.isActive) {

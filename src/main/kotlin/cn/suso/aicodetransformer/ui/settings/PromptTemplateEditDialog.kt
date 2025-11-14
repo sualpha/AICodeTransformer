@@ -1,5 +1,7 @@
 package cn.suso.aicodetransformer.ui.settings
 
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import cn.suso.aicodetransformer.model.PromptTemplate
 import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
@@ -14,6 +16,7 @@ import javax.swing.Action
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
+import javax.swing.SwingUtilities
 
 /**
  * Prompt模板编辑对话框
@@ -28,21 +31,32 @@ class PromptTemplateEditDialog(
     private val editPanel = PromptTemplateEditPanel()
     
     private var result: PromptTemplate? = null
-    
+
+    private val applyButton = JButton()
+    private val okButton = JButton()
+    private val cancelButton = JButton()
+
+    private val languageListener: () -> Unit = {
+        SwingUtilities.invokeLater {
+            if (!isDisposed) {
+                refreshTexts()
+            }
+        }
+    }
+
     init {
-        title = if (template != null) "编辑模板" else "创建模板"
-        setOKButtonText("确认")
-        setCancelButtonText("取消")
-        
         editPanel.setTemplate(template)
-        
+
         // 根据模板类型设置可用变量
         setAvailableVariablesForTemplate(template)
-        
+
         init()
-        
+
         // 设置对话框大小
         setSize(800, 600)
+
+        refreshTexts()
+        LanguageManager.addChangeListener(languageListener)
     }
     
     override fun createCenterPanel(): JComponent {
@@ -52,34 +66,31 @@ class PromptTemplateEditDialog(
     
     override fun createSouthPanel(): JComponent {
         val panel = JPanel(FlowLayout(FlowLayout.LEFT))
-        
+
         // 创建应用按钮
-        val applyButton = JButton("应用")
         applyButton.addActionListener {
             if (doValidate() == null) {
                 doApplyAction()
             }
         }
-        
+
         // 创建确认按钮
-        val okButton = JButton("确认")
         okButton.addActionListener {
             doOKAction()
         }
-        
+
         // 创建取消按钮
-        val cancelButton = JButton("取消")
         cancelButton.addActionListener {
             doCancelAction()
         }
-        
+
         panel.add(applyButton)
         panel.add(okButton)
         panel.add(cancelButton)
-        
+
         return panel
     }
-    
+
     private fun doApplyAction() {
         val templateFromFields = editPanel.createTemplateFromFields()
         if (templateFromFields != null) {
@@ -90,36 +101,36 @@ class PromptTemplateEditDialog(
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     contentPanel,
-                    "保存模板失败: ${e.message}",
-                    "保存失败"
+                    I18n.t("prompt.dialog.save.error.message", e.message ?: ""),
+                    I18n.t("prompt.dialog.save.error.title")
                 )
             }
         }
     }
-    
+
     override fun doValidate(): ValidationInfo? {
         // 验证模板名称
         val templateFromFields = editPanel.createTemplateFromFields()
         if (templateFromFields == null) {
-            return ValidationInfo("模板名称不能为空")
+            return ValidationInfo(I18n.t("prompt.validation.name.required"))
         }
-        
+
         // 验证模板内容
         if (templateFromFields.content.isBlank()) {
-            return ValidationInfo("模板内容不能为空")
+            return ValidationInfo(I18n.t("prompt.validation.content.required"))
         }
-        
+
         // 验证快捷键格式
         val shortcutKey = templateFromFields.shortcutKey
         if (!shortcutKey.isNullOrBlank()) {
             if (!isValidShortcutKey(shortcutKey)) {
-                return ValidationInfo("快捷键格式不正确，请使用如 Ctrl+Alt+T 的格式")
+                return ValidationInfo(I18n.t("prompt.validation.shortcut.invalid"))
             }
             
             // 检查快捷键是否已被使用
             val existingTemplate = templateService.getTemplateByShortcut(shortcutKey)
             if (existingTemplate != null && existingTemplate.id != templateFromFields.id) {
-                return ValidationInfo("快捷键已被模板 '${existingTemplate.name}' 使用")
+                return ValidationInfo(I18n.t("prompt.validation.shortcut.duplicate", existingTemplate.name))
             }
         }
         
@@ -129,17 +140,18 @@ class PromptTemplateEditDialog(
             it.name == templateFromFields.name && it.id != templateFromFields.id 
         }
         if (duplicateName != null) {
-            return ValidationInfo("模板名称已存在")
+            return ValidationInfo(I18n.t("prompt.validation.name.duplicate"))
         }
         
         // 验证模板变量
         val variableErrors = (templateService as PromptTemplateServiceImpl).validateTemplateVariables(templateFromFields)
         if (variableErrors.isNotEmpty()) {
-            return ValidationInfo("模板变量验证失败: ${variableErrors.first()}")
+            return ValidationInfo(I18n.t("prompt.validation.variables.failed", variableErrors.first()))
         }
         
         return null
     }
+
     
     override fun doOKAction() {
         val templateFromFields = editPanel.createTemplateFromFields()
@@ -151,22 +163,22 @@ class PromptTemplateEditDialog(
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     contentPanel,
-                    "保存模板失败: ${e.message}",
-                    "保存失败"
+                    I18n.t("prompt.dialog.save.error.message", e.message ?: ""),
+                    I18n.t("prompt.dialog.save.error.title")
                 )
             }
         }
     }
-    
+
     override fun doCancelAction() {
         if (editPanel.isModified()) {
             val result = Messages.showYesNoCancelDialog(
                 contentPanel,
-                "模板已修改，是否保存更改？",
-                "确认关闭",
-                "保存",
-                "不保存",
-                "取消",
+                I18n.t("prompt.dialog.confirm.close.message"),
+                I18n.t("prompt.dialog.confirm.close.title"),
+                I18n.t("prompt.dialog.confirm.close.save"),
+                I18n.t("prompt.dialog.confirm.close.discard"),
+                I18n.t("prompt.dialog.confirm.close.cancel"),
                 Messages.getQuestionIcon()
             )
             
@@ -186,7 +198,7 @@ class PromptTemplateEditDialog(
             super.doCancelAction()
         }
     }
-    
+
     /**
      * 验证快捷键格式
      */
@@ -195,7 +207,28 @@ class PromptTemplateEditDialog(
         val pattern = Regex("^(Ctrl|Alt|Shift|Meta)(\\+(Ctrl|Alt|Shift|Meta))*\\+[A-Za-z0-9]$")
         return pattern.matches(shortcutKey)
     }
-    
+
+    private fun refreshTexts() {
+        title = if (template != null) {
+            I18n.t("prompt.dialog.edit.title")
+        } else {
+            I18n.t("prompt.dialog.create.title")
+        }
+
+        setOKButtonText(I18n.t("prompt.dialog.button.ok"))
+        setCancelButtonText(I18n.t("prompt.dialog.button.cancel"))
+
+        applyButton.text = I18n.t("prompt.dialog.button.apply")
+        okButton.text = I18n.t("prompt.dialog.button.ok")
+        cancelButton.text = I18n.t("prompt.dialog.button.cancel")
+
+        getOKAction().putValue(Action.NAME, I18n.t("prompt.dialog.button.ok"))
+        getCancelAction().putValue(Action.NAME, I18n.t("prompt.dialog.button.cancel"))
+
+        setAvailableVariablesForTemplate(template)
+        editPanel.refreshTexts()
+    }
+
     /**
      * 获取编辑结果
      */
@@ -205,20 +238,24 @@ class PromptTemplateEditDialog(
       * 根据模板类型设置可用变量
       */
      private fun setAvailableVariablesForTemplate(template: PromptTemplate?) {
-          val availableVariables = when {
-                // 如果是提交相关的模板，只显示Git相关的变量
-                template?.tags?.contains("commit") == true ||
-                template?.tags?.contains("git") == true ||
-                template?.category == "GIT_OPERATIONS" ||
-                defaultCategory == "GIT_OPERATIONS" -> {
-                    TemplateConstants.GitBuiltInVariable.values().map { it.variable to it.description }
-                }
-                // 其他情况显示模板变量
-                else -> TemplateConstants.TemplateBuiltInVariable.values().map { it.variable to it.description }
-            }
-          
-          editPanel.setAvailableVariables(availableVariables)
-      }
+        val isGitRelated = sequenceOf(
+            template?.id,
+            template?.name,
+            template?.category,
+            defaultCategory
+        ).filterNotNull().any { value ->
+            value.contains("commit", ignoreCase = true) ||
+                value.contains("git", ignoreCase = true)
+        }
+
+        val availableVariables = if (isGitRelated) {
+            TemplateConstants.GitBuiltInVariable.values().map { it.variable to it.description }
+        } else {
+            TemplateConstants.TemplateBuiltInVariable.values().map { it.variable to it.description }
+        }
+
+        editPanel.setAvailableVariables(availableVariables)
+    }
     
     companion object {
         /**
@@ -244,5 +281,11 @@ class PromptTemplateEditDialog(
                 null
             }
         }
+    }
+
+    override fun dispose() {
+        editPanel.dispose()
+        LanguageManager.removeChangeListener(languageListener)
+        super.dispose()
     }
 }

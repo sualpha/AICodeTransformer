@@ -1,10 +1,13 @@
 package cn.suso.aicodetransformer.service.impl
 
+import cn.suso.aicodetransformer.constants.TemplateConstants
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import cn.suso.aicodetransformer.model.*
 import cn.suso.aicodetransformer.service.ErrorHandlingService
 import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.TemplateChangeListener
 import cn.suso.aicodetransformer.service.TemplateVariableResolver
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
@@ -32,7 +35,7 @@ import kotlin.concurrent.write
     name = "AICodeTransformerTemplates",
     storages = [Storage("aicodetransformer-templates.xml")]
 )
-class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponent<PromptTemplateState> {
+class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponent<PromptTemplateState>, Disposable {
     
     companion object {
         fun getInstance(): PromptTemplateService = service<PromptTemplateService>()
@@ -50,6 +53,10 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
     private val usageStats = ConcurrentHashMap<String, Int>()
     private val lock = ReentrantReadWriteLock()
     private var state = PromptTemplateState()
+    private val languageListener: () -> Unit = {
+        initializeDefaultTemplates()
+        forceSaveState()
+    }
     
 
     
@@ -101,12 +108,9 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 this.state.usageStatistics.clear()
                 this.usageStats.clear()
             }
-            
-            // 确保有默认模板
-            if (this.state.templates.isEmpty()) {
-                initializeDefaultTemplates()
-            }
         }
+        initializeDefaultTemplates()
+        LanguageManager.addChangeListener(languageListener)
     }
     
     override fun getTemplates(): List<PromptTemplate> {
@@ -290,13 +294,6 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 }
             }
             
-            // 验证标签
-            for (tag in template.tags) {
-                if (tag.isBlank() || tag.length > 20) {
-                    return "标签不能为空且长度不能超过20个字符"
-                }
-            }
-            
             if (!template.isValid()) {
                 return "模板格式不正确"
             }
@@ -449,8 +446,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 it.name.lowercase().contains(lowerKeyword) ||
                 it.content.lowercase().contains(lowerKeyword) ||
                 it.description?.lowercase()?.contains(lowerKeyword) == true ||
-                it.category.lowercase().contains(lowerKeyword) == true ||
-                it.tags.any { tag -> tag.lowercase().contains(lowerKeyword) }
+                it.category.lowercase().contains(lowerKeyword) == true
             }
         }
     }
@@ -477,14 +473,39 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
      * 初始化默认模板
      */
     private fun initializeDefaultTemplates() {
-        val defaultTemplates = getDefaultTemplates()
-        defaultTemplates.forEach { template ->
-            if (state.templates.none { it.id == template.id }) {
-                state.templates.add(template)
-                logger.debug("添加默认模板: ${template.name}")
+        lock.write {
+            val builtInConfigs = TemplateConstants.TemplateConfig.getBuiltInTemplates()
+            builtInConfigs.forEach { config ->
+                val existingIndex = state.templates.indexOfFirst { it.id == config.id }
+                if (existingIndex >= 0) {
+                    val existing = state.templates[existingIndex]
+                    val updated = existing.copy(
+                        name = config.displayName,
+                        description = config.description,
+                        content = config.content,
+                        category = config.category.displayName
+                    )
+                    state.templates[existingIndex] = updated
+                    listeners.forEach { it.onTemplateUpdated(existing, updated) }
+                } else {
+                    val template = PromptTemplate(
+                        id = config.id,
+                        name = config.displayName,
+                        description = config.description,
+                        content = config.content,
+                        category = config.category.displayName,
+                        isBuiltIn = config.isBuiltIn
+                    )
+                    state.templates.add(template)
+                    listeners.forEach { it.onTemplateAdded(template) }
+                }
             }
         }
-        logger.info("默认模板初始化完成，共加载 ${defaultTemplates.size} 个模板")
+        logger.info("默认模板初始化完成，共加载 ${getDefaultTemplates().size} 个模板")
+    }
+
+    override fun dispose() {
+        LanguageManager.removeChangeListener(languageListener)
     }
     
     /**
@@ -541,24 +562,6 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
     fun getTemplatesByCategory(category: String): List<PromptTemplate> {
         return lock.read {
             state.templates.filter { it.category == category }
-        }
-    }
-    
-    /**
-     * 获取所有标签
-     */
-    fun getAllTags(): List<String> {
-        return lock.read {
-            state.templates.flatMap { it.tags }.distinct().sorted()
-        }
-    }
-    
-    /**
-     * 根据标签获取模板
-     */
-    fun getTemplatesByTag(tag: String): List<PromptTemplate> {
-        return lock.read {
-            state.templates.filter { tag in it.tags }
         }
     }
     

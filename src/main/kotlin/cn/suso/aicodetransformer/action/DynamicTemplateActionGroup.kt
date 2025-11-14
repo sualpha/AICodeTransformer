@@ -4,6 +4,8 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import cn.suso.aicodetransformer.service.PromptTemplateService
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.model.TemplateCategory
 import cn.suso.aicodetransformer.service.ActionService
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
 
@@ -34,7 +36,14 @@ class DynamicTemplateActionGroup : ActionGroup() {
             val actions = mutableListOf<AnAction>()
             
             // 按分类分组
-            val templatesByCategory = enabledTemplates.groupBy { it.category.ifEmpty { "其他" } }
+            val templatesByCategory = enabledTemplates.groupBy { template ->
+                val categoryKey = TemplateCategory.fromDisplayName(template.category)?.name
+                if (categoryKey != null) {
+                    I18n.t("template.category.${categoryKey.lowercase()}.name")
+                } else {
+                    template.category.ifEmpty { I18n.t("template.category.other") }
+                }
+            }
             
             templatesByCategory.forEach { (category, templates) ->
                 if (templatesByCategory.size > 1) {
@@ -78,9 +87,9 @@ class DynamicTemplateActionGroup : ActionGroup() {
         // 更新菜单文本
         val templateCount = promptTemplateService.getEnabledTemplates().size
         e.presentation.text = if (templateCount > 0) {
-            "AI代码转换 ($templateCount 个模板)"
+            I18n.t("template.dynamic.group.title.count", templateCount)
         } else {
-            "AI代码转换 (无可用模板)"
+            I18n.t("template.dynamic.group.title.empty")
         }
     }
     
@@ -88,7 +97,7 @@ class DynamicTemplateActionGroup : ActionGroup() {
      * 创建"无模板"提示动作
      */
     private fun createNoTemplatesAction(): AnAction {
-        return object : AnAction("无可用模板", "请在设置中创建并启用模板", null) {
+        return object : AnAction(I18n.t("template.dynamic.group.empty"), I18n.t("template.dynamic.group.empty.desc"), null) {
             override fun getActionUpdateThread(): ActionUpdateThread {
                 return ActionUpdateThread.BGT
             }
@@ -98,7 +107,7 @@ class DynamicTemplateActionGroup : ActionGroup() {
                 val project = e.project
                 if (project != null) {
                     com.intellij.openapi.options.ShowSettingsUtil.getInstance()
-                        .showSettingsDialog(project, "AI Code Transformer")
+                        .showSettingsDialog(project, I18n.t("settings.title"))
                 }
             }
             
@@ -112,7 +121,7 @@ class DynamicTemplateActionGroup : ActionGroup() {
      * 创建错误提示动作
      */
     private fun createErrorAction(errorMessage: String): AnAction {
-        return object : AnAction("加载模板失败", errorMessage, null) {
+        return object : AnAction(I18n.t("template.dynamic.group.error"), errorMessage, null) {
             override fun getActionUpdateThread(): ActionUpdateThread {
                 return ActionUpdateThread.BGT
             }

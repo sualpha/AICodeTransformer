@@ -3,9 +3,13 @@ package cn.suso.aicodetransformer.service.impl
 import cn.suso.aicodetransformer.constants.DownloadState
 import cn.suso.aicodetransformer.constants.UpdateRecordStatusConstants
 import cn.suso.aicodetransformer.constants.UpdateStatus
+import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.model.BackupInfo
 import cn.suso.aicodetransformer.model.UpdateInfo
 import cn.suso.aicodetransformer.model.UpdateRecord
+import cn.suso.aicodetransformer.service.AutoUpdateService
+import cn.suso.aicodetransformer.service.LoggingService
+import cn.suso.aicodetransformer.service.UpdateStatusListener
 import cn.suso.aicodetransformer.service.*
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -19,8 +23,8 @@ import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import java.net.URL
 import java.security.MessageDigest
+import java.text.MessageFormat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -140,7 +144,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         return withContext(Dispatchers.IO) {
             try {
                 updateStatus(UpdateStatus.CHECKING)
-                notifyProgress(0, "正在检查更新...")
+                notifyProgress(0, I18n.t("status.checking"))
                 
                 logger.info("开始检查更新")
                 
@@ -151,18 +155,18 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     val currentVersion = getCurrentVersion()
                     if (isNewerVersion(updateInfo.version, currentVersion)) {
                         updateStatus(UpdateStatus.AVAILABLE, updateInfo)
-                        notifyProgress(100, "发现新版本: ${updateInfo.version}")
+                        notifyProgress(100, MessageFormat.format(I18n.t("status.available"), updateInfo.version))
                         logger.info("发现新版本: ${updateInfo.version}")
                         return@withContext updateInfo
                     } else {
                         updateStatus(UpdateStatus.UP_TO_DATE)
-                        notifyProgress(100, "已是最新版本")
+                        notifyProgress(100, I18n.t("status.up_to_date"))
                         logger.info("当前已是最新版本")
                         return@withContext null
                     }
                 } else {
                     updateStatus(UpdateStatus.UP_TO_DATE)
-                    notifyProgress(100, "检查完成，已是最新版本")
+                    notifyProgress(100, I18n.t("status.up_to_date"))
                     return@withContext null
                 }
                 
@@ -192,7 +196,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             
             try {
                 updateStatus(UpdateStatus.DOWNLOADING, updateInfo)
-                notifyProgress(0, "开始下载更新...")
+                notifyProgress(0, I18n.t("status.downloading"))
                 
                 logger.info("开始下载更新: ${updateInfo.version}")
 
@@ -216,11 +220,11 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 
                 // 检查是否已存在完整的下载文件
                 if (downloadFile.exists()) {
-                    notifyProgress(50, "检查已下载文件...")
+                    notifyProgress(50, I18n.t("update.download.existing"))
                     val existingChecksum = calculateChecksum(downloadFile)
                     if (existingChecksum == updateInfo.checksum && updateInfo.checksum.isNotEmpty()) {
                         updateStatus(UpdateStatus.DOWNLOADED, updateInfo)
-                        notifyProgress(100, "文件已存在，跳过下载")
+                        notifyProgress(100, I18n.t("update.download.skip"))
                         logger.info("文件已存在且校验通过，跳过下载: ${downloadFile.absolutePath}")
                         return@withContext true
                     } else {
@@ -247,13 +251,13 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 if (success) {
                     // 更新状态为校验中
                     updateDownloadState(DownloadState.VERIFYING, "验证文件完整性")
-                    notifyProgress(90, "验证文件完整性...")
+                    notifyProgress(90, I18n.t("update.download.verify"))
                     val verificationResult = verifyFileIntegrity(downloadFile, updateInfo.checksum)
                     
                     if (verificationResult) {
                         updateDownloadState(DownloadState.COMPLETED, "下载并校验完成")
                         updateStatus(UpdateStatus.DOWNLOADED, updateInfo)
-                        notifyProgress(100, "下载完成")
+                        notifyProgress(100, I18n.t("status.downloaded"))
                         logger.info("更新下载完成: ${downloadFile.absolutePath}")
                         true
                     } else {
@@ -336,7 +340,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         return withContext(Dispatchers.IO) {
             try {
                 updateStatus(UpdateStatus.INSTALLING, updateInfo)
-                notifyProgress(0, "准备安装更新...")
+                notifyProgress(0, I18n.t("update.install.preparing"))
                 
                 logger.info("开始安装更新: ${updateInfo.version}")
                 
@@ -357,7 +361,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     throw Exception("更新文件不存在: ${downloadedFile.absolutePath}")
                 }
                 
-                notifyProgress(10, "验证更新文件...")
+                notifyProgress(10, I18n.t("update.install.verify.file"))
                 
                 // 2. 验证文件完整性
                 if (updateInfo.checksum.isNotEmpty()) {
@@ -382,7 +386,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     logger.info("文件基本完整性检查通过（未提供校验和）")
                 }
                 
-                notifyProgress(20, "准备安装环境...")
+                notifyProgress(20, I18n.t("update.install.prepare.env"))
                 
                 // 3. 获取当前插件路径
                 val currentPluginPath = getCurrentPluginPath()
@@ -390,25 +394,25 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     throw Exception("无法确定当前插件路径")
                 }
                 
-                notifyProgress(30, "备份当前插件...")
+                notifyProgress(30, I18n.t("update.install.backup"))
                 
                 // 4. 备份当前插件
                 val backupFile = createBackup(currentPluginPath)
                 
-                notifyProgress(50, "安装新版本...")
+                notifyProgress(50, I18n.t("update.install.copy"))
                 
                 try {
                     // 5. 复制新版本到插件目录
                     installNewVersion(downloadedFile, currentPluginPath)
                     
-                    notifyProgress(80, "验证安装...")
+                    notifyProgress(80, I18n.t("update.install.verify"))
                     
                     // 6. 验证安装是否成功
                     if (!verifyInstallation(currentPluginPath)) {
                         throw Exception("安装验证失败")
                     }
                     
-                    notifyProgress(90, "清理临时文件...")
+                    notifyProgress(90, I18n.t("update.install.cleanup"))
                     
                     // 7. 清理下载的临时文件
                     downloadedFile.delete()
@@ -417,7 +421,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     recordUpdateHistory(updateInfo, UpdateRecordStatusConstants.SUCCESS)
                     
                     updateStatus(UpdateStatus.INSTALLED, updateInfo)
-                    notifyProgress(100, "安装完成")
+                    notifyProgress(100, I18n.t("status.installed"))
                     logger.info("更新安装完成: ${updateInfo.version}")
 
                     // 9. 提示用户重启IDE

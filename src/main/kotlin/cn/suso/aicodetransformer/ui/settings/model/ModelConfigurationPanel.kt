@@ -1,5 +1,7 @@
 package cn.suso.aicodetransformer.ui.settings.model
 
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
@@ -36,10 +38,21 @@ class ModelConfigurationPanel(
     private var originalConfigurations: List<ModelConfiguration> = emptyList()
     private var currentConfigurations: MutableList<ModelConfiguration> = mutableListOf()
     
+    private lateinit var leftTitleLabel: JBLabel
+    private lateinit var rightTitleLabel: JBLabel
+    private lateinit var importButton: JButton
+    private lateinit var exportButton: JButton
+    private val languageChangeListener: () -> Unit = {
+        SwingUtilities.invokeLater {
+            refreshTexts()
+        }
+    }
+
     init {
         setupUI()
         setupListeners()
         loadConfigurations()
+        LanguageManager.addChangeListener(languageChangeListener)
     }
     
     private fun setupUI() {
@@ -67,13 +80,13 @@ class ModelConfigurationPanel(
         val extraButtonsPanel = JPanel()
         extraButtonsPanel.layout = BoxLayout(extraButtonsPanel, BoxLayout.X_AXIS)
         
-        val importButton = JButton("导入")
+        importButton = JButton(I18n.t("model.import"))
         importButton.addActionListener { importConfigurations() }
-        importButton.toolTipText = "从文件导入配置"
+        importButton.toolTipText = I18n.t("model.import.tooltip")
         
-        val exportButton = JButton("导出")
+        exportButton = JButton(I18n.t("model.export"))
         exportButton.addActionListener { exportConfigurations() }
-        exportButton.toolTipText = "导出配置到文件"
+        exportButton.toolTipText = I18n.t("model.export.tooltip")
         
         extraButtonsPanel.add(importButton)
         extraButtonsPanel.add(Box.createHorizontalStrut(5))
@@ -95,7 +108,7 @@ class ModelConfigurationPanel(
         }
         
         // 左侧面板标题
-        val leftTitleLabel = JBLabel("模型配置列表")
+        leftTitleLabel = JBLabel(I18n.t("model.list.title"))
         leftTitleLabel.font = leftTitleLabel.font.deriveFont(Font.BOLD, 14f)
         leftTitleLabel.border = EmptyBorder(JBUI.insets(0, 0, 8, 0))
         
@@ -107,7 +120,7 @@ class ModelConfigurationPanel(
         leftPanel.preferredSize = Dimension(300, -1)
         
         // 右侧面板标题
-        val rightTitleLabel = JBLabel("配置详情")
+        rightTitleLabel = JBLabel(I18n.t("model.detail.title"))
         rightTitleLabel.font = rightTitleLabel.font.deriveFont(Font.BOLD, 14f)
         rightTitleLabel.border = EmptyBorder(JBUI.insets(0, 0, 8, 0))
         
@@ -126,6 +139,16 @@ class ModelConfigurationPanel(
         splitPane.setOneTouchExpandable(true)
         
         add(splitPane, BorderLayout.CENTER)
+    }
+
+    private fun refreshTexts() {
+        leftTitleLabel.text = I18n.t("model.list.title")
+        rightTitleLabel.text = I18n.t("model.detail.title")
+        importButton.text = I18n.t("model.import")
+        importButton.toolTipText = I18n.t("model.import.tooltip")
+        exportButton.text = I18n.t("model.export")
+        exportButton.toolTipText = I18n.t("model.export.tooltip")
+        detailPanel.refreshTexts()
     }
     
     private fun setupListeners() {

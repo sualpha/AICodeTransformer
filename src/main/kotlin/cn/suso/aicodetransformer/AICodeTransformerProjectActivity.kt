@@ -1,19 +1,17 @@
 package cn.suso.aicodetransformer
 
-import cn.suso.aicodetransformer.model.ExecutionResult
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.model.ErrorContext
 import cn.suso.aicodetransformer.notification.ShortcutNotificationService
 import cn.suso.aicodetransformer.service.*
 import cn.suso.aicodetransformer.service.impl.*
 import cn.suso.aicodetransformer.constants.ExecutionStatus
+import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.model.ErrorHandlingResult
 import cn.suso.aicodetransformer.model.ExecutionContext
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ProjectManagerListener
@@ -73,6 +71,8 @@ class AICodeTransformerProjectActivity : ProjectActivity {
     
     private var initialized = false
     private var messageBusConnection: MessageBusConnection? = null
+
+    private fun tr(key: String, vararg params: Any): String = I18n.t(key, *params)
     
     override suspend fun execute(project: Project) {
         logger.info("AI Code Transformer ProjectActivity.execute() 被调用，项目: ${project.name}")
@@ -198,7 +198,7 @@ class AICodeTransformerProjectActivity : ProjectActivity {
                     statusService.updateExecutionStatus(
                         context.executionId,
                         ExecutionStatus.RUNNING,
-                        "正在执行模板: $templateId",
+                        tr("status.execution.runningTemplate", templateId),
                         0,
                         project
                     )
@@ -218,7 +218,7 @@ class AICodeTransformerProjectActivity : ProjectActivity {
                     statusService.updateExecutionStatus(
                         templateId,
                         ExecutionStatus.COMPLETED,
-                        "执行完成",
+                        tr("status.execution.completed"),
                         100,
                         project
                     )
@@ -228,7 +228,7 @@ class AICodeTransformerProjectActivity : ProjectActivity {
                     statusService.updateExecutionStatus(
                         templateId,
                         ExecutionStatus.FAILED,
-                        "执行失败: $error",
+                        tr("status.execution.failedWithReason", error),
                         0,
                         project
                     )
@@ -238,7 +238,7 @@ class AICodeTransformerProjectActivity : ProjectActivity {
                     statusService.updateExecutionStatus(
                         templateId,
                         ExecutionStatus.CANCELLED,
-                        "执行已取消",
+                        tr("status.execution.cancelled"),
                         0,
                         project
                     )
@@ -321,40 +321,6 @@ class AICodeTransformerProjectActivity : ProjectActivity {
     }
     
     /**
-     * 初始化默认快捷键（已禁用 - 内置模板不再设置默认快捷键）
-     */
-    private fun initializeDefaultShortcuts() {
-        // 根据用户需求，内置模板不再设置默认快捷键
-        // 用户可以在设置页面手动为模板配置快捷键
-        logger.info("跳过默认快捷键初始化 - 内置模板不设置默认快捷键")
-    }
-    
-    /**
-     * 自动恢复快捷键
-     */
-    private fun autoRecoverShortcuts() {
-        try {
-            val recoveredCount = shortcutRecoveryService.autoRecoverShortcuts()
-            if (recoveredCount > 0) {
-                logger.info("自动恢复了 $recoveredCount 个快捷键")
-                // 刷新模板动作以应用恢复的快捷键
-                refreshTemplateActions()
-                // 显示恢复成功通知
-                shortcutNotificationService.showRecoverySuccessNotification(null, recoveredCount)
-            }
-            
-            // 验证快捷键配置并显示相关通知
-            shortcutNotificationService.validateAndNotify(null)
-            
-            // 备份当前快捷键配置
-            shortcutRecoveryService.backupShortcuts()
-            
-        } catch (e: Exception) {
-            logger.error("自动恢复快捷键失败", e)
-        }
-    }
-    
-    /**
      * 刷新模板动作
      * 当模板配置发生变化时调用
      */
@@ -376,117 +342,7 @@ class AICodeTransformerProjectActivity : ProjectActivity {
             )
         }
     }
-    
-    /**
-     * 执行指定的模板
-     */
-    fun executeTemplate(templateId: String, project: Project?) {
-        try {
-            val currentProject = project ?: return
-            
-            // 获取当前编辑器和选中的代码
-            val editor = FileEditorManager.getInstance(currentProject).selectedTextEditor
-            if (editor != null) {
-                val selectionModel = editor.selectionModel
-                val selectedText = selectionModel.selectedText
-                
-                if (!selectedText.isNullOrBlank()) {
-                    // 获取模板
-                    val template = promptTemplateService.getTemplate(templateId)
-                    if (template == null) {
-                        statusService.showErrorNotification(
-                            "错误",
-                            "模板不存在: $templateId",
-                            currentProject
-                        )
-                        return
-                    }
-                    
-                    // 异步执行模板，避免阻塞UI线程
-                    executionService.executeTemplateAsync(template, selectedText, currentProject, editor) { result ->
-                        handleExecutionResult(result, editor, currentProject)
-                    }
-                } else {
-                    statusService.showWarningNotification(
-                        "提示",
-                        "请先选择要转换的代码",
-                        currentProject
-                    )
-                }
-            } else {
-                statusService.showWarningNotification(
-                    "提示",
-                    "请先选择要转换的代码",
-                    currentProject
-                )
-            }
-            
-        } catch (e: Exception) {
-            logger.error("执行模板失败: $templateId", e)
-            errorHandlingService.handleException(
-                e,
-                ErrorContext(
-                    operation = "执行模板",
-                    component = "AICodeTransformerProjectActivity",
-                    additionalInfo = mapOf("templateId" to templateId)
-                ),
-                project
-            )
-        }
-    }
-    
-    /**
-     * 处理执行结果
-     */
-    private fun handleExecutionResult(
-        result: ExecutionResult,
-        editor: Editor,
-        project: Project?
-    ) {
-        try {
-            if (result.success && !result.content.isNullOrBlank()) {
-                // 执行成功，替换代码
-                val selectionModel = editor.selectionModel
-                codeReplacementService.replaceText(
-                    editor,
-                    selectionModel.selectionStart,
-                    selectionModel.selectionEnd,
-                    result.content
-                )
-                
-                statusService.showSuccessNotification(
-                    "执行成功",
-                    "代码已成功转换",
-                    project
-                )
-            } else {
-                if (result.success) {
-                    statusService.showWarningNotification(
-                        "提示",
-                        "AI模型未生成有效代码",
-                        project
-                    )
-                } else {
-                    statusService.showErrorNotification(
-                        "执行失败",
-                        result.errorMessage ?: "模板执行失败",
-                        project
-                    )
-                }
-            }
-            
-        } catch (e: Exception) {
-            logger.error("处理执行结果失败", e)
-            errorHandlingService.handleException(
-                e,
-                ErrorContext(
-                    operation = "处理执行结果",
-                    component = "AICodeTransformerProjectActivity"
-                ),
-                project
-            )
-        }
-    }
+
     
     /**
      * 设置项目关闭监听器

@@ -1,12 +1,13 @@
 package cn.suso.aicodetransformer.ui.settings
 
 import cn.suso.aicodetransformer.constants.TemplateConstants
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import cn.suso.aicodetransformer.model.PromptTemplate
 import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
 
-import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.components.JBCheckBox
@@ -21,6 +22,7 @@ import java.awt.Dimension
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
+import javax.swing.SwingUtilities
 
 /**
  * 模板编辑面板 - 专门用于编辑模板的组件
@@ -37,7 +39,7 @@ class PromptTemplateEditPanel : JPanel() {
     private val nameField = JBTextField()
     private val descriptionField = JBTextField()
     private val categoryField = JBTextField()
-    private val enabledCheckBox = JBCheckBox("启用模板")
+    private val enabledCheckBox = JBCheckBox()
 
     
     // 内容字段
@@ -45,10 +47,14 @@ class PromptTemplateEditPanel : JPanel() {
     private val contentScrollPane = JBScrollPane(contentArea)
     
     // 编辑按钮
-    private val validateTemplateButton = JButton("验证模板")
-    private val insertVariableButton = JButton("插入变量")
-    private val resetContentButton = JButton("重置内容")
+    private val validateTemplateButton = JButton()
+    private val insertVariableButton = JButton()
+    private val resetContentButton = JButton()
     private val contentToolbar = JPanel()
+    private val tabbedPane = JBTabbedPane()
+    private val languageListener: () -> Unit = {
+        SwingUtilities.invokeLater { refreshTexts() }
+    }
     
     private var currentTemplate: PromptTemplate? = null
     private var isModified = false
@@ -59,37 +65,39 @@ class PromptTemplateEditPanel : JPanel() {
         setupUI()
         setupListeners()
         setupFieldTooltips()
-        
+
+        refreshTexts()
+
+        LanguageManager.addChangeListener(languageListener)
+
         // 默认启用编辑模式
         setEditMode(true)
     }
     
     private fun setupUI() {
-        val tabbedPane = JBTabbedPane()
-        
         // 基本信息标签页
-        tabbedPane.addTab("基本信息", createBasicInfoPanel())
+        tabbedPane.addTab(I18n.t("prompt.basic.tab"), createBasicInfoPanel())
         
         // 模板内容标签页
-        tabbedPane.addTab("模板内容", createContentPanel())
+        tabbedPane.addTab(I18n.t("prompt.content.tab"), createContentPanel())
         
         add(tabbedPane, BorderLayout.CENTER)
     }
     
     private fun setupFieldTooltips() {
-        TooltipHelper.setTooltip(nameField, "模板的显示名称，用于在列表中识别此模板")
-        TooltipHelper.setTooltip(descriptionField, "模板的详细描述，说明模板的用途和功能")
-        TooltipHelper.setTooltip(categoryField, "模板分类，用于组织和筛选模板")
-        TooltipHelper.setTooltip(enabledCheckBox, "是否启用此模板，禁用后将不会在模板列表中显示")
+        TooltipHelper.setTooltip(nameField, I18n.t("prompt.tooltip.name"))
+        TooltipHelper.setTooltip(descriptionField, I18n.t("prompt.tooltip.description"))
+        TooltipHelper.setTooltip(categoryField, I18n.t("prompt.tooltip.category"))
+        TooltipHelper.setTooltip(enabledCheckBox, I18n.t("prompt.tooltip.enabled"))
 
         TooltipHelper.setTooltip(contentArea, TooltipHelper.TemplateTooltips.TEMPLATE_VARIABLES)
     }
     
     private fun createBasicInfoPanel(): JPanel {
         return FormBuilder.createFormBuilder()
-            .addLabeledComponent("模板名称:", nameField)
-            .addLabeledComponent("描述:", descriptionField)
-            .addLabeledComponent("分类:", categoryField)
+            .addLabeledComponent(I18n.t("prompt.name.label"), nameField)
+            .addLabeledComponent(I18n.t("prompt.description.label"), descriptionField)
+            .addLabeledComponent(I18n.t("prompt.category.field"), categoryField)
             .addComponent(enabledCheckBox)
             .addComponentFillVertically(JPanel(), 0)
             .panel
@@ -194,8 +202,8 @@ class PromptTemplateEditPanel : JPanel() {
         if (name.isEmpty()) {
             Messages.showWarningDialog(
                 this,
-                "模板名称不能为空",
-                "验证模板"
+                I18n.t("prompt.validation.name.required"),
+                I18n.t("prompt.validation.title")
             )
             return
         }
@@ -203,8 +211,8 @@ class PromptTemplateEditPanel : JPanel() {
         if (content.isEmpty()) {
             Messages.showWarningDialog(
                 this,
-                "模板内容为空，无法验证",
-                "验证模板"
+                I18n.t("prompt.validation.content.empty"),
+                I18n.t("prompt.validation.title")
             )
             return
         }
@@ -213,8 +221,8 @@ class PromptTemplateEditPanel : JPanel() {
         if (template == null) {
             Messages.showWarningDialog(
                 this,
-                "创建模板失败",
-                "验证模板"
+                I18n.t("prompt.validation.create.failed"),
+                I18n.t("prompt.validation.title")
             )
             return
         }
@@ -224,21 +232,22 @@ class PromptTemplateEditPanel : JPanel() {
             val currentContext = template.content
             
             val message = buildString {
-                append("模板验证结果：\n\n")
-                
+                append(I18n.t("prompt.validation.result.title"))
+                append("\n\n")
+
                 if (currentContext.isNotBlank()) {
-                    append("✓ 模板验证通过！")
+                    append(I18n.t("prompt.validation.result.success"))
                 } else {
-                    append("⚠ 模板内容不能为空")
+                    append(I18n.t("prompt.validation.result.empty"))
                 }
             }
             
-            Messages.showInfoMessage(this, message, "验证结果")
+            Messages.showInfoMessage(this, message, I18n.t("prompt.validation.result.dialog"))
         } catch (e: Exception) {
             Messages.showErrorDialog(
                 this,
-                "验证模板时发生错误：${e.message}",
-                "验证失败"
+                I18n.t("prompt.validation.error.message", e.message ?: ""),
+                I18n.t("prompt.validation.error.title")
             )
         }
     }
@@ -253,7 +262,7 @@ class PromptTemplateEditPanel : JPanel() {
 
         JBPopupFactory.getInstance()
             .createPopupChooserBuilder(variableNames.toList())
-            .setTitle("插入变量")
+            .setTitle(I18n.t("prompt.insertVariable.title"))
             .setItemChosenCallback { selectedItem ->
                 val selectedVariable = variables.find { "${it.first} - ${it.second}" == selectedItem }?.first
                 selectedVariable?.let { insertVariableAtCursor(it) }
@@ -281,10 +290,10 @@ class PromptTemplateEditPanel : JPanel() {
     private fun resetTemplateContent() {
         val result = Messages.showYesNoDialog(
             null,
-            "确定要重置模板内容吗？这将清空当前的所有内容。",
-            "重置模板内容",
-            "重置",
-            "取消",
+            I18n.t("prompt.reset.confirm.message"),
+            I18n.t("prompt.reset.confirm.title"),
+            I18n.t("prompt.reset.confirm.ok"),
+            I18n.t("prompt.reset.confirm.cancel"),
             Messages.getQuestionIcon()
         )
         
@@ -306,18 +315,18 @@ class PromptTemplateEditPanel : JPanel() {
         return when {
             category.contains("commit", ignoreCase = true) || 
             category.contains("git", ignoreCase = true) -> {
-                "请为以下代码变更生成提交信息：\n\n{SELECTED_TEXT}\n\n要求：\n- 使用简洁明了的语言\n- 遵循约定式提交格式\n- 突出主要变更内容"
+                I18n.t("prompt.defaultContent.commit")
             }
             category.contains("代码", ignoreCase = true) || 
             category.contains("code", ignoreCase = true) -> {
-                "请分析以下代码：\n\n{SELECTED_TEXT}\n\n请提供：\n- 代码功能说明\n- 可能的改进建议\n- 潜在问题分析"
+                I18n.t("prompt.defaultContent.code")
             }
             category.contains("文档", ignoreCase = true) || 
             category.contains("doc", ignoreCase = true) -> {
-                "请为以下内容生成文档：\n\n{SELECTED_TEXT}\n\n要求：\n- 结构清晰\n- 内容详细\n- 易于理解"
+                I18n.t("prompt.defaultContent.doc")
             }
             else -> {
-                "请处理以下内容：\n\n{SELECTED_TEXT}\n\n请根据具体需求进行分析和处理。"
+                I18n.t("prompt.defaultContent.generic")
             }
         }
     }
@@ -342,16 +351,15 @@ class PromptTemplateEditPanel : JPanel() {
             val content = contentArea.text
             val enabled = enabledCheckBox.isSelected
             val shortcut: String? = null
-            val tags = emptyList<String>()
             
             // 验证基本字段
             if (strictValidation) {
                 if (name.isEmpty()) {
-                    throw IllegalArgumentException("模板名称不能为空")
+                    throw IllegalArgumentException(I18n.t("prompt.validation.name.required"))
                 }
                 
                 if (content.isEmpty()) {
-                    throw IllegalArgumentException("模板内容不能为空")
+                    throw IllegalArgumentException(I18n.t("prompt.validation.content.required"))
                 }
             } else {
                 // 非严格验证模式，允许空内容用于预览
@@ -366,7 +374,6 @@ class PromptTemplateEditPanel : JPanel() {
                 description = description.takeIf { it.isNotEmpty() },
                 content = content,
                 category = category,
-                tags = tags,
                 enabled = enabled,
                 isBuiltIn = false,
                 shortcutKey = shortcut,
@@ -374,7 +381,7 @@ class PromptTemplateEditPanel : JPanel() {
                 updatedAt = java.time.LocalDateTime.now().toString()
             )
         } catch (e: Exception) {
-            Messages.showErrorDialog(this, "创建模板对象失败：${e.message}", "错误")
+            Messages.showErrorDialog(this, I18n.t("prompt.create.error.message", e.message ?: ""), I18n.t("prompt.create.error.title"))
             return null
         }
     }
@@ -384,5 +391,21 @@ class PromptTemplateEditPanel : JPanel() {
      */
     fun setAvailableVariables(variables: List<Pair<String, String>>) {
         this.availableVariables = variables
+    }
+
+    fun refreshTexts() {
+        enabledCheckBox.text = I18n.t("prompt.enableTemplate")
+        validateTemplateButton.text = I18n.t("prompt.validate")
+        insertVariableButton.text = I18n.t("prompt.insertVariable")
+        resetContentButton.text = I18n.t("prompt.resetContent")
+
+        tabbedPane.setTitleAt(0, I18n.t("prompt.basic.tab"))
+        tabbedPane.setTitleAt(1, I18n.t("prompt.content.tab"))
+
+        setupFieldTooltips()
+    }
+
+    fun dispose() {
+        LanguageManager.removeChangeListener(languageListener)
     }
 }

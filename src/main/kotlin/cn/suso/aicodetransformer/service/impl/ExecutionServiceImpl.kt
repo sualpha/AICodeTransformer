@@ -660,9 +660,9 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
      * 检查是否为对象转换模板
      */
     private fun isObjectConversionTemplate(template: PromptTemplate): Boolean {
-        return template.id == "object-convert" || 
+        return template.id == "object-convert" ||
                template.name.contains("对象转换", ignoreCase = true) ||
-               template.category == "代码转换" && template.tags.any { it.contains("对象转换", ignoreCase = true) }
+               template.category.contains("对象转换", ignoreCase = true)
     }
     
     /**

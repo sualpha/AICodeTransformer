@@ -27,6 +27,7 @@ import cn.suso.aicodetransformer.util.LineEndingUtils
 import cn.suso.aicodetransformer.util.LineEndingIssueType
 import cn.suso.aicodetransformer.util.GitCommandExecutor
 import com.intellij.openapi.ui.Messages
+import cn.suso.aicodetransformer.i18n.I18n
 
 /**
  * VCS服务实现类
@@ -39,7 +40,7 @@ class VCSServiceImpl : VCSService {
             project = project,
             staged = staged,
             filePath = filePath,
-            progressTitle = "获取文件差异..."
+            progressTitle = I18n.t("vcs.progress.diff")
         )
         return result.getDisplayMessage()
     }
@@ -135,7 +136,6 @@ class VCSServiceImpl : VCSService {
             }
 
             if (project == null) {
-                println("VCSServiceImpl: getActualFileCount - 无法获取项目实例")
                 return changes.size // 回退到原始数量
             }
 
@@ -143,7 +143,6 @@ class VCSServiceImpl : VCSService {
             val repositories = GitRepositoryManager.getInstance(project).repositories
 
             if (repositories.isEmpty()) {
-                println("VCSServiceImpl: getActualFileCount - 没有找到Git仓库")
                 return changes.size // 回退到原始数量
             }
 
@@ -174,11 +173,9 @@ class VCSServiceImpl : VCSService {
                 }
             }
             
-            println("VCSServiceImpl: getActualFileCount - 变更数量: ${changes.size}, 实际处理文件数量: $actualFileCount")
             actualFileCount
             
         } catch (e: Exception) {
-            println("VCSServiceImpl: getActualFileCount异常: ${e.message}")
             e.printStackTrace()
             changes.size // 回退到原始数量
         }
@@ -294,7 +291,7 @@ class VCSServiceImpl : VCSService {
                 } catch (e: Exception) {
                     success = false
                 }
-            }, "提交变更...", true, project)
+            }, I18n.t("vcs.progress.commit"), true, project)
 
             success
         } catch (e: Exception) {
@@ -327,7 +324,7 @@ class VCSServiceImpl : VCSService {
                 } catch (e: Exception) {
                     success = false
                 }
-            }, "推送变更...", true, project)
+            }, I18n.t("vcs.progress.push"), true, project)
 
             success
         } catch (e: Exception) {

@@ -1,5 +1,6 @@
 package cn.suso.aicodetransformer.ui.settings.model
 
+import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.model.ModelType
 
@@ -9,6 +10,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.components.*
+import com.intellij.ui.TitledSeparator
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
@@ -27,7 +29,7 @@ class ModelConfigurationDetailPanel(private val project: Project) : JPanel(Borde
     private val nameField = JBTextField()
     private val descriptionField = JBTextField()
     private val typeComboBox = ComboBox(ModelType.values())
-    private val enabledCheckBox = JBCheckBox("启用此配置")
+    private val enabledCheckBox = JBCheckBox(I18n.t("model.config.enabled"))
     
     // API配置字段
     private val apiBaseUrlField = JBTextField()
@@ -35,8 +37,17 @@ class ModelConfigurationDetailPanel(private val project: Project) : JPanel(Borde
     private val apiKeyField = JBPasswordField()
     
     // API key相关的UI组件，用于动态显示/隐藏
+    private lateinit var nameLabel: JLabel
+    private lateinit var descriptionLabel: JLabel
+    private lateinit var typeLabel: JLabel
+    private lateinit var apiBaseUrlLabel: JLabel
+    private lateinit var modelNameLabel: JLabel
     private lateinit var apiKeyLabel: JLabel
     private lateinit var apiKeyComponent: JComponent
+    private lateinit var temperatureLabel: JLabel
+    private lateinit var maxTokensLabel: JLabel
+    private lateinit var apiSeparator: TitledSeparator
+    private lateinit var paramsSeparator: TitledSeparator
     
     // 参数配置字段
     private val temperatureSpinner = JSpinner(SpinnerNumberModel(0.7, 0.0, 2.0, 0.1))
@@ -63,22 +74,32 @@ class ModelConfigurationDetailPanel(private val project: Project) : JPanel(Borde
         val formBuilder = FormBuilder.createFormBuilder()
         
         // 基本信息部分
-        formBuilder.addLabeledComponent(JLabel("配置名称:"), nameField)
-        formBuilder.addLabeledComponent(JLabel("描述:"), descriptionField)
-        formBuilder.addLabeledComponent(JLabel("模型类型:"), typeComboBox)
+        nameLabel = JLabel(I18n.t("model.config.name"))
+        formBuilder.addLabeledComponent(nameLabel, nameField)
+        descriptionLabel = JLabel(I18n.t("model.config.description"))
+        formBuilder.addLabeledComponent(descriptionLabel, descriptionField)
+        typeLabel = JLabel(I18n.t("model.config.type"))
+        formBuilder.addLabeledComponent(typeLabel, typeComboBox)
+        enabledCheckBox.text = I18n.t("model.config.enabled")
         formBuilder.addComponent(enabledCheckBox)
         
-        formBuilder.addComponent(com.intellij.ui.TitledSeparator("API配置"))
-        formBuilder.addLabeledComponent(JLabel("API基础URL:"), apiBaseUrlField)
-        formBuilder.addLabeledComponent(JLabel("模型名称:"), modelNameField)
+        apiSeparator = TitledSeparator(I18n.t("model.api.section"))
+        formBuilder.addComponent(apiSeparator)
+        apiBaseUrlLabel = JLabel(I18n.t("model.api.baseUrl"))
+        formBuilder.addLabeledComponent(apiBaseUrlLabel, apiBaseUrlField)
+        modelNameLabel = JLabel(I18n.t("model.api.modelName"))
+        formBuilder.addLabeledComponent(modelNameLabel, modelNameField)
         
         // API密钥字段不在界面上显示
-        apiKeyLabel = JLabel("API密钥:")
+        apiKeyLabel = JLabel(I18n.t("model.api.key"))
         apiKeyComponent = apiKeyField
         
-        formBuilder.addComponent(com.intellij.ui.TitledSeparator("参数配置"))
-        formBuilder.addLabeledComponent(JLabel("温度 (Temperature):"), temperatureSpinner)
-        formBuilder.addLabeledComponent(JLabel("最大Token数:"), maxTokensSpinner)
+        paramsSeparator = TitledSeparator(I18n.t("model.params.section"))
+        formBuilder.addComponent(paramsSeparator)
+        temperatureLabel = JLabel(I18n.t("model.params.temperature"))
+        formBuilder.addLabeledComponent(temperatureLabel, temperatureSpinner)
+        maxTokensLabel = JLabel(I18n.t("model.params.maxTokens"))
+        formBuilder.addLabeledComponent(maxTokensLabel, maxTokensSpinner)
         
         // 详情页不显示连接配置部分
         
@@ -113,6 +134,20 @@ class ModelConfigurationDetailPanel(private val project: Project) : JPanel(Borde
         TooltipHelper.setTooltip(retryAttemptsSpinner, "连接失败时的重试次数，建议设置为1-5次")
         
 
+    }
+
+    fun refreshTexts() {
+        nameLabel.text = I18n.t("model.config.name")
+        descriptionLabel.text = I18n.t("model.config.description")
+        typeLabel.text = I18n.t("model.config.type")
+        enabledCheckBox.text = I18n.t("model.config.enabled")
+        apiSeparator.text = I18n.t("model.api.section")
+        apiBaseUrlLabel.text = I18n.t("model.api.baseUrl")
+        modelNameLabel.text = I18n.t("model.api.modelName")
+        apiKeyLabel.text = I18n.t("model.api.key")
+        paramsSeparator.text = I18n.t("model.params.section")
+        temperatureLabel.text = I18n.t("model.params.temperature")
+        maxTokensLabel.text = I18n.t("model.params.maxTokens")
     }
     
     private fun setupListeners() {

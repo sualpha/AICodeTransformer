@@ -1,6 +1,9 @@
 package cn.suso.aicodetransformer.model
 
+import cn.suso.aicodetransformer.i18n.I18n
 import kotlinx.serialization.Serializable
+import java.util.Locale
+import java.util.ResourceBundle
 
 /**
  * AI代码转换模板
@@ -18,9 +21,6 @@ data class Template(
     
     /** 模板分类 */
     val category: TemplateCategory,
-    
-    /** 模板标签 */
-    val tags: List<String> = emptyList(),
     
     /** 提示词模板 */
     val promptTemplate: String,
@@ -89,23 +89,46 @@ data class Template(
  * 模板分类
  */
 @Serializable
-enum class TemplateCategory(val displayName: String, val description: String) {
-    CODE_CONVERSION("代码转换", "不同编程语言之间的代码转换"),
-    CODE_OPTIMIZATION("代码优化", "代码性能和质量优化"),
-    CODE_REVIEW("代码审查", "代码质量检查和建议"),
-    DOCUMENTATION("文档生成", "生成代码文档和注释"),
-    TESTING("测试生成", "生成单元测试和测试用例"),
-    REFACTORING("重构", "代码重构和结构优化"),
-    BUG_FIXING("错误修复", "识别和修复代码错误"),
-    API_GENERATION("API生成", "生成API接口和文档"),
-    DATABASE("数据库", "数据库相关的代码生成"),
-    FRONTEND("前端开发", "前端代码生成和优化"),
-    BACKEND("后端开发", "后端代码生成和优化"),
-    MOBILE("移动开发", "移动应用开发相关"),
-    DEVOPS("运维部署", "部署和运维相关代码"),
-    ALGORITHM("算法实现", "算法和数据结构实现"),
-    GIT_OPERATIONS("Git操作", "Git提交、分支管理等版本控制相关"),
-    CUSTOM("自定义", "用户自定义模板")
+enum class TemplateCategory(private val displayNameKey: String, private val descriptionKey: String) {
+    CODE_CONVERSION("template.category.codeConversion.name", "template.category.codeConversion.description"),
+    CODE_OPTIMIZATION("template.category.codeOptimization.name", "template.category.codeOptimization.description"),
+    CODE_REVIEW("template.category.codeReview.name", "template.category.codeReview.description"),
+    DOCUMENTATION("template.category.documentation.name", "template.category.documentation.description"),
+    TESTING("template.category.testing.name", "template.category.testing.description"),
+    REFACTORING("template.category.refactoring.name", "template.category.refactoring.description"),
+    BUG_FIXING("template.category.bugFixing.name", "template.category.bugFixing.description"),
+    API_GENERATION("template.category.apiGeneration.name", "template.category.apiGeneration.description"),
+    DATABASE("template.category.database.name", "template.category.database.description"),
+    FRONTEND("template.category.frontend.name", "template.category.frontend.description"),
+    BACKEND("template.category.backend.name", "template.category.backend.description"),
+    MOBILE("template.category.mobile.name", "template.category.mobile.description"),
+    DEVOPS("template.category.devops.name", "template.category.devops.description"),
+    ALGORITHM("template.category.algorithm.name", "template.category.algorithm.description"),
+    GIT_OPERATIONS("template.category.gitOperations.name", "template.category.gitOperations.description"),
+    CUSTOM("template.category.custom.name", "template.category.custom.description");
+
+    val displayName: String
+        get() = I18n.t(displayNameKey)
+
+    val description: String
+        get() = I18n.t(descriptionKey)
+
+    companion object {
+        private val supportedLocales = listOf(
+            Locale.SIMPLIFIED_CHINESE,
+            Locale("en", "US")
+        )
+
+        fun fromDisplayName(displayName: String): TemplateCategory? {
+            return values().firstOrNull { category ->
+                supportedLocales.any { locale ->
+                    runCatching {
+                        ResourceBundle.getBundle("i18n.messages", locale).getString(category.displayNameKey)
+                    }.getOrNull() == displayName
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -128,9 +151,6 @@ data class TemplateSearchCriteria(
     
     /** 分类过滤 */
     val category: TemplateCategory? = null,
-    
-    /** 标签过滤 */
-    val tags: List<String> = emptyList(),
     
     /** 编程语言过滤 */
     val language: String? = null,

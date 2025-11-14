@@ -44,10 +44,6 @@ data class PromptTemplate(
     
 
     
-    /** 标签 */
-    @com.intellij.util.xmlb.annotations.Transient
-    val tags: List<String> = emptyList(),
-    
     /** 使用的模型配置ID */
     @Attribute("modelConfigId")
     val modelConfigId: String? = null,
@@ -104,7 +100,6 @@ data class PromptTemplate(
                 content = config.content,
                 description = config.description,
                 category = config.category.displayName,
-                tags = config.tags,
                 shortcutKey = null,
                 isBuiltIn = config.isBuiltIn
             )
@@ -119,7 +114,6 @@ data class PromptTemplate(
                 content = config.content,
                 description = config.description,
                 category = config.category.displayName,
-                tags = config.tags,
                 shortcutKey = null,
                 isBuiltIn = config.isBuiltIn
             )
@@ -134,7 +128,6 @@ data class PromptTemplate(
                 content = config.content,
                 description = config.description,
                 category = config.category.displayName,
-                tags = config.tags,
                 shortcutKey = null,
                 isBuiltIn = config.isBuiltIn
             )
@@ -149,7 +142,6 @@ data class PromptTemplate(
                 content = config.content,
                 description = config.description,
                 category = config.category.displayName,
-                tags = config.tags,
                 shortcutKey = null,
                 isBuiltIn = config.isBuiltIn
             )
@@ -165,7 +157,6 @@ data class PromptTemplate(
                 name = config.displayName,
                 content = config.content,
                 category = config.category.displayName,
-                tags = config.tags,
                 description = config.description,
                 shortcutKey = null,
                 isBuiltIn = config.isBuiltIn

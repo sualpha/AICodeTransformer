@@ -8,6 +8,7 @@ import cn.suso.aicodetransformer.model.ExecutionStatusInfo
 import cn.suso.aicodetransformer.constants.ExecutionStatus
 import cn.suso.aicodetransformer.constants.NotificationType
 import cn.suso.aicodetransformer.constants.BalloonType
+import cn.suso.aicodetransformer.i18n.I18n
 import com.intellij.notification.*
 import com.intellij.notification.NotificationType as IntellijNotificationType
 import com.intellij.openapi.actionSystem.AnAction
@@ -42,6 +43,8 @@ class StatusServiceImpl : StatusService, Disposable {
         private val logger = Logger.getInstance(StatusServiceImpl::class.java)
         private const val NOTIFICATION_GROUP_ID = "AICodeTransformer"
     }
+
+    private fun tr(key: String, vararg params: Any): String = I18n.t(key, *params)
     
     private val notificationGroup: NotificationGroup by lazy {
         NotificationGroupManager.getInstance()
@@ -252,15 +255,15 @@ class StatusServiceImpl : StatusService, Disposable {
             }
             ExecutionStatus.COMPLETED -> {
                 hideProgress(project)
-                showSuccessNotification("执行完成", message, project)
+                showSuccessNotification(tr("status.execution.notify.completed.title"), message, project)
             }
             ExecutionStatus.FAILED -> {
                 hideProgress(project)
-                showErrorNotification("执行失败", message, project)
+                showErrorNotification(tr("status.execution.notify.failed.title"), message, project)
             }
             ExecutionStatus.CANCELLED -> {
                 hideProgress(project)
-                showWarningNotification("执行已取消", message, project)
+                showWarningNotification(tr("status.execution.notify.cancelled.title"), message, project)
             }
             else -> {
                 // PENDING状态不显示通知

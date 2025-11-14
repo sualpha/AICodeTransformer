@@ -1,6 +1,8 @@
 package cn.suso.aicodetransformer.ui.settings.model
 
+import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.model.ModelConfiguration
+import cn.suso.aicodetransformer.model.ModelType
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import javax.swing.JList
@@ -22,17 +24,24 @@ class ModelConfigurationListCellRenderer : ColoredListCellRenderer<ModelConfigur
             append(value.name, SimpleTextAttributes.REGULAR_ATTRIBUTES)
             
             // 显示模型类型
-            append(" (${value.modelType.displayName})", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            val typeLabel = when (value.modelType) {
+                ModelType.OPENAI_COMPATIBLE -> tr("model.config.list.type.openai")
+                ModelType.CLAUDE -> tr("model.config.list.type.claude")
+                ModelType.LOCAL -> tr("model.config.list.type.local")
+            }
+            append(" ($typeLabel)", SimpleTextAttributes.GRAYED_ATTRIBUTES)
             
             // 如果是默认配置，添加标记
             if (value.isDefault()) {
-                append(" [默认]", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                append(" ${tr("model.config.list.defaultTag")}", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
             }
             
             // 如果配置被禁用，使用灰色显示
             if (!value.enabled) {
-                append(" [已禁用]", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                append(" ${tr("model.config.list.disabledTag")}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
             }
         }
     }
+
+    private fun tr(key: String, vararg params: Any): String = I18n.t(key, *params)
 }

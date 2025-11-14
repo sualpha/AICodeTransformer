@@ -1,6 +1,8 @@
 package cn.suso.aicodetransformer.ui.settings
 
 import cn.suso.aicodetransformer.constants.TemplateConstants
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import cn.suso.aicodetransformer.model.CommitSettings
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
@@ -20,6 +22,7 @@ import java.awt.Dimension
 import java.awt.FlowLayout
 import javax.swing.JButton
 import javax.swing.JPanel
+import javax.swing.SwingUtilities
 import javax.swing.border.EmptyBorder
 
 /**
@@ -31,10 +34,12 @@ class CommitSettingsPanel(
 ) : JPanel(BorderLayout()) {
     
     // UI组件
-    private val autoCommitCheckBox = JBCheckBox("启用自动提交")
-    private val autoPushCheckBox = JBCheckBox("启用自动推送")
+    private val autoCommitCheckBox = JBCheckBox(I18n.t("commit.autoCommit"))
+    private val autoPushCheckBox = JBCheckBox(I18n.t("commit.autoPush"))
     private val singleFileTemplateTextArea = JBTextArea()
     private val summaryTemplateTextArea = JBTextArea()
+    private var lastSimpleDefault: String = CommitSettings.SIMPLE_TEMPLATE
+    private var lastSummaryDefault: String = CommitSettings.SUMMARY_TEMPLATE
     
     // 保留向后兼容
     @Deprecated("使用 singleFileTemplateTextArea 替代")
@@ -44,10 +49,26 @@ class CommitSettingsPanel(
     private var currentSettings = CommitSettings.createDefault()
     private var originalSettings = CommitSettings.createDefault()
     
+    private lateinit var singleTitleLabel: JBLabel
+    private lateinit var summaryTitleLabel: JBLabel
+    private lateinit var singleResetButton: JButton
+    private lateinit var singleInsertButton: JButton
+    private lateinit var summaryResetButton: JButton
+    private lateinit var summaryInsertButton: JButton
+    private var singleFileVariables: List<Pair<String, String>> = emptyList()
+    private var summaryVariables: List<Pair<String, String>> = emptyList()
+    private val languageChangeListener: () -> Unit = {
+        SwingUtilities.invokeLater {
+            refreshTexts()
+        }
+    }
+
     init {
         setupUI()
         loadSettings()
         setupListeners()
+        refreshTexts()
+        LanguageManager.addChangeListener(languageChangeListener)
     }
     
     private fun setupUI() {
@@ -71,8 +92,8 @@ class CommitSettingsPanel(
         val panel = JPanel(BorderLayout())
         
         // 添加标签到顶部
-        val titleLabel = JBLabel("单个文件提示词:")
-        panel.add(titleLabel, BorderLayout.NORTH)
+        singleTitleLabel = JBLabel(I18n.t("commit.single.title"))
+        panel.add(singleTitleLabel, BorderLayout.NORTH)
         
         singleFileTemplateTextArea.rows = 6
         singleFileTemplateTextArea.columns = 50
@@ -91,15 +112,15 @@ class CommitSettingsPanel(
         
         // 左侧按钮面板（重置、Insert Variable）
         val leftButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT))
-        val resetButton = JButton("重置为默认")
-        resetButton.addActionListener { 
+        singleResetButton = JButton(I18n.t("commit.resetDefault"))
+        singleResetButton.addActionListener { 
             singleFileTemplateTextArea.text = CommitSettings.SIMPLE_TEMPLATE
         }
-        leftButtonPanel.add(resetButton)
+        leftButtonPanel.add(singleResetButton)
         
-        val insertVariableButton = JButton("插入内置变量")
-        insertVariableButton.addActionListener { showVariablePopup(insertVariableButton, singleFileTemplateTextArea, singleFileVariables) }
-        leftButtonPanel.add(insertVariableButton)
+        singleInsertButton = JButton(I18n.t("commit.insertVariable"))
+        singleInsertButton.addActionListener { showVariablePopup(singleInsertButton, singleFileTemplateTextArea, singleFileVariables) }
+        leftButtonPanel.add(singleInsertButton)
         
         buttonPanel.add(leftButtonPanel, BorderLayout.WEST)
         
@@ -113,8 +134,8 @@ class CommitSettingsPanel(
         val panel = JPanel(BorderLayout())
         
         // 添加标签到顶部
-        val titleLabel = JBLabel("汇总提示词:")
-        panel.add(titleLabel, BorderLayout.NORTH)
+        summaryTitleLabel = JBLabel(I18n.t("commit.summary.title"))
+        panel.add(summaryTitleLabel, BorderLayout.NORTH)
         
         summaryTemplateTextArea.rows = 6
         summaryTemplateTextArea.columns = 50
@@ -133,15 +154,15 @@ class CommitSettingsPanel(
         
         // 左侧按钮面板（重置、Insert Variable）
         val leftButtonPanel = JPanel(FlowLayout(FlowLayout.LEFT))
-        val resetButton = JButton("重置为默认")
-        resetButton.addActionListener { 
+        summaryResetButton = JButton(I18n.t("commit.resetDefault"))
+        summaryResetButton.addActionListener { 
             summaryTemplateTextArea.text = CommitSettings.SUMMARY_TEMPLATE
         }
-        leftButtonPanel.add(resetButton)
+        leftButtonPanel.add(summaryResetButton)
         
-        val insertVariableButton = JButton("插入内置变量")
-        insertVariableButton.addActionListener { showVariablePopup(insertVariableButton, summaryTemplateTextArea, summaryVariables) }
-        leftButtonPanel.add(insertVariableButton)
+        summaryInsertButton = JButton(I18n.t("commit.insertVariable"))
+        summaryInsertButton.addActionListener { showVariablePopup(summaryInsertButton, summaryTemplateTextArea, summaryVariables) }
+        leftButtonPanel.add(summaryInsertButton)
         
         buttonPanel.add(leftButtonPanel, BorderLayout.WEST)
         
@@ -168,8 +189,43 @@ class CommitSettingsPanel(
     }
     
     private fun setupTooltips() {
-        TooltipHelper.setTooltip(autoCommitCheckBox, "启用后，生成提交消息后会自动执行提交操作")
-        TooltipHelper.setTooltip(autoPushCheckBox, "启用后，自动提交完成后会自动推送到远程仓库")
+        TooltipHelper.setTooltip(autoCommitCheckBox, I18n.t("commit.autoCommit"))
+        TooltipHelper.setTooltip(autoPushCheckBox, I18n.t("commit.autoPush"))
+    }
+
+    private fun refreshTexts() {
+        autoCommitCheckBox.text = I18n.t("commit.autoCommit")
+        autoPushCheckBox.text = I18n.t("commit.autoPush")
+        singleTitleLabel.text = I18n.t("commit.single.title")
+        summaryTitleLabel.text = I18n.t("commit.summary.title")
+        singleResetButton.text = I18n.t("commit.resetDefault")
+        summaryResetButton.text = I18n.t("commit.resetDefault")
+        singleInsertButton.text = I18n.t("commit.insertVariable")
+        summaryInsertButton.text = I18n.t("commit.insertVariable")
+
+        val newSimpleDefault = CommitSettings.SIMPLE_TEMPLATE
+        if (CommitSettings.matchesSimpleTemplateDefault(singleFileTemplateTextArea.text) ||
+            singleFileTemplateTextArea.text == lastSimpleDefault
+        ) {
+            singleFileTemplateTextArea.text = newSimpleDefault
+        }
+        lastSimpleDefault = newSimpleDefault
+
+        val newSummaryDefault = CommitSettings.SUMMARY_TEMPLATE
+        if (CommitSettings.matchesSummaryTemplateDefault(summaryTemplateTextArea.text) ||
+            summaryTemplateTextArea.text == lastSummaryDefault
+        ) {
+            summaryTemplateTextArea.text = newSummaryDefault
+        }
+        lastSummaryDefault = newSummaryDefault
+
+        singleFileVariables = listOf(
+            TemplateConstants.GitBuiltInVariable.CHANGED_FILES.variable to I18n.t("prompt.variable.changedFiles"),
+            TemplateConstants.GitBuiltInVariable.FILE_DIFFS.variable to I18n.t("prompt.variable.fileDiffs")
+        )
+        summaryVariables = listOf(
+            TemplateConstants.GitBuiltInVariable.BATCH_COMMIT_MESSAGES.variable to I18n.t("prompt.variable.batchCommitMessages")
+        )
     }
     
     private fun loadSettings() {
@@ -251,30 +307,23 @@ class CommitSettingsPanel(
             maxTotalContentLength = currentSettings.maxTotalContentLength
         )
     }
-    
-    /**
-     * 单个文件模板专用变量
-     */
-    private val singleFileVariables = listOf(
-        "{{changedFiles}}" to "Git变更文件列表",
-        "{{fileDiffs}}" to "文件差异详情"
-    )
-    
-    /**
-     * 汇总模板专用变量
-     */
-    private val summaryVariables = listOf(
-        "{{batchCommitMessages}}" to "多个批次的提交信息"
-    )
-    
-    /**
-     * 显示变量选择弹窗
-     */
-    private fun showVariablePopup(component: JButton, targetTextArea: JBTextArea = singleFileTemplateTextArea, customVariables: List<Pair<String, String>>? = null) {
-        val variables = customVariables ?: TemplateConstants.GitBuiltInVariable.values().map { it.variable to it.description }
-        
+
+    private fun showVariablePopup(
+        component: JButton,
+        targetTextArea: JBTextArea = singleFileTemplateTextArea,
+        customVariables: List<Pair<String, String>>? = null
+    ) {
+        val variables = customVariables ?: listOf(
+            TemplateConstants.GitBuiltInVariable.CHANGED_FILES.variable to I18n.t("prompt.variable.changedFiles"),
+            TemplateConstants.GitBuiltInVariable.FILE_DIFFS.variable to I18n.t("prompt.variable.fileDiffs"),
+            TemplateConstants.GitBuiltInVariable.BATCH_COMMIT_MESSAGES.variable to I18n.t("prompt.variable.batchCommitMessages")
+        )
+
         val popup = JBPopupFactory.getInstance().createListPopup(
-            object : BaseListPopupStep<String>("选择变量", variables.map { "${it.first} - ${it.second}" }) {
+            object : BaseListPopupStep<String>(
+                I18n.t("commit.insertVariable"),
+                variables.map { "${it.first} - ${it.second}" }
+            ) {
                 override fun onChosen(selectedValue: String, finalChoice: Boolean): PopupStep<*>? {
                     if (finalChoice) {
                         val selectedVariable = variables.find { "${it.first} - ${it.second}" == selectedValue }?.first
@@ -282,23 +331,16 @@ class CommitSettingsPanel(
                     }
                     return null
                 }
-                
-                override fun getTextFor(value: String): String {
-                    return value
-                }
-                
-                override fun getIconFor(value: String): javax.swing.Icon? {
-                    return null
-                }
+
+                override fun getTextFor(value: String): String = value
+
+                override fun getIconFor(value: String): javax.swing.Icon? = null
             }
         )
-        
+
         popup.showUnderneathOf(component)
     }
-    
-    /**
-     * 在光标位置插入变量
-     */
+
     private fun insertVariableAtCursor(variableName: String, targetTextArea: JBTextArea = singleFileTemplateTextArea) {
         val caretPosition = targetTextArea.caretPosition
         val currentText = targetTextArea.text
@@ -306,6 +348,4 @@ class CommitSettingsPanel(
         targetTextArea.text = newText
         targetTextArea.caretPosition = caretPosition + variableName.length
     }
-    
-
 }

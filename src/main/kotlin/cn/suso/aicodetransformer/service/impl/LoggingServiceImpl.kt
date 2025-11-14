@@ -1,6 +1,7 @@
 package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.constants.*
+import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.model.*
 import cn.suso.aicodetransformer.model.SortDirection
 import cn.suso.aicodetransformer.service.*
@@ -141,7 +142,7 @@ class LoggingServiceImpl : LoggingService {
         addLogEntry(
             level = LogLevel.INFO,
             type = LogType.API_CALL,
-            message = "API调用开始: ${config.name}",
+            message = I18n.t("log.api.call.start", config.name),
             context = "Request ID: $requestId",
             userId = userId,
             requestId = requestId,
@@ -160,10 +161,11 @@ class LoggingServiceImpl : LoggingService {
             "errorType" to (result.errorType?.name ?: "none")
         ))
         
+        val messageKey = if (result.success) "log.api.call.end.success" else "log.api.call.end.failure"
         addLogEntry(
             level = level,
             type = LogType.API_CALL,
-            message = "API调用完成: ${if (result.success) "成功" else "失败"} (${responseTimeMs}ms)",
+            message = I18n.t(messageKey, responseTimeMs),
             context = "Request ID: $requestId",
             requestId = requestId,
             metadata = metadata
@@ -196,9 +198,9 @@ class LoggingServiceImpl : LoggingService {
         
         // 合并敏感数据记录，避免重复日志
         val message = if (this.config.logSensitiveData) {
-            "API请求详情: $requestBody"
+            I18n.t("log.api.request.details.sensitive", requestBody)
         } else {
-            "API请求详情记录"
+            I18n.t("log.api.request.details")
         }
         
         addLogEntry(
@@ -227,9 +229,9 @@ class LoggingServiceImpl : LoggingService {
         
         // 合并敏感数据记录，避免重复日志
         val message = if (this.config.logSensitiveData) {
-            "API响应详情: $responseBody"
+            I18n.t("log.api.response.details.sensitive", responseBody)
         } else {
-            "API响应详情记录"
+            I18n.t("log.api.response.details")
         }
         
         addLogEntry(

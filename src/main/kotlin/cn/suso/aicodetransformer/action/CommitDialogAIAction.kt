@@ -1,5 +1,6 @@
 package cn.suso.aicodetransformer.action
 
+import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.model.FileChangeInfo
 import cn.suso.aicodetransformer.model.CommitSettings
 import cn.suso.aicodetransformer.model.ModelConfiguration
@@ -43,10 +44,36 @@ import git4idea.repo.GitRepositoryManager
 /**
  * 在Git提交对话框中添加AI生成commit信息的Action
  */
-class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成commit信息", null) {
+class CommitDialogAIAction : AnAction(I18n.t("commit.aiAction.text"), I18n.t("commit.aiAction.description"), null) {
 
     companion object {
         private val COMMIT_WORKFLOW_UI_KEY = DataKey.create<CommitWorkflowUi>("CommitWorkflowUi")
+    }
+
+    private fun tr(key: String, vararg args: Any): String = I18n.t(key, *args)
+
+    private fun showInfo(project: Project, messageKey: String, titleKey: String = "notice", vararg args: Any) {
+        Messages.showInfoMessage(project, tr(messageKey, *args), tr(titleKey))
+    }
+
+    private fun showError(project: Project, messageKey: String, vararg args: Any) {
+        Messages.showErrorDialog(project, tr(messageKey, *args), tr("commit.aiAction.errorTitle"))
+    }
+
+    private fun showError(project: Project, messageKey: String, titleKey: String, vararg args: Any) {
+        Messages.showErrorDialog(project, tr(messageKey, *args), tr(titleKey))
+    }
+
+    private fun notify(project: Project, titleKey: String, contentKey: String, type: NotificationType, vararg args: Any) {
+        Notifications.Bus.notify(
+            Notification(
+                "VCS",
+                tr(titleKey, *args),
+                tr(contentKey, *args),
+                type
+            ),
+            project
+        )
     }
 
     override fun getActionUpdateThread(): ActionUpdateThread {
@@ -76,19 +103,15 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
 
                 if (templateContent.isBlank()) {
                     ApplicationManager.getApplication().invokeLater {
-                        Messages.showInfoMessage(project, "没有可用的commit模板", "提示")
+                        showInfo(project, "commit.aiAction.noTemplate")
                     }
                     return@executeOnPooledThread
                 }
-                
+
                 generateAndSetCommitMessage(project, e, templateContent)
             } catch (ex: Exception) {
                 ApplicationManager.getApplication().invokeLater {
-                    Messages.showErrorDialog(
-                        project,
-                        "生成commit信息失败: ${ex.message}",
-                        "错误"
-                    )
+                    showError(project, "commit.aiAction.generateError", ex.message ?: "")
                 }
             }
         }
@@ -136,10 +159,10 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
         val finalSelectedChanges = selectedChanges
         
         // 使用ProgressManager在后台线程中执行，显示进度条
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "正在生成AI提交信息...", true) {
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, tr("commit.aiAction.progress.title"), true) {
             override fun run(indicator: ProgressIndicator) {
                 try {
-                    indicator.text = "正在分析文件变更..."
+                    indicator.text = tr("commit.aiAction.progress.analyzing")
                     indicator.fraction = 0.1
                     
                     if (finalSelectedChanges == null || finalSelectedChanges.isEmpty()) {
@@ -149,7 +172,7 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
                         
                         if (allChanges.isEmpty()) {
                             ApplicationManager.getApplication().invokeLater {
-                                Messages.showInfoMessage(project, "没有检测到文件变更", "提示")
+                                showInfo(project, "commit.aiAction.noChanges")
                             }
                             return
                         } else {
@@ -157,10 +180,10 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
                             ApplicationManager.getApplication().invokeLater {
                                 val result = Messages.showYesNoDialog(
                                     project,
-                                    "没有检测到选中的文件。\n\n是否要为所有 ${allChanges.size} 个变更文件生成提交信息？\n\n点击\"否\"可以取消操作，然后在Git Changes面板中选择特定文件后重试。",
-                                    "AI提交信息生成",
-                                    "为所有文件生成",
-                                    "取消",
+                                    tr("commit.aiAction.generateAll.prompt", allChanges.size),
+                                    tr("commit.aiAction.generateAll.title"),
+                                    tr("commit.aiAction.generateAll.yes"),
+                                    tr("commit.aiAction.generateAll.no"),
                                     Messages.getQuestionIcon()
                                 )
                                 
@@ -177,11 +200,7 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
                     
                 } catch (ex: Exception) {
                     ApplicationManager.getApplication().invokeLater {
-                        Messages.showErrorDialog(
-                            project,
-                            "AI生成提交信息失败: ${ex.message}",
-                            "错误"
-                        )
+                        showError(project, "commit.aiAction.generateFailed", ex.message ?: "")
                     }
                 }
             }
@@ -203,10 +222,10 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
         val result = aiModelService.callModel(config, prompt, apiKey)
         
         return if (result.success) {
-            val content = result.content ?: "自动生成的提交信息"
+            val content = result.content ?: tr("commit.aiAction.result.autoGenerated")
             content
         } else {
-            throw Exception(result.errorMessage ?: "AI调用失败")
+            throw Exception(result.errorMessage ?: tr("commit.aiAction.error.aiCallFailed"))
         }
     }
 
@@ -221,22 +240,22 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
             val aiModelService = project.service<AIModelService>()
             
             val config = configurationService.getDefaultModelConfiguration()
-                ?: return "配置错误：未找到默认模型配置"
+                ?: return tr("commit.aiAction.error.noDefaultConfig")
             
             val apiKey = config.apiKey
             if (apiKey.isBlank()) {
-                return "配置错误：API密钥未设置"
+                return tr("commit.aiAction.error.apiKeyMissing")
             }
             
             val result = aiModelService.callModel(config, prompt, apiKey)
             
             if (result.success) {
-                result.content ?: "生成失败：返回内容为空"
+                result.content ?: tr("commit.aiAction.error.emptyResponse")
             } else {
-                "生成失败：${result.errorMessage}"
+                tr("commit.aiAction.error.batchFailed", result.errorMessage ?: "")
             }
         } catch (e: Exception) {
-            "生成异常：${e.message}"
+            tr("commit.aiAction.error.batchException", e.message ?: "")
         }
     }
     
@@ -248,22 +267,17 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
         val configurationService = service<ConfigurationService>()
         
         if (batchResults.size == 1) {
-            // 只有一个批次，直接返回结果（去掉批次前缀）
-            val result = batchResults.first().substringAfter(": ")
-            return result
+            return batchResults.first().substringAfter(": ")
         }
-        
-        // 从配置中获取汇总模板
+
         val commitSettings = configurationService.getCommitSettings()
         val summaryTemplate = commitSettings.summaryTemplate
-        
-        // 使用模板变量替换
-        val summaryPrompt = summaryTemplate.replace("{{batchCommitMessages}}", batchResults.joinToString("\n\n"))
-        
+        val joinedResults = batchResults.joinToString("\n\n")
 
-        val result = generateCommitForBatch(summaryPrompt, project)
-        
-        return result
+        var summaryPrompt = summaryTemplate.replace("{{batchCommitMessages}}", joinedResults)
+        summaryPrompt = summaryPrompt.replace("{BATCH_COMMIT_MESSAGES}", joinedResults)
+
+        return generateCommitForBatch(summaryPrompt, project)
     }
 
     private fun setCommitMessageToDialog(e: AnActionEvent, message: String): Boolean {
@@ -329,12 +343,12 @@ class CommitDialogAIAction : AnAction("🤖 AI生成", "使用AI自动生成comm
     private fun buildPromptForChanges(fileChanges: List<FileChangeInfo>, templateContent: String): String {
         // 构建文件变更信息
         val changesInfo = fileChanges.joinToString("\n\n") { change ->
-            """
-文件: ${change.filePath}
-变更类型: ${change.changeType}
-差异详情:
-${change.diff}
-            """.trimIndent()
+            listOf(
+                tr("commit.aiAction.prompt.fileLine", change.filePath),
+                tr("commit.aiAction.prompt.changeTypeLine", change.changeType),
+                tr("commit.aiAction.prompt.diffHeader"),
+                change.diff
+            ).joinToString("\n")
         }
         
         // 构建文件列表
@@ -350,12 +364,13 @@ ${change.diff}
         // 如果原始模板中没有任何变量，则在末尾添加变更信息以保持兼容性
         if (!templateContent.contains("{{changedFiles}}") && 
             !templateContent.contains("{{fileDiffs}}")) {
-            result = """
-$templateContent
-
-以下是代码变更信息：
-$changesInfo
-            """.trimIndent()
+            result = buildString {
+                append(templateContent)
+                append("\n\n")
+                append(tr("commit.aiAction.prompt.appendChangesHeader"))
+                append("\n")
+                append(changesInfo)
+            }
         }
         
         return result
@@ -418,12 +433,15 @@ $changesInfo
         // 根据是否有选中文件更新按钮文本和描述
         if (hasSelectedFiles && selectedChanges != null) {
             val changesSize = selectedChanges.size
-            e.presentation.text = "🤖 AI生成 (${changesSize}个文件)"
-            e.presentation.description = "为选中的${changesSize}个文件生成commit信息"
+            e.presentation.text = tr("commit.aiAction.presentation.selected", changesSize)
+            e.presentation.description = tr("commit.aiAction.presentation.selected.desc", changesSize)
         } else if (hasAnyChanges) {
             val allChangesCount = changeListManager.defaultChangeList.changes.size
-            e.presentation.text = "🤖 AI生成 (所有${allChangesCount}个文件)"
-            e.presentation.description = "为所有${allChangesCount}个变更文件生成commit信息"
+            e.presentation.text = tr("commit.aiAction.presentation.all", allChangesCount)
+            e.presentation.description = tr("commit.aiAction.presentation.all.desc", allChangesCount)
+        } else {
+            e.presentation.text = tr("commit.aiAction.text")
+            e.presentation.description = tr("commit.aiAction.description")
         }
     }
     
@@ -483,22 +501,14 @@ $changesInfo
                         selectedChanges = allChanges
                     } else {
                         ApplicationManager.getApplication().invokeLater {
-                            Messages.showInfoMessage(
-                                project,
-                                "暂存区没有文件可提交，请先添加文件到暂存区。",
-                                "无文件可提交"
-                            )
+                            showInfo(project, "commit.aiAction.autoCommit.noStaged")
                         }
                         return
                     }
                 } catch (ex: Exception) {
                     loggingService.logError(ex, "CommitDialogAIAction - 获取暂存区文件异常: ${ex.message}")
                     ApplicationManager.getApplication().invokeLater {
-                        Messages.showErrorDialog(
-                            project,
-                            "获取暂存区文件时发生错误: ${ex.message}",
-                            "获取文件错误"
-                        )
+                        showError(project, "commit.aiAction.autoCommit.fetchStagedError", ex.message ?: "")
                     }
                     return
                 }
@@ -511,11 +521,7 @@ $changesInfo
             
         } catch (ex: Exception) {
             loggingService.logError(ex, "自动提交异常: ${ex.message}")
-            Messages.showErrorDialog(
-                project,
-                "自动提交过程中发生异常: ${ex.message}",
-                "自动提交异常"
-            )
+            showError(project, "commit.aiAction.autoCommit.exception", ex.message ?: "")
         }
     }
 
@@ -551,14 +557,12 @@ $changesInfo
                                     loggingService.logError(ex, "CommitDialogAIAction - VCS刷新失败: ${ex.message}")
                                 }
                                 
-                                Notifications.Bus.notify(
-                                    Notification(
-                                        "VCS",
-                                        "自动提交成功",
-                                        "已成功提交 $fileCount 个文件到版本控制系统",
-                                        NotificationType.INFORMATION
-                                    ),
-                                    project
+                                notify(
+                                    project,
+                                    "commit.aiAction.notify.autoCommit.success.title",
+                                    "commit.aiAction.notify.autoCommit.success.content",
+                                    NotificationType.INFORMATION,
+                                    fileCount
                                 )
                                 
                                 // 如果启用了自动推送，执行推送
@@ -567,14 +571,11 @@ $changesInfo
                                 }
                             } else {
                                 loggingService.logError(Exception("VCS提交失败"), "提交失败 - vcsService.commitChanges返回false")
-                                Notifications.Bus.notify(
-                                    Notification(
-                                        "VCS",
-                                        "自动提交失败",
-                                        "提交过程中发生错误，请检查日志获取详细信息",
-                                        NotificationType.ERROR
-                                    ),
-                                    project
+                                notify(
+                                    project,
+                                    "commit.aiAction.notify.autoCommit.failure.title",
+                                    "commit.aiAction.notify.autoCommit.failure.content",
+                                    NotificationType.ERROR
                                 )
                             }
                         }
@@ -583,50 +584,40 @@ $changesInfo
                         // 在EDT线程中显示错误
                         ApplicationManager.getApplication().invokeLater {
                             loggingService.logError(ex, "后台提交执行失败: ${ex.message}")
-                            Notifications.Bus.notify(
-                                Notification(
-                                    "VCS",
-                                    "自动提交异常",
-                                    "后台提交执行失败: ${ex.message}",
-                                    NotificationType.ERROR
-                                ),
-                                project
+                            notify(
+                                project,
+                                "commit.aiAction.notify.autoCommit.exception.title",
+                                "commit.aiAction.notify.autoCommit.exception.content",
+                                NotificationType.ERROR,
+                                ex.message ?: ""
                             )
                         }
                     }
                 } else {
-                    Notifications.Bus.notify(
-                        Notification(
-                            "VCS",
-                            "自动提交失败",
-                            "提交信息为空，无法执行提交",
-                            NotificationType.WARNING
-                        ),
-                        project
+                    notify(
+                        project,
+                        "commit.aiAction.notify.autoCommit.failure.title",
+                        "commit.aiAction.notify.autoCommit.emptyMessage",
+                        NotificationType.WARNING
                     )
                 }
             } else {
-                Notifications.Bus.notify(
-                    Notification(
-                        "VCS",
-                        "无需提交",
-                        "没有检测到需要提交的变更",
-                        NotificationType.INFORMATION
-                    ),
-                    project
+                notify(
+                    project,
+                    "commit.aiAction.notify.autoCommit.noChanges.title",
+                    "commit.aiAction.notify.autoCommit.noChanges.content",
+                    NotificationType.INFORMATION
                 )
             }
             
         } catch (ex: Exception) {
             loggingService.logError(ex, "备用提交方法执行失败: ${ex.message}")
-            Notifications.Bus.notify(
-                Notification(
-                    "VCS",
-                    "自动提交异常",
-                    "备用提交方法执行失败: ${ex.message}",
-                    NotificationType.ERROR
-                ),
-                project
+            notify(
+                project,
+                "commit.aiAction.notify.autoCommit.exception.title",
+                "commit.aiAction.notify.autoCommit.fallbackError",
+                NotificationType.ERROR,
+                ex.message ?: ""
             )
         }
     }
@@ -642,24 +633,18 @@ $changesInfo
                 // 在EDT线程中更新UI
                 ApplicationManager.getApplication().invokeLater {
                     if (success) {
-                        Notifications.Bus.notify(
-                            Notification(
-                                "VCS",
-                                "自动推送成功",
-                                "代码已自动推送到远程仓库",
-                                NotificationType.INFORMATION
-                            ),
-                            project
+                        notify(
+                            project,
+                            "commit.aiAction.notify.autoPush.success.title",
+                            "commit.aiAction.notify.autoPush.success.content",
+                            NotificationType.INFORMATION
                         )
                     } else {
-                        Notifications.Bus.notify(
-                            Notification(
-                                "VCS",
-                                "自动推送失败",
-                                "推送过程中发生错误，请手动推送",
-                                NotificationType.WARNING
-                            ),
-                            project
+                        notify(
+                            project,
+                            "commit.aiAction.notify.autoPush.failure.title",
+                            "commit.aiAction.notify.autoPush.failure.content",
+                            NotificationType.WARNING
                         )
                     }
                 }
@@ -668,14 +653,12 @@ $changesInfo
                 // 在EDT线程中显示错误
                 ApplicationManager.getApplication().invokeLater {
                     loggingService.logError(ex, "自动推送失败: ${ex.message}")
-                    Notifications.Bus.notify(
-                        Notification(
-                            "VCS",
-                            "自动推送失败",
-                            "自动推送功能暂时不可用，请手动推送。错误: ${ex.message}",
-                            NotificationType.WARNING
-                        ),
-                        project
+                    notify(
+                        project,
+                        "commit.aiAction.notify.autoPush.failure.title",
+                        "commit.aiAction.notify.autoPush.unavailable.content",
+                        NotificationType.WARNING,
+                        ex.message ?: ""
                     )
                 }
             }
@@ -690,17 +673,13 @@ $changesInfo
      * 带进度条的提交信息生成方法（用于用户确认所有文件后的重新启动）
      */
     private fun generateCommitForChangesWithProgress(e: AnActionEvent, project: Project, changes: List<Change>, templateContent: String) {
-        ProgressManager.getInstance().run(object : Task.Backgroundable(project, "正在生成AI提交信息...", true) {
+        ProgressManager.getInstance().run(object : Task.Backgroundable(project, tr("commit.aiAction.progress.title"), true) {
             override fun run(indicator: ProgressIndicator) {
                 try {
                     generateCommitForChangesInternal(e, project, changes, templateContent, indicator)
                 } catch (ex: Exception) {
                     ApplicationManager.getApplication().invokeLater {
-                        Messages.showErrorDialog(
-                            project,
-                            "AI生成提交信息失败: ${ex.message}",
-                            "错误"
-                        )
+                        showError(project, "commit.aiAction.generateFailed", ex.message ?: "")
                     }
                 }
             }
@@ -716,7 +695,7 @@ $changesInfo
         val configurationService = service<ConfigurationService>()
         val loggingService = service<LoggingService>()
 
-        indicator.text = "正在分析文件变更..."
+        indicator.text = tr("commit.aiAction.progress.analyzingChanges")
         indicator.fraction = 0.2
 
            // 在分析与生成diff前，确保所有编辑内容已保存并提交到PSI
@@ -732,7 +711,7 @@ $changesInfo
         // 分析文件变更
         val fileChanges = mutableListOf<FileChangeInfo>()
         for ((index, change) in changes.withIndex()) {
-            indicator.text = "正在分析文件 ${index + 1}/${changes.size}..."
+            indicator.text = tr("commit.aiAction.progress.analyzingFile", index + 1, changes.size)
             indicator.fraction = 0.2 + (0.3 * index / changes.size)
             
             // 获取文件路径，对删除文件特殊处理
@@ -741,7 +720,7 @@ $changesInfo
                 change.beforeRevision != null -> change.beforeRevision!!.file.path
                 change.afterRevision != null -> change.afterRevision!!.file.path
                 else -> {
-                    loggingService.logWarning("无法获取文件路径，跳过此变更", "CommitDialogAIAction")
+                    loggingService.logWarning("Unable to resolve file path, skipping change", "CommitDialogAIAction")
                     continue
                 }
             }
@@ -755,13 +734,14 @@ $changesInfo
             }
             
             val changeType = when (change.type) {
-                Change.Type.NEW -> "新增文件"
-                Change.Type.DELETED -> "删除文件"
-                Change.Type.MODIFICATION -> "修改文件"
-                Change.Type.MOVED -> "移动文件"
-                else -> "未知变更"
+                Change.Type.NEW -> tr("commit.aiAction.changeType.new")
+                Change.Type.DELETED -> tr("commit.aiAction.changeType.deleted")
+                Change.Type.MODIFICATION -> tr("commit.aiAction.changeType.modified")
+                Change.Type.MOVED -> tr("commit.aiAction.changeType.moved")
+                else -> tr("commit.aiAction.changeType.unknown")
             }
 
+            val diffLine = tr("commit.aiAction.diff.fileLine", changeType, fileName)
             val diff = try {
                 // 对于所有文件类型，都使用相对路径
                 val relativePath = getRelativePathFromProject(project, fullPath)
@@ -770,26 +750,26 @@ $changesInfo
                     if (ensureFileInStagingArea(project, relativePath)) {
                         vcsService.getFileDiff(project, relativePath, staged = true)
                     } else {
-                        "$changeType: $fileName\n无法将文件添加到暂存区"
+                        "$diffLine\n${tr("commit.aiAction.error.ensureStage")}"
                     }
                 } else {
-                    "$changeType: $fileName\n无法获取文件差异内容"
+                    "$diffLine\n${tr("commit.aiAction.error.diffUnavailable")}" 
                 }
             } catch (e: Exception) {
-                "获取差异失败: ${e.message}"
+                tr("commit.aiAction.error.diffFailed", e.message ?: "")
             }
 
             fileChanges.add(FileChangeInfo(fileName, changeType, diff))
         }
 
-        indicator.text = "正在验证AI模型配置..."
+        indicator.text = tr("commit.aiAction.progress.validatingConfig")
         indicator.fraction = 0.5
 
         // 获取AI模型配置
         val config = configurationService.getDefaultModelConfiguration()
         if (config == null) {
             ApplicationManager.getApplication().invokeLater {
-                Messages.showErrorDialog(project, "请先配置AI模型", "错误")
+                showError(project, "commit.aiAction.error.configureModelFirst")
             }
             return
         }
@@ -797,7 +777,7 @@ $changesInfo
         val apiKey = config.apiKey
         if (apiKey.isBlank()) {
             ApplicationManager.getApplication().invokeLater {
-                Messages.showErrorDialog(project, "请先设置API密钥", "错误")
+                showError(project, "commit.aiAction.error.apiKeyRequired")
             }
             return
         }
@@ -805,7 +785,7 @@ $changesInfo
         // 获取配置设置
         val commitSettings = configurationService.getCommitSettings()
 
-        indicator.text = "正在生成提交信息..."
+        indicator.text = tr("commit.aiAction.progress.generatingMessage")
         indicator.fraction = 0.6
 
 
@@ -821,14 +801,14 @@ $changesInfo
 
             val commitMessage = if (decision.needsBatching) {
                 // 分批处理
-                indicator.text = "正在分批处理文件..."
+                indicator.text = tr("commit.aiAction.progress.processingBatches")
                 indicator.fraction = 0.7
                 runBlocking {
                     processBatchCommitWithDecision(decision, templateContent, project, config, apiKey, aiModelService, indicator)
                 }
             } else {
                 // 单批处理
-                indicator.text = "正在调用AI生成提交信息..."
+                indicator.text = tr("commit.aiAction.progress.callingModel")
                 indicator.fraction = 0.8
                 val prompt = buildPromptForChanges(fileChanges, templateContent)
                 runBlocking {
@@ -836,7 +816,7 @@ $changesInfo
                 }
             }
 
-            indicator.text = "正在设置提交信息..."
+            indicator.text = tr("commit.aiAction.progress.settingMessage")
             indicator.fraction = 0.9
 
             // 回到EDT线程设置提交信息
@@ -849,24 +829,16 @@ $changesInfo
                         performAutoCommit(e, project, commitSettings, loggingService, commitMessage)
                     }
                 } else {
-                    Messages.showErrorDialog(
-                        project,
-                        "无法自动设置提交信息到对话框，请手动输入提交信息",
-                        "设置失败"
-                    )
+                    showError(project, "commit.aiAction.error.setMessageFailed", "commit.aiAction.error.setMessageFailed.title")
                 }
             }
 
-            indicator.text = "完成"
+            indicator.text = tr("commit.aiAction.progress.done")
             indicator.fraction = 1.0
 
         } catch (ex: Exception) {
             ApplicationManager.getApplication().invokeLater {
-                Messages.showErrorDialog(
-                    project,
-                    "AI生成提交信息失败: ${ex.message}",
-                    "错误"
-                )
+                showError(project, "commit.aiAction.generateFailed", ex.message ?: "")
             }
         }
     }
@@ -883,21 +855,21 @@ $changesInfo
         aiModelService: AIModelService,
         indicator: ProgressIndicator? = null
     ): String {
-        val batches = decision.batches ?: throw IllegalArgumentException("批次信息不能为空")
+        val batches = decision.batches ?: throw IllegalArgumentException("Batch information must not be null")
         val batchResults = mutableListOf<String>()
         
         for ((batchIndex, batch) in batches.withIndex()) {
-            indicator?.text = "正在处理批次 ${batchIndex + 1}/${batches.size}..."
+            indicator?.text = tr("commit.aiAction.progress.processingBatch", batchIndex + 1, batches.size)
             indicator?.fraction = 0.7 + (0.15 * batchIndex / batches.size)
             
             val prompt = buildPromptForChanges(batch, templateContent)
             val batchResult = generateCommitForSingleBatch(prompt, config, apiKey, aiModelService)
-            batchResults.add("批次 ${batchIndex + 1}: $batchResult")
+            batchResults.add(tr("commit.aiAction.batch.resultLine", batchIndex + 1, batchResult))
             
         }
         
         // 汇总所有批次结果
-        indicator?.text = "正在汇总批次结果..."
+        indicator?.text = tr("commit.aiAction.progress.summarizingBatches")
         indicator?.fraction = 0.9
 
         return summarizeBatchResults(batchResults, templateContent, project)

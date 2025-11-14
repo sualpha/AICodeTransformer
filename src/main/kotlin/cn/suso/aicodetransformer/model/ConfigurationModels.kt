@@ -133,6 +133,12 @@ class GlobalSettings {
     var lastUpdateCheckTime: Long = 0L
         get() = field
         set(value) { field = value }
+
+    // 显示语言：system/zh_CN/en_US
+    @com.intellij.util.xmlb.annotations.Attribute("displayLanguage")
+    var displayLanguage: String = "system"
+        get() = field
+        set(value) { field = value }
     
     // 缓存设置
     @com.intellij.util.xmlb.annotations.Attribute("enableCache")
@@ -162,7 +168,8 @@ class GlobalSettings {
         updateCheckIntervalHours: Int = 24,
         lastUpdateCheckTime: Long = 0L,
         enableCache: Boolean = false,
-        cacheDefaultTtlMinutes: Int = 15
+        cacheDefaultTtlMinutes: Int = 15,
+        displayLanguage: String = "system"
     ) {
         this.enableLogging = enableLogging
         this.logLevel = logLevel
@@ -176,6 +183,7 @@ class GlobalSettings {
         this.lastUpdateCheckTime = lastUpdateCheckTime
         this.enableCache = enableCache
         this.cacheDefaultTtlMinutes = cacheDefaultTtlMinutes
+        this.displayLanguage = displayLanguage
     }
 }
 

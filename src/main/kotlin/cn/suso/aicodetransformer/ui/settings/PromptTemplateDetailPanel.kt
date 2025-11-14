@@ -1,5 +1,6 @@
 package cn.suso.aicodetransformer.ui.settings
 
+import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.model.PromptTemplate
 import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
@@ -22,16 +23,22 @@ class PromptTemplateDetailPanel : JPanel() {
     
     private val templateService: PromptTemplateService = PromptTemplateServiceImpl.getInstance()
     
+    private lateinit var tabbedPane: JTabbedPane
+    
     // 基本信息字段
     private val nameField = JBTextField()
     private val descriptionField = JBTextField()
     private val categoryField = JBTextField()
-    private val enabledCheckBox = JBCheckBox("启用模板")
-    private val builtInCheckBox = JBCheckBox("内置模板")
+    private val enabledCheckBox = JBCheckBox(I18n.t("prompt.enableTemplate"))
+    private val builtInCheckBox = JBCheckBox(I18n.t("prompt.builtInTemplate"))
+    private lateinit var nameLabel: JBLabel
+    private lateinit var descriptionLabel: JBLabel
+    private lateinit var categoryLabel: JBLabel
+    private lateinit var shortcutLabel: JBLabel
     
     // 快捷键字段
     private val shortcutField = JBTextField()
-    private val shortcutHelpLabel = JLabel("<html><small>格式: Ctrl+Alt+T 或 Ctrl+Shift+A</small></html>")
+    private val shortcutHelpLabel = JLabel("<html><small>${I18n.t("prompt.shortcut.help")}</small></html>")
     
     // 内容字段
     private val contentArea = JBTextArea()
@@ -40,7 +47,7 @@ class PromptTemplateDetailPanel : JPanel() {
     // 标签字段已移除 - 不再需要标签功能
     
     // 编辑按钮（仅在创建模式下显示）
-    private val validateTemplateButton = JButton("验证模板")
+    private val validateTemplateButton = JButton(I18n.t("prompt.validate"))
     private val contentToolbar = JPanel()
     
     private var currentTemplate: PromptTemplate? = null
@@ -55,15 +62,15 @@ class PromptTemplateDetailPanel : JPanel() {
     }
     
     private fun setupUI() {
-        val tabbedPane = JTabbedPane()
+        tabbedPane = JTabbedPane()
         
         // 基本信息标签页
         val basicPanel = createBasicInfoPanel()
-        tabbedPane.addTab("基本信息", basicPanel)
+        tabbedPane.addTab(I18n.t("prompt.basic.tab"), basicPanel)
         
         // 内容标签页
         val contentPanel = createContentPanel()
-        tabbedPane.addTab("模板内容", contentPanel)
+        tabbedPane.addTab(I18n.t("prompt.content.tab"), contentPanel)
         
 
         
@@ -95,11 +102,15 @@ class PromptTemplateDetailPanel : JPanel() {
         panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
         
         // 创建紧凑的表单布局
+        nameLabel = JBLabel(I18n.t("prompt.name.label")).apply { labelFor = nameField }
+        descriptionLabel = JBLabel(I18n.t("prompt.description.label")).apply { labelFor = descriptionField }
+        categoryLabel = JBLabel(I18n.t("prompt.category.field")).apply { labelFor = categoryField }
+        shortcutLabel = JBLabel(I18n.t("prompt.shortcut.label")).apply { labelFor = shortcutField }
         val formPanel = FormBuilder.createFormBuilder()
-            .addLabeledComponent("模板名称:", nameField)
-            .addLabeledComponent("描述:", descriptionField)
-            .addLabeledComponent("分类:", categoryField)
-            .addLabeledComponent("快捷键:", JPanel(BorderLayout()).apply {
+            .addLabeledComponent(nameLabel, nameField)
+            .addLabeledComponent(descriptionLabel, descriptionField)
+            .addLabeledComponent(categoryLabel, categoryField)
+            .addLabeledComponent(shortcutLabel, JPanel(BorderLayout()).apply {
                 add(shortcutField, BorderLayout.CENTER)
                 add(shortcutHelpLabel, BorderLayout.SOUTH)
             })
@@ -150,6 +161,23 @@ class PromptTemplateDetailPanel : JPanel() {
         
         // 编辑按钮事件监听器
         validateTemplateButton.addActionListener { validateTemplateAndShowResult() }
+    }
+
+    fun refreshTexts() {
+        enabledCheckBox.text = I18n.t("prompt.enableTemplate")
+        builtInCheckBox.text = I18n.t("prompt.builtInTemplate")
+        validateTemplateButton.text = I18n.t("prompt.validate")
+        shortcutHelpLabel.text = "<html><small>${I18n.t("prompt.shortcut.help")}</small></html>"
+
+        nameLabel.text = I18n.t("prompt.name.label")
+        descriptionLabel.text = I18n.t("prompt.description.label")
+        categoryLabel.text = I18n.t("prompt.category.field")
+        shortcutLabel.text = I18n.t("prompt.shortcut.label")
+
+        if (::tabbedPane.isInitialized) {
+            tabbedPane.setTitleAt(0, I18n.t("prompt.basic.tab"))
+            tabbedPane.setTitleAt(1, I18n.t("prompt.content.tab"))
+        }
     }
     
     fun setTemplate(template: PromptTemplate?) {
@@ -291,8 +319,6 @@ class PromptTemplateDetailPanel : JPanel() {
             val content = contentArea.text
             val enabled = enabledCheckBox.isSelected
             val shortcut: String? = null
-            // 标签功能已移除
-            val tags = emptyList<String>()
             
             // 验证基本字段
             if (strictValidation) {
@@ -316,7 +342,6 @@ class PromptTemplateDetailPanel : JPanel() {
                 description = description.takeIf { it.isNotEmpty() },
                 content = content,
                 category = category,
-                tags = tags,
                 enabled = enabled,
                 isBuiltIn = false,
                 shortcutKey = shortcut,

@@ -1,6 +1,8 @@
 package cn.suso.aicodetransformer.ui.settings
 
+import cn.suso.aicodetransformer.model.CommitSettings
 import cn.suso.aicodetransformer.service.ConfigurationService
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.options.Configurable
@@ -32,6 +34,16 @@ class AICodeTransformerConfigurable : Configurable {
         return try {
             if (settingsPanel == null) {
                 val currentProject = project ?: ProjectManager.getInstance().defaultProject
+                // 初始化显示语言
+                kotlin.runCatching {
+                    val settings = configurationService.getGlobalSettings()
+                    LanguageManager.setLanguage(settings.displayLanguage)
+                    val commitSettings = configurationService.getCommitSettings()
+                    val normalized = CommitSettings.normalizeTemplates(commitSettings)
+                    if (normalized != commitSettings) {
+                        configurationService.saveCommitSettings(normalized)
+                    }
+                }
                 settingsPanel = AICodeTransformerSettingsPanel(currentProject, configurationService)
             }
             settingsPanel
@@ -68,6 +80,14 @@ class AICodeTransformerConfigurable : Configurable {
     }
     
     override fun disposeUIResources() {
+        // 调用面板的dispose方法清理资源
+        settingsPanel?.let { panel ->
+            // 如果有dispose方法，调用它
+            kotlin.runCatching {
+                val disposeMethod = panel.javaClass.getMethod("dispose")
+                disposeMethod.invoke(panel)
+            }
+        }
         settingsPanel = null
     }
 }

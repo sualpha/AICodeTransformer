@@ -6,6 +6,8 @@ import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.TemplateChangeListener
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.i18n.LanguageManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.ToolbarDecorator
@@ -24,6 +26,7 @@ import java.awt.Font
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 import javax.swing.event.DocumentEvent
+import javax.swing.SwingUtilities
 import javax.swing.event.DocumentListener
 import javax.swing.event.ListSelectionEvent
 import javax.swing.event.ListSelectionListener
@@ -46,8 +49,14 @@ class PromptTemplatePanel(
     // UI 组件
     private val searchField = JBTextField()
     private lateinit var templateManagementPanel: JPanel
+    private lateinit var titleLabel: JBLabel
+    private lateinit var descLabel: JBLabel
+    private lateinit var searchLabel: JBLabel
+    private lateinit var categoryLabel: JBLabel
+    private lateinit var leftTitleLabel: JBLabel
+    private lateinit var rightTitleLabel: JBLabel
     private val categoryComboBox = JComboBox<String>()
-    private val enabledOnlyCheckBox = JBCheckBox("仅显示启用的模板")
+    private val enabledOnlyCheckBox = JBCheckBox(I18n.t("prompt.enabledOnly"))
     
     private val templateListModel = DefaultListModel<PromptTemplate>()
     private val templateList = JBList(templateListModel)
@@ -55,7 +64,10 @@ class PromptTemplatePanel(
     
     private val detailPanel = PromptTemplateDetailPanel()
     
-    private val statusLabel = JLabel("就绪")
+    private val statusLabel = JLabel(I18n.t("status.ready"))
+    private lateinit var importButton: JButton
+    private lateinit var exportButton: JButton
+    private lateinit var resetButton: JButton
     
     private var templates = listOf<PromptTemplate>()
     private var filteredTemplates = listOf<PromptTemplate>()
@@ -69,6 +81,7 @@ class PromptTemplatePanel(
         setupUI()
         loadTemplates()
         setupListeners()
+        setupLanguageListener()
         promptTemplateService.addTemplateChangeListener(this)
     }
     
@@ -77,11 +90,11 @@ class PromptTemplatePanel(
         val headerPanel = JBPanel<JBPanel<*>>(BorderLayout())
         headerPanel.border = EmptyBorder(JBUI.insets(0, 0, 16, 0))
         
-        val titleLabel = JBLabel("Prompt 模板管理")
+        titleLabel = JBLabel(I18n.t("prompt.management.title"))
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
         titleLabel.foreground = UIUtil.getLabelForeground()
-        
-        val descLabel = JBLabel("管理AI代码转换的Prompt模板和快捷键绑定")
+
+        descLabel = JBLabel(I18n.t("prompt.management.desc"))
         descLabel.font = descLabel.font.deriveFont(12f)
         descLabel.foreground = UIUtil.getLabelDisabledForeground()
         
@@ -97,8 +110,8 @@ class PromptTemplatePanel(
         
         // 添加标签页
         tabbedPane.border = JBUI.Borders.empty()
-        tabbedPane.addTab("模板管理", templateManagementPanel)
-        tabbedPane.addTab("快捷键绑定", shortcutBindingPanel)
+        tabbedPane.addTab(I18n.t("prompt.tab.templates"), templateManagementPanel)
+        tabbedPane.addTab(I18n.t("prompt.tab.shortcuts"), shortcutBindingPanel)
         
         add(tabbedPane, BorderLayout.CENTER)
     }
@@ -129,18 +142,18 @@ class PromptTemplatePanel(
         val searchPanel = JBPanel<JBPanel<*>>()
         searchPanel.layout = BoxLayout(searchPanel, BoxLayout.X_AXIS)
         
-        val searchLabel = JBLabel("搜索: ")
+        searchLabel = JBLabel(I18n.t("prompt.search.label"))
         searchLabel.font = searchLabel.font.deriveFont(Font.BOLD)
         searchPanel.add(searchLabel)
         
         searchField.preferredSize = Dimension(200, searchField.preferredSize.height)
-        searchField.toolTipText = "搜索模板名称、内容或标签"
-        searchField.putClientProperty("JTextField.placeholderText", "输入关键词搜索...")
+        searchField.toolTipText = I18n.t("prompt.search.tooltip")
+        searchField.putClientProperty("JTextField.placeholderText", I18n.t("prompt.search.placeholder"))
         searchPanel.add(searchField)
         
         searchPanel.add(Box.createHorizontalStrut(16))
         
-        val categoryLabel = JBLabel("分类: ")
+        categoryLabel = JBLabel(I18n.t("prompt.category.label"))
         categoryLabel.font = categoryLabel.font.deriveFont(Font.BOLD)
         searchPanel.add(categoryLabel)
         searchPanel.add(categoryComboBox)
@@ -156,7 +169,7 @@ class PromptTemplatePanel(
     
     private fun createSplitPane(): JSplitPane {
         // 左侧面板标题和列表
-        val leftTitleLabel = JBLabel("模板列表")
+        leftTitleLabel = JBLabel(I18n.t("prompt.list.title"))
         leftTitleLabel.font = leftTitleLabel.font.deriveFont(Font.BOLD, 14f)
         leftTitleLabel.border = EmptyBorder(JBUI.insets(0, 0, 8, 0))
         
@@ -167,7 +180,7 @@ class PromptTemplatePanel(
         leftPanel.preferredSize = Dimension(350, -1)
         
         // 右侧面板标题和详情
-        val rightTitleLabel = JBLabel("模板详情")
+        rightTitleLabel = JBLabel(I18n.t("prompt.detail.title"))
         rightTitleLabel.font = rightTitleLabel.font.deriveFont(Font.BOLD, 14f)
         rightTitleLabel.border = EmptyBorder(JBUI.insets(0, 0, 8, 0))
         
@@ -187,6 +200,30 @@ class PromptTemplatePanel(
         splitPane.setOneTouchExpandable(true)
         
         return splitPane
+    }
+
+    private fun setupLanguageListener() {
+        val refreshTexts = {
+            titleLabel.text = I18n.t("prompt.management.title")
+            descLabel.text = I18n.t("prompt.management.desc")
+            tabbedPane.setTitleAt(0, I18n.t("prompt.tab.templates"))
+            tabbedPane.setTitleAt(1, I18n.t("prompt.tab.shortcuts"))
+            searchLabel.text = I18n.t("prompt.search.label")
+            categoryLabel.text = I18n.t("prompt.category.label")
+            enabledOnlyCheckBox.text = I18n.t("prompt.enabledOnly")
+            leftTitleLabel.text = I18n.t("prompt.list.title")
+            rightTitleLabel.text = I18n.t("prompt.detail.title")
+            searchField.toolTipText = I18n.t("prompt.search.tooltip")
+            searchField.putClientProperty("JTextField.placeholderText", I18n.t("prompt.search.placeholder"))
+            importButton.text = I18n.t("prompt.import")
+            importButton.toolTipText = I18n.t("prompt.import.tooltip")
+            exportButton.text = I18n.t("prompt.export")
+            exportButton.toolTipText = I18n.t("prompt.export.tooltip")
+            resetButton.text = I18n.t("prompt.reset")
+            resetButton.toolTipText = I18n.t("prompt.reset.tooltip")
+            detailPanel.refreshTexts()
+        }
+        LanguageManager.addChangeListener(refreshTexts)
     }
     
     private fun createTemplateListPanel(): JPanel {
@@ -243,22 +280,22 @@ class PromptTemplatePanel(
         val buttonPanel = JBPanel<JBPanel<*>>()
         buttonPanel.layout = BoxLayout(buttonPanel, BoxLayout.X_AXIS)
         
-        val importButton = JButton("导入模板")
-        importButton.toolTipText = "从文件导入模板配置"
+        importButton = JButton(I18n.t("prompt.import"))
+        importButton.toolTipText = I18n.t("prompt.import.tooltip")
         importButton.addActionListener { importTemplates() }
         buttonPanel.add(importButton)
         
         buttonPanel.add(Box.createHorizontalStrut(8))
         
-        val exportButton = JButton("导出模板")
-        exportButton.toolTipText = "导出当前模板配置到文件"
+        exportButton = JButton(I18n.t("prompt.export"))
+        exportButton.toolTipText = I18n.t("prompt.export.tooltip")
         exportButton.addActionListener { exportTemplates() }
         buttonPanel.add(exportButton)
         
         buttonPanel.add(Box.createHorizontalStrut(8))
         
-        val resetButton = JButton("重置为默认")
-        resetButton.toolTipText = "恢复到系统默认模板"
+        resetButton = JButton(I18n.t("prompt.reset"))
+        resetButton.toolTipText = I18n.t("prompt.reset.tooltip")
         resetButton.addActionListener { resetToDefaults() }
         buttonPanel.add(resetButton)
         
@@ -286,60 +323,71 @@ class PromptTemplatePanel(
             if (!e.valueIsAdjusting) {
                 val selectedTemplate = templateList.selectedValue
                 detailPanel.setTemplate(selectedTemplate)
-                updateStatus(if (selectedTemplate != null) "已选择模板: ${selectedTemplate.name}" else "就绪")
+                updateStatus(
+                    if (selectedTemplate != null) I18n.t("prompt.status.selected", selectedTemplate.name)
+                    else I18n.t("status.ready")
+                )
             }
         }
     }
     
     private fun loadTemplates() {
         try {
-            val templates = promptTemplateService.getTemplates()
-            this.templates = templates
-            
-            // 更新分类下拉框
-            val categories = templates.map { it.category }.distinct().sorted()
-            categoryComboBox.removeAllItems()
-            categoryComboBox.addItem("全部")
-            categories.forEach { categoryComboBox.addItem(it) }
-            
+            templates = promptTemplateService.getTemplates()
+            refreshCategoryComboBox()
             filterTemplates()
-            updateStatus("已加载 ${templates.size} 个模板")
+            updateStatus(I18n.t("prompt.status.loaded", templates.size))
         } catch (e: Exception) {
             Messages.showErrorDialog(
                 this,
                 "加载模板失败：${e.message}",
                 "加载错误"
             )
-            updateStatus("加载模板失败: ${e.message}")
+            updateStatus(I18n.t("prompt.status.load.fail", e.message ?: ""))
         }
     }
-    
+
+    private fun refreshCategoryComboBox() {
+        val previousSelection = categoryComboBox.selectedItem as? String
+        val allLabel = I18n.t("prompt.category.all")
+        val categories = templates.map { it.category }.filter { it.isNotBlank() }.distinct().sorted()
+
+        val modelValues = mutableListOf(allLabel)
+        modelValues.addAll(categories)
+
+        categoryComboBox.model = DefaultComboBoxModel(modelValues.toTypedArray())
+
+        when {
+            previousSelection != null && modelValues.contains(previousSelection) ->
+                categoryComboBox.selectedItem = previousSelection
+            else -> categoryComboBox.selectedIndex = 0
+        }
+    }
+
     private fun filterTemplates() {
-        val searchText = searchField.text.lowercase()
+        val searchText = searchField.text.trim().lowercase()
         val selectedCategory = categoryComboBox.selectedItem as? String
         val enabledOnly = enabledOnlyCheckBox.isSelected
-        
-        val filtered = templates.filter { template ->
-            val matchesSearch = searchText.isEmpty() || 
+        val allLabel = I18n.t("prompt.category.all")
+
+        filteredTemplates = templates.filter { template ->
+            val matchesSearch = searchText.isEmpty() ||
                 template.name.lowercase().contains(searchText) ||
                 template.description?.lowercase()?.contains(searchText) == true ||
-                template.content.lowercase().contains(searchText) ||
-                template.tags.any { it.lowercase().contains(searchText) }
-            
-            val matchesCategory = selectedCategory == null || selectedCategory == "全部" || template.category == selectedCategory
+                template.content.lowercase().contains(searchText)
+
+            val matchesCategory = selectedCategory == null || selectedCategory == allLabel || template.category == selectedCategory
             val matchesEnabled = !enabledOnly || template.enabled
-            
+
             matchesSearch && matchesCategory && matchesEnabled
         }
-        
-        templateListModel.clear()
-        filtered.forEach { templateListModel.addElement(it) }
-        
-        updateStatus("显示 ${filtered.size} / ${templates.size} 个模板")
-    }
-    
 
-    
+        templateListModel.clear()
+        filteredTemplates.forEach { templateListModel.addElement(it) }
+
+        updateStatus(I18n.t("prompt.status.filtered", filteredTemplates.size, templates.size))
+    }
+
     private fun selectTemplate(templateId: String) {
         for (i in 0 until templateListModel.size) {
             if (templateListModel.getElementAt(i).id == templateId) {
@@ -357,14 +405,15 @@ class PromptTemplatePanel(
     private fun addTemplate() {
         try {
             val selectedCategory = categoryComboBox.selectedItem as? String
-            val category = if (selectedCategory == "全部") null else selectedCategory
+            val allLabel = I18n.t("prompt.category.all")
+            val category = if (selectedCategory == allLabel) null else selectedCategory
             val dialog = PromptTemplateEditDialog.showCreateDialog(project, category)
             if (dialog != null) {
                 promptTemplateService.saveTemplate(dialog)
                 loadTemplates()
                 selectTemplate(dialog.id)
                 notifyModification()
-                updateStatus("模板添加成功")
+                updateStatus(I18n.t("prompt.status.add.success"))
             }
         } catch (e: Exception) {
             Messages.showErrorDialog(
@@ -372,7 +421,7 @@ class PromptTemplatePanel(
                 "添加模板时发生错误：${e.message}",
                 "添加模板失败"
             )
-            updateStatus("添加模板失败")
+            updateStatus(I18n.t("prompt.status.add.fail"))
         }
     }
     
@@ -385,7 +434,7 @@ class PromptTemplatePanel(
                 loadTemplates()
                 selectTemplate(dialog.id)
                 notifyModification()
-                updateStatus("模板编辑成功")
+                updateStatus(I18n.t("prompt.status.edit.success"))
             }
         } catch (e: Exception) {
             Messages.showErrorDialog(
@@ -393,18 +442,18 @@ class PromptTemplatePanel(
                 "编辑模板时发生错误：${e.message}",
                 "编辑模板失败"
             )
-            updateStatus("编辑模板失败")
+            updateStatus(I18n.t("prompt.status.edit.fail"))
         }
     }
     
     private fun removeTemplate() {
         try {
             val selectedTemplate = templateList.selectedValue ?: return
-            
+
             val result = Messages.showYesNoDialog(
                 this,
-                "确定要删除模板 '${selectedTemplate.name}' 吗？",
-                "确认删除",
+                I18n.t("prompt.delete.confirm.message", selectedTemplate.name),
+                I18n.t("prompt.delete.confirm.title"),
                 Messages.getQuestionIcon()
             )
             
@@ -412,15 +461,15 @@ class PromptTemplatePanel(
                 promptTemplateService.deleteTemplate(selectedTemplate.id)
                 loadTemplates()
                 notifyModification()
-                updateStatus("模板删除成功")
+                updateStatus(I18n.t("prompt.status.delete.success"))
             }
         } catch (e: Exception) {
             Messages.showErrorDialog(
                 this,
-                "删除模板时发生错误：${e.message}",
-                "删除模板失败"
+                I18n.t("prompt.delete.error.message", e.message ?: ""),
+                I18n.t("prompt.delete.error.title")
             )
-            updateStatus("删除模板失败")
+            updateStatus(I18n.t("prompt.status.delete.fail"))
         }
     }
     
@@ -478,8 +527,8 @@ class PromptTemplatePanel(
                 val overwrite = if (hasConflict) {
                     Messages.showYesNoDialog(
                         this,
-                        "检测到相同ID的模板，是否覆盖同名模板？",
-                        "导入选项",
+                        I18n.t("prompt.import.overwrite.question"),
+                        I18n.t("prompt.import.overwrite.title"),
                         null
                     ) == Messages.YES
                 } else {
@@ -489,23 +538,23 @@ class PromptTemplatePanel(
                 // 进行导入
                 val importedCount = promptTemplateService.importTemplates(content, overwrite)
 
-                val suffix = if (overwrite) "（已覆盖同名模板）" else ""
+                val suffix = if (overwrite) I18n.t("prompt.import.overwrite.suffix") else ""
                 Messages.showInfoMessage(
                     this,
-                    "成功导入 ${importedCount} 个模板$suffix",
-                    "导入成功"
+                    I18n.t("prompt.import.success.message", importedCount, suffix),
+                    I18n.t("prompt.import.success.title")
                 )
                 
                 loadTemplates()
                 notifyModification()
-                updateStatus("成功导入 ${importedCount} 个模板$suffix")
+                updateStatus(I18n.t("prompt.import.success.status", importedCount, suffix))
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     this,
-                    "导入失败：${e.message}",
-                    "导入错误"
+                    I18n.t("prompt.import.failure.message", e.message ?: ""),
+                    I18n.t("prompt.import.failure.title")
                 )
-                updateStatus("导入模板失败")
+                updateStatus(I18n.t("prompt.import.failure.status"))
             }
         }
     }
@@ -525,20 +574,20 @@ class PromptTemplatePanel(
             try {
                 val file = fileChooser.selectedFile
                 promptTemplateService.exportTemplatesToFile(file.absolutePath, emptyList())
-                
+
                 Messages.showInfoMessage(
                     this,
-                    "模板已成功导出到: ${file.absolutePath}",
-                    "导出成功"
+                    I18n.t("prompt.export.success.message", file.absolutePath),
+                    I18n.t("prompt.export.success.title")
                 )
-                updateStatus("模板导出成功")
+                updateStatus(I18n.t("prompt.export.success.status"))
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     this,
-                    "导出失败：${e.message}",
-                    "导出错误"
+                    I18n.t("prompt.export.failure.message", e.message ?: ""),
+                    I18n.t("prompt.export.failure.title")
                 )
-                updateStatus("导出模板失败")
+                updateStatus(I18n.t("prompt.export.failure.status"))
             }
         }
     }
@@ -617,10 +666,12 @@ class PromptTemplatePanel(
                 text = buildString {
                     append(value.name)
                     if (!value.enabled) {
-                        append(" (已禁用)")
+                        append(" ")
+                        append(I18n.t("prompt.template.disabled.suffix"))
                     }
                     if (value.isBuiltIn) {
-                        append(" [内置]")
+                        append(" ")
+                        append(I18n.t("prompt.template.builtin.suffix"))
                     }
                     if (!value.shortcutKey.isNullOrBlank()) {
                         append(" (${value.shortcutKey})")
@@ -634,10 +685,7 @@ class PromptTemplatePanel(
                         append("${value.description}<br>")
                     }
                     if (!value.category.isNullOrBlank()) {
-                        append("分类: ${value.category}<br>")
-                    }
-                    if (value.tags.isNotEmpty()) {
-                        append("标签: ${value.tags.joinToString(", ")}<br>")
+                        append("${I18n.t("prompt.template.tooltip.category")}: ${value.category}<br>")
                     }
                     append("</html>")
                 }

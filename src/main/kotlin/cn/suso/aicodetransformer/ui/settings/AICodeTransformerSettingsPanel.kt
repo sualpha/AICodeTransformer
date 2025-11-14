@@ -3,6 +3,8 @@ package cn.suso.aicodetransformer.ui.settings
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.ui.settings.model.ModelConfigurationPanel
+import cn.suso.aicodetransformer.i18n.I18n
+import cn.suso.aicodetransformer.i18n.LanguageManager
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
@@ -26,7 +28,7 @@ class AICodeTransformerSettingsPanel(
     private val configurationService: ConfigurationService
 ) : JPanel(BorderLayout()) {
     
-    private val tabbedPane = JBTabbedPane()
+    private var tabbedPane = JBTabbedPane()
     private val modelConfigPanel: ModelConfigurationPanel
     private val promptTemplatePanel: PromptTemplatePanel
     private val commitSettingsPanel: CommitSettingsPanel
@@ -40,43 +42,67 @@ class AICodeTransformerSettingsPanel(
         
         // 初始化面板
         modelConfigPanel = ModelConfigurationPanel(project, configurationService)
-        
-        // 初始化Prompt模板面板
         promptTemplatePanel = PromptTemplatePanel(project, configurationService)
-        
-        // 初始化提交设置面板
         commitSettingsPanel = CommitSettingsPanel(project, configurationService)
-        
-        // 初始化配置管理面板
         systemManagementPanel = SystemManagementPanel(project)
-        
-        // 添加标签页 - 使用紧凑的标题
-        tabbedPane.addTab("模型", modelConfigPanel)
-        tabbedPane.addTab("模板", promptTemplatePanel)
-        tabbedPane.addTab("提交", commitSettingsPanel)
-        tabbedPane.addTab("系统", systemManagementPanel)
-        
-        // 设置tab页独立性 - 允许每个tab页有独立的高度
-        tabbedPane.setTabLayoutPolicy(JBTabbedPane.SCROLL_TAB_LAYOUT)
-        // 设置每个tab页可以有独立的高度，不强制保持一致
-        tabbedPane.putClientProperty("JTabbedPane.tabAreaAlignment", "leading")
-        tabbedPane.putClientProperty("JTabbedPane.hasFullBorder", true)
-        
+
+        configureTabbedPane(tabbedPane)
         add(tabbedPane, BorderLayout.CENTER)
         
         // 加载初始数据
         reset()
+        // 监听语言变化以刷新页签文本
+        LanguageManager.addChangeListener {
+            SwingUtilities.invokeLater {
+                val selectedIndex = tabbedPane.selectedIndex
+                remove(tabbedPane)
+                tabbedPane = JBTabbedPane()
+                configureTabbedPane(tabbedPane, selectedIndex)
+                add(tabbedPane, BorderLayout.CENTER)
+                revalidate()
+                repaint()
+                setupHeaderTexts()
+            }
+        }
     }
-    
+
+    private fun configureTabbedPane(pane: JBTabbedPane, selectedIndex: Int = 0) {
+        // 添加标签页 - 使用国际化标题
+        val titles = arrayOf(
+            I18n.t("tab.models"),
+            I18n.t("tab.templates"),
+            I18n.t("tab.commit"),
+            I18n.t("tab.system")
+        )
+        val panels = arrayOf(
+            modelConfigPanel,
+            promptTemplatePanel,
+            commitSettingsPanel,
+            systemManagementPanel
+        )
+        for (i in titles.indices) {
+            pane.addTab(titles[i], panels[i])
+        }
+
+        // 设置tab页独立性 - 允许每个tab页有独立的高度
+        pane.setTabLayoutPolicy(JBTabbedPane.SCROLL_TAB_LAYOUT)
+        pane.putClientProperty("JTabbedPane.tabAreaAlignment", "leading")
+        pane.putClientProperty("JTabbedPane.hasFullBorder", true)
+
+        if (selectedIndex in 0 until pane.tabCount) {
+            pane.selectedIndex = selectedIndex
+        }
+    }
+
     private fun setupHeader() {
         val headerPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 0, 0))
         headerPanel.border = EmptyBorder(JBUI.insetsBottom(16))
         
-        val titleLabel = JBLabel("AI Code Transformer 设置")
+        val titleLabel = JBLabel(I18n.t("settings.title"))
         titleLabel.font = titleLabel.font.deriveFont(Font.BOLD, 16f)
         titleLabel.foreground = UIUtil.getLabelForeground()
         
-        val descLabel = JBLabel("配置AI模型和Prompt模板以优化代码转换体验")
+        val descLabel = JBLabel(I18n.t("settings.desc"))
         descLabel.font = descLabel.font.deriveFont(12f)
         descLabel.foreground = UIUtil.getLabelDisabledForeground()
         
@@ -86,6 +112,17 @@ class AICodeTransformerSettingsPanel(
         
         headerPanel.add(titlePanel)
         add(headerPanel, BorderLayout.NORTH)
+    }
+
+    private fun setupHeaderTexts() {
+        // 重新设置顶部标题与描述（简单方式：重建头部）
+        val northComp = (layout as? BorderLayout)?.getLayoutComponent(BorderLayout.NORTH)
+        if (northComp != null) {
+            remove(northComp)
+        }
+        setupHeader()
+        revalidate()
+        repaint()
     }
     
     /**
@@ -136,21 +173,24 @@ class AICodeTransformerSettingsPanel(
             
             // 根据修改的内容显示相应的保存消息
             val savedItems = mutableListOf<String>()
-            if (hasModelChanges) savedItems.add("模型配置")
-            if (hasPromptChanges) savedItems.add("模板配置")
-            if (hasCommitChanges) savedItems.add("提交设置")
-            if (hasSystemChanges) savedItems.add("系统设置")
-            
+            if (hasModelChanges) savedItems.add(I18n.t("settings.save.item.models"))
+            if (hasPromptChanges) savedItems.add(I18n.t("settings.save.item.prompts"))
+            if (hasCommitChanges) savedItems.add(I18n.t("settings.save.item.commit"))
+            if (hasSystemChanges) savedItems.add(I18n.t("settings.save.item.system"))
+
+            val separator = I18n.t("settings.save.separator")
+            val itemsText = savedItems.joinToString(separator)
+
             Messages.showInfoMessage(
                 project,
-                "${savedItems.joinToString("、")}已成功保存！",
-                "保存成功"
+                I18n.t("settings.save.success.message", itemsText),
+                I18n.t("settings.save.success.title")
             )
         } catch (e: Exception) {
             Messages.showErrorDialog(
                 project,
-                "保存配置时发生错误：${e.message}",
-                "保存失败"
+                I18n.t("settings.save.error.message", e.message ?: ""),
+                I18n.t("settings.save.error.title")
             )
             throw e
         }
@@ -173,10 +213,18 @@ class AICodeTransformerSettingsPanel(
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     project,
-                    "加载配置时发生错误：${e.message}",
-                    "加载失败"
+                    I18n.t("settings.load.error.message", e.message ?: ""),
+                    I18n.t("settings.load.error.title")
                 )
             }
         }
+    }
+    
+    /**
+     * 清理资源
+     */
+    fun dispose() {
+        // 调用SystemManagementPanel的dispose方法清理语言监听器
+        systemManagementPanel.dispose()
     }
 }
