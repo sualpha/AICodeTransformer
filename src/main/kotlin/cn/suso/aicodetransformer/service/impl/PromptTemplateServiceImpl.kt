@@ -54,8 +54,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
     private val lock = ReentrantReadWriteLock()
     private var state = PromptTemplateState()
     private val languageListener: () -> Unit = {
-        initializeDefaultTemplates()
-        forceSaveState()
+        refreshBuiltInTemplatesForCurrentLanguage()
     }
     
 
@@ -110,6 +109,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
             }
         }
         initializeDefaultTemplates()
+        refreshBuiltInTemplatesForCurrentLanguage()
         LanguageManager.addChangeListener(languageListener)
     }
     
@@ -479,6 +479,10 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 val existingIndex = state.templates.indexOfFirst { it.id == config.id }
                 if (existingIndex >= 0) {
                     val existing = state.templates[existingIndex]
+                    if (!existing.isBuiltIn) {
+                        // 用户创建或将内置模板标记为自定义，不强制覆盖
+                        return@forEach
+                    }
                     val updated = existing.copy(
                         name = config.displayName,
                         description = config.description,
@@ -502,6 +506,37 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
             }
         }
         logger.info("默认模板初始化完成，共加载 ${getDefaultTemplates().size} 个模板")
+    }
+
+    private fun refreshBuiltInTemplatesForCurrentLanguage() {
+        var changed = false
+        lock.write {
+            val builtInConfigs = TemplateConstants.TemplateConfig.getBuiltInTemplates().associateBy { it.id }
+            state.templates.replaceAll { template ->
+                val config = builtInConfigs[template.id]
+                if (config == null || !template.isBuiltIn) {
+                    template
+                } else {
+                    val matchesName = template.name == config.displayName
+                    val matchesDescription = (template.description ?: "") == (config.description ?: "")
+                    val matchesContent = template.content == config.content
+                    if (matchesName && matchesDescription && matchesContent) {
+                        template
+                    } else {
+                        changed = true
+                        template.copy(
+                            name = config.displayName,
+                            description = config.description,
+                            content = config.content,
+                            category = config.category.displayName
+                        )
+                    }
+                }
+            }
+        }
+        if (changed) {
+            forceSaveState()
+        }
     }
 
     override fun dispose() {

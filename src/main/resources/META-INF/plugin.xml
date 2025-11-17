@@ -143,7 +143,6 @@
         
         <!-- Notification groups -->
         <notificationGroup id="AICodeTransformer" displayType="BALLOON" key="notification.group.aicodetransformer"/>
-        <notificationGroup id="AICodeTransformer.Shortcuts" displayType="BALLOON" key="notification.group.shortcuts"/>
     </extensions>
     
     <!-- Actions -->

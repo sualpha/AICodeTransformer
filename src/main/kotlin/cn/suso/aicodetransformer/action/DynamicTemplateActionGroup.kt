@@ -37,12 +37,8 @@ class DynamicTemplateActionGroup : ActionGroup() {
             
             // 按分类分组
             val templatesByCategory = enabledTemplates.groupBy { template ->
-                val categoryKey = TemplateCategory.fromDisplayName(template.category)?.name
-                if (categoryKey != null) {
-                    I18n.t("template.category.${categoryKey.lowercase()}.name")
-                } else {
-                    template.category.ifEmpty { I18n.t("template.category.other") }
-                }
+                TemplateCategory.fromDisplayName(template.category)?.displayName
+                    ?: template.category.ifEmpty { I18n.t("template.category.custom.name") }
             }
             
             templatesByCategory.forEach { (category, templates) ->
