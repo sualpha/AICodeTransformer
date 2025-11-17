@@ -91,6 +91,7 @@ data class Template(
 @Serializable
 enum class TemplateCategory(private val displayNameKey: String, private val descriptionKey: String) {
     CODE_CONVERSION("template.category.codeConversion.name", "template.category.codeConversion.description"),
+    CODE_GENERATION("template.category.codeGeneration.name", "template.category.codeGeneration.description"),
     CODE_OPTIMIZATION("template.category.codeOptimization.name", "template.category.codeOptimization.description"),
     CODE_REVIEW("template.category.codeReview.name", "template.category.codeReview.description"),
     DOCUMENTATION("template.category.documentation.name", "template.category.documentation.description"),
@@ -115,8 +116,8 @@ enum class TemplateCategory(private val displayNameKey: String, private val desc
 
     companion object {
         private val supportedLocales = listOf(
-            Locale.SIMPLIFIED_CHINESE,
-            Locale("en", "US")
+            Locale.forLanguageTag("zh-CN"),
+            Locale.US
         )
 
         fun fromDisplayName(displayName: String): TemplateCategory? {

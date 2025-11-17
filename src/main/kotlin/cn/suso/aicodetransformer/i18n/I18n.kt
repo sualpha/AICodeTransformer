@@ -19,9 +19,9 @@ object LanguageManager {
     fun setLanguage(code: String) {
         val newLocale = when (code) {
             "system" -> Locale.getDefault()
-            "en_US", "en" -> Locale("en", "US")
-            "zh_CN", "zh" -> Locale("zh", "CN")
-            else -> Locale("zh", "CN")
+            "en_US", "en" -> Locale.US
+            "zh_CN", "zh" -> Locale.SIMPLIFIED_CHINESE
+            else -> Locale.forLanguageTag(code.replace('_', '-')).takeIf { !it.language.isNullOrEmpty() } ?: Locale.SIMPLIFIED_CHINESE
         }
         languageCode = code
         locale = newLocale

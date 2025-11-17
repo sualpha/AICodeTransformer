@@ -96,7 +96,7 @@ data class CommitSettings(
 
         private val SUPPORTED_LOCALES: List<Locale> = listOf(
             Locale.SIMPLIFIED_CHINESE,
-            Locale("en", "US")
+            Locale.US
         )
 
         private fun loadTemplate(key: String, locale: Locale): String? = runCatching {

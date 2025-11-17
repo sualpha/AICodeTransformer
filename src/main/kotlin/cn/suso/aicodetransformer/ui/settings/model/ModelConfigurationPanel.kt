@@ -15,6 +15,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Font
@@ -39,6 +40,7 @@ class ModelConfigurationPanel(
     private var currentConfigurations: MutableList<ModelConfiguration> = mutableListOf()
     
     private lateinit var leftTitleLabel: JBLabel
+    private lateinit var defaultInfoLabel: JBLabel
     private lateinit var rightTitleLabel: JBLabel
     private lateinit var importButton: JButton
     private lateinit var exportButton: JButton
@@ -110,11 +112,21 @@ class ModelConfigurationPanel(
         // 左侧面板标题
         leftTitleLabel = JBLabel(I18n.t("model.list.title"))
         leftTitleLabel.font = leftTitleLabel.font.deriveFont(Font.BOLD, 14f)
-        leftTitleLabel.border = EmptyBorder(JBUI.insets(0, 0, 8, 0))
+
+        defaultInfoLabel = JBLabel(I18n.t("model.default.info"))
+        defaultInfoLabel.font = defaultInfoLabel.font.deriveFont(Font.PLAIN, 11f)
+        defaultInfoLabel.foreground = UIUtil.getLabelDisabledForeground()
+        defaultInfoLabel.border = EmptyBorder(JBUI.insets(4, 0, 0, 0))
+
+        val leftHeaderPanel = JBPanel<JBPanel<*>>()
+        leftHeaderPanel.layout = BoxLayout(leftHeaderPanel, BoxLayout.Y_AXIS)
+        leftHeaderPanel.border = EmptyBorder(JBUI.insets(0, 0, 8, 0))
+        leftHeaderPanel.add(leftTitleLabel)
+        leftHeaderPanel.add(defaultInfoLabel)
         
         // 左侧面板 - 配置列表
         val leftPanel = JBPanel<JBPanel<*>>(BorderLayout())
-        leftPanel.add(leftTitleLabel, BorderLayout.NORTH)
+        leftPanel.add(leftHeaderPanel, BorderLayout.NORTH)
         leftPanel.add(decorator, BorderLayout.CENTER)
         leftPanel.border = EmptyBorder(JBUI.insets(0, 0, 0, 8))
         leftPanel.preferredSize = Dimension(300, -1)
@@ -143,6 +155,7 @@ class ModelConfigurationPanel(
 
     private fun refreshTexts() {
         leftTitleLabel.text = I18n.t("model.list.title")
+        defaultInfoLabel.text = I18n.t("model.default.info")
         rightTitleLabel.text = I18n.t("model.detail.title")
         importButton.text = I18n.t("model.import")
         importButton.toolTipText = I18n.t("model.import.tooltip")
@@ -200,10 +213,12 @@ class ModelConfigurationPanel(
         val selectedIndex = configList.selectedIndex
         if (selectedIndex >= 0) {
             val config = currentConfigurations[selectedIndex]
+            val message = I18n.t("model.delete.confirm.message", config.name)
+            val title = I18n.t("model.delete.confirm.title")
             val result = Messages.showYesNoDialog(
                 project,
-                "确定要删除配置 '${config.name}' 吗？",
-                "确认删除",
+                message,
+                title,
                 Messages.getQuestionIcon()
             )
             

@@ -57,6 +57,18 @@ object TemplateConstants {
             supportedLanguages = listOf("json", "javascript", "typescript")
         ),
 
+        COMMENT_DRIVEN_GENERATOR(
+            id = "comment-driven-generator",
+            displayNameKey = "template.commentDrivenGenerator.name",
+            descriptionKey = "template.commentDrivenGenerator.description",
+            category = TemplateCategory.CODE_GENERATION,
+            contentKey = "template.commentDrivenGenerator.content",
+            supportedLanguages = listOf(
+                "java", "kotlin", "javascript", "typescript", "python", "go", "csharp",
+                "cpp", "swift", "php", "ruby", "rust"
+            )
+        ),
+
         TRANSLATION_CONVERTER(
             id = "translation-converter",
             displayNameKey = "template.translationConverter.name",

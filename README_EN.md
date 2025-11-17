@@ -21,6 +21,7 @@ AICodeTransformer is a powerful IntelliJ IDEA plugin that integrates multiple AI
 
 ### 📝 Intelligent Template System
 - **Built-in Templates**: Variable Name Generator, CamelCase conversion, object transformation, JSON formatting, Smart Translation, etc.
+  - 🧠 **Comment-Driven Generator**: Transform inline comments into complete implementations while preserving method signatures
   - 🔄 **Object Conversion**: Generate conversion methods between Java objects with field-by-field explicit conversion based on field analysis
   - 📝 **CamelCase Conversion**: One-click variable naming format conversion, supporting arbitrary character strings
   - 📋 **JSON Formatting**: Intelligent JSON formatting tool: automatically handle special characters, complete missing symbols, fix syntax errors and beautify format
