@@ -2,7 +2,6 @@ package cn.suso.aicodetransformer
 
 import cn.suso.aicodetransformer.model.ModelConfiguration
 import cn.suso.aicodetransformer.model.ErrorContext
-import cn.suso.aicodetransformer.notification.ShortcutNotificationService
 import cn.suso.aicodetransformer.service.*
 import cn.suso.aicodetransformer.service.impl.*
 import cn.suso.aicodetransformer.constants.ExecutionStatus
@@ -66,9 +65,7 @@ class AICodeTransformerProjectActivity : ProjectActivity {
     private lateinit var codeReplacementService: CodeReplacementService
     private lateinit var statusService: StatusService
     private lateinit var errorHandlingService: ErrorHandlingService
-    private lateinit var shortcutRecoveryService: ShortcutRecoveryService
-    private lateinit var shortcutNotificationService: ShortcutNotificationService
-    
+
     private var initialized = false
     private var messageBusConnection: MessageBusConnection? = null
 
@@ -122,12 +119,6 @@ class AICodeTransformerProjectActivity : ProjectActivity {
             
             errorHandlingService = application.service<ErrorHandlingService>()
             logger.info("ErrorHandlingService 初始化完成")
-            
-            shortcutRecoveryService = application.service<ShortcutRecoveryService>()
-            logger.info("ShortcutRecoveryService 初始化完成")
-            
-            shortcutNotificationService = ShortcutNotificationService()
-            logger.info("ShortcutNotificationService 初始化完成")
             
             // 确保内置模板已初始化（不设置快捷键）
             logger.info("开始初始化内置模板...")
@@ -422,31 +413,6 @@ class AICodeTransformerProjectActivity : ProjectActivity {
             logger.info("资源清理完成")
         } catch (e: Exception) {
             logger.error("清理资源时发生错误", e)
-        }
-    }
-
-    /**
-     * 自动恢复快捷键
-     */
-    private fun autoRecoverShortcuts() {
-        try {
-            val recoveredCount = shortcutRecoveryService.autoRecoverShortcuts()
-            if (recoveredCount > 0) {
-                logger.info("自动恢复了 $recoveredCount 个快捷键")
-                // 刷新模板动作以应用恢复的快捷键
-                refreshTemplateActions()
-                // 显示恢复成功通知
-                shortcutNotificationService.showRecoverySuccessNotification(null, recoveredCount)
-            }
-
-            // 验证快捷键配置并显示相关通知
-            shortcutNotificationService.validateAndNotify(null)
-
-            // 备份当前快捷键配置
-            shortcutRecoveryService.backupShortcuts()
-
-        } catch (e: Exception) {
-            logger.error("自动恢复快捷键失败", e)
         }
     }
     

@@ -117,16 +117,12 @@
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.CodeReplacementServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.StatusService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.StatusServiceImpl"/>
-        <applicationService serviceInterface="cn.suso.aicodetransformer.service.ShortcutRecoveryService"
-                           serviceImplementation="cn.suso.aicodetransformer.service.impl.ShortcutRecoveryServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.ErrorHandlingService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.ErrorHandlingServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.CacheService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.CacheServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.RateLimitService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.RateLimitServiceImpl"/>
-        <applicationService serviceInterface="cn.suso.aicodetransformer.service.PerformanceMonitorService"
-                           serviceImplementation="cn.suso.aicodetransformer.service.impl.PerformanceMonitorServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.LoggingService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.LoggingServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.AutoUpdateService"

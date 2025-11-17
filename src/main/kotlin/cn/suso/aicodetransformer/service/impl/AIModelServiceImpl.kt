@@ -7,7 +7,6 @@ import cn.suso.aicodetransformer.service.CacheService
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.service.ErrorHandlingService
 import cn.suso.aicodetransformer.service.LoggingService
-import cn.suso.aicodetransformer.service.PerformanceMonitorService
 import cn.suso.aicodetransformer.service.RateLimitService
 import cn.suso.aicodetransformer.service.RequestListener
 import com.intellij.openapi.components.service
@@ -42,7 +41,6 @@ class AIModelServiceImpl : AIModelService {
     private val errorHandlingService: ErrorHandlingService = service()
     private val cacheService: CacheService = service()
     private val rateLimitService: RateLimitService = service()
-    private val performanceMonitorService: PerformanceMonitorService = service()
     private val loggingService: LoggingService = service()
     private val httpClient: HttpClient
     private val requestIdGenerator = AtomicLong(0)
@@ -105,8 +103,7 @@ class AIModelServiceImpl : AIModelService {
         loggingService.logApiCallStart(requestId, config, prompt)
         
         // 开始性能跟踪
-        val performanceTracker = performanceMonitorService.startTracking(requestId, config, prompt)
-        
+
         // 检查缓存
         val cacheKey = cacheService.generateCacheKey(config, prompt, config.temperature, config.maxTokens)
         val cachedResult = cacheService.getCachedResponse(cacheKey)
@@ -114,9 +111,6 @@ class AIModelServiceImpl : AIModelService {
             logger.debug("返回缓存结果，requestId: $requestId")
             loggingService.logInfo("返回缓存结果", "requestId: $requestId")
             notifyListeners { it.onRequestStarted(requestId, config, prompt) }
-            
-            performanceTracker.recordCacheHit()
-            performanceMonitorService.endTracking(performanceTracker, cachedResult)
             loggingService.logApiCallEnd(requestId, cachedResult, 0)
             
             notifyListeners { it.onRequestCompleted(requestId, cachedResult) }
@@ -156,7 +150,6 @@ class AIModelServiceImpl : AIModelService {
             activeRequests.remove(requestId)
             
             val responseTime = System.currentTimeMillis() - startTime
-            performanceMonitorService.endTracking(performanceTracker, result)
             loggingService.logApiCallEnd(requestId, result, responseTime)
             
             // 记录请求并缓存成功的结果
