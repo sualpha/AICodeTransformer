@@ -351,7 +351,7 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
             updateExecutionProgress(context, 20, "构建提示词...")
             indicator?.text = "构建提示词..."
             logger.info("开始构建提示词，模板: ${context.template.name}")
-            val prompt = buildPrompt(context.template, context.selectedText, context.project)
+            val prompt = buildPrompt(context.template, context.selectedText, context.project, context.editor)
             logger.info("提示词构建完成，长度: ${prompt.length}")
             
             // 4. 调用AI模型
@@ -522,7 +522,12 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
     /**
      * 构建提示词
      */
-    private fun buildPrompt(template: PromptTemplate, selectedText: String, project: Project? = null): String {
+    private fun buildPrompt(
+        template: PromptTemplate,
+        selectedText: String,
+        project: Project? = null,
+        editor: Editor? = null
+    ): String {
         // 基础变量
         val variables = mutableMapOf(
             "code" to selectedText,
@@ -601,7 +606,7 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
         }
         
         // 使用模板对象而不是模板内容来处理变量替换
-        return promptTemplateService.processTemplate(template, variables)
+        return promptTemplateService.processTemplate(template, variables, editor)
     }
     
     /**

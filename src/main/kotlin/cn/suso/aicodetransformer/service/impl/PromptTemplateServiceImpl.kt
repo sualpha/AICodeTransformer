@@ -12,7 +12,9 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.serialization.encodeToString
@@ -196,26 +198,47 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
         }
     }
     
-    override fun processTemplate(template: PromptTemplate, variables: Map<String, String>): String {
-        // 首先使用TemplateVariableResolver处理新的内置变量
-        val project = ProjectManager.getInstance().openProjects.firstOrNull()
-        if (project != null) {
-            val fileEditorManager = FileEditorManager.getInstance(project)
-            val selectedEditor = fileEditorManager.selectedTextEditor
-            if (selectedEditor != null) {
-                val resolver = TemplateVariableResolver(project)
-                val resolvedContent = resolver.resolveVariables(template.content, selectedEditor)
-                val updatedTemplate = template.copy(content = resolvedContent)
-                return updatedTemplate.render(variables)
-            }
+    override fun processTemplate(
+        template: PromptTemplate,
+        variables: Map<String, String>,
+        editor: Editor?
+    ): String {
+        val (effectiveProject, effectiveEditor) = resolveProjectAndEditor(editor)
+
+        if (effectiveProject != null && effectiveEditor != null) {
+            val resolver = TemplateVariableResolver(effectiveProject)
+            val resolvedContent = resolver.resolveVariables(template.content, effectiveEditor)
+            val updatedTemplate = template.copy(content = resolvedContent)
+            return updatedTemplate.render(variables)
         }
+
         return template.render(variables)
     }
-    
-    override fun processTemplate(templateId: String, variables: Map<String, String>): String {
+
+    override fun processTemplate(
+        templateId: String,
+        variables: Map<String, String>,
+        editor: Editor?
+    ): String {
         val template = getTemplate(templateId)
             ?: throw IllegalArgumentException("模板不存在: $templateId")
-        return processTemplate(template, variables)
+        return processTemplate(template, variables, editor)
+    }
+
+    private fun resolveProjectAndEditor(editor: Editor?): Pair<Project?, Editor?> {
+        if (editor != null) {
+            return editor.project to editor
+        }
+
+        val project = ProjectManager.getInstance().openProjects.firstOrNull()
+        if (project != null) {
+            val selectedEditor = FileEditorManager.getInstance(project).selectedTextEditor
+            if (selectedEditor != null) {
+                return project to selectedEditor
+            }
+        }
+
+        return null to null
     }
     
 

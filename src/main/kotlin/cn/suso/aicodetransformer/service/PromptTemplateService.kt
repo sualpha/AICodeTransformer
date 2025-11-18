@@ -1,6 +1,7 @@
 package cn.suso.aicodetransformer.service
 
 import cn.suso.aicodetransformer.model.PromptTemplate
+import com.intellij.openapi.editor.Editor
 
 /**
  * Prompt模板管理服务接口
@@ -61,7 +62,7 @@ interface PromptTemplateService {
      * @param variables 变量映射
      * @return 处理后的内容
      */
-    fun processTemplate(template: PromptTemplate, variables: Map<String, String>): String
+    fun processTemplate(template: PromptTemplate, variables: Map<String, String>, editor: Editor? = null): String
     
     /**
      * 处理模板内容，替换变量
@@ -69,7 +70,7 @@ interface PromptTemplateService {
      * @param variables 变量映射
      * @return 处理后的内容
      */
-    fun processTemplate(templateId: String, variables: Map<String, String>): String
+    fun processTemplate(templateId: String, variables: Map<String, String>, editor: Editor? = null): String
     
 
     
