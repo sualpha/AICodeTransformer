@@ -84,6 +84,66 @@ class SystemManagementPanel(
     // 当前下载任务的Job
     private var downloadJob: Job? = null
 
+    private val updateStatusListener = object : UpdateStatusListener {
+        override fun onStatusChanged(oldStatus: UpdateStatus, newStatus: UpdateStatus, updateInfo: UpdateInfo?) {
+            SwingUtilities.invokeLater {
+                if (!::downloadUpdateButton.isInitialized || !::checkUpdateButton.isInitialized) {
+                    return@invokeLater
+                }
+                // 保存当前更新信息
+                currentUpdateInfo = updateInfo
+
+                currentUpdateStatus = newStatus
+                currentProgressMessage = null
+                currentProgressValue = null
+                currentErrorMessage = null
+
+                // 控制按钮状态
+                checkUpdateButton.isEnabled = newStatus == UpdateStatus.IDLE || newStatus == UpdateStatus.ERROR || newStatus == UpdateStatus.UP_TO_DATE
+
+                // 控制下载按钮
+                downloadUpdateButton.isVisible = newStatus == UpdateStatus.AVAILABLE
+                downloadUpdateButton.isEnabled = newStatus == UpdateStatus.AVAILABLE
+
+                // 控制取消下载按钮
+                cancelDownloadButton.isVisible = newStatus == UpdateStatus.DOWNLOADING
+                cancelDownloadButton.isEnabled = newStatus == UpdateStatus.DOWNLOADING
+
+                // 控制安装按钮
+                installUpdateButton.isVisible = newStatus == UpdateStatus.DOWNLOADED
+                installUpdateButton.isEnabled = newStatus == UpdateStatus.DOWNLOADED
+
+                refreshStatusLabelText()
+
+                // 重新布局以适应按钮的显示/隐藏
+                revalidate()
+                repaint()
+            }
+        }
+
+        override fun onProgressChanged(progress: Int, message: String) {
+            SwingUtilities.invokeLater {
+                currentProgressMessage = message
+                currentProgressValue = progress.takeIf { it > 0 }
+                currentErrorMessage = null
+                refreshStatusLabelText()
+            }
+        }
+
+        override fun onError(error: String) {
+            SwingUtilities.invokeLater {
+                currentUpdateStatus = UpdateStatus.ERROR
+                currentErrorMessage = error
+                currentProgressMessage = null
+                currentProgressValue = null
+                refreshStatusLabelText()
+                if (::checkUpdateButton.isInitialized) {
+                    checkUpdateButton.isEnabled = true
+                }
+            }
+        }
+    }
+
     // 语言设置控件
     private var suppressLanguageEvents = false
     private lateinit var languageZhRadio: JRadioButton
@@ -371,60 +431,7 @@ class SystemManagementPanel(
         panel.add(updateActionPanel)
         
         // 注册更新状态监听器
-        autoUpdateService.addStatusListener(object : UpdateStatusListener {
-            override fun onStatusChanged(oldStatus: UpdateStatus, newStatus: UpdateStatus, updateInfo: UpdateInfo?) {
-                SwingUtilities.invokeLater {
-                    // 保存当前更新信息
-                    currentUpdateInfo = updateInfo
-                    
-                    currentUpdateStatus = newStatus
-                    currentProgressMessage = null
-                    currentProgressValue = null
-                    currentErrorMessage = null
-
-                    // 控制按钮状态
-                    checkUpdateButton.isEnabled = newStatus == UpdateStatus.IDLE || newStatus == UpdateStatus.ERROR || newStatus == UpdateStatus.UP_TO_DATE
-                    
-                    // 控制下载按钮
-                    downloadUpdateButton.isVisible = newStatus == UpdateStatus.AVAILABLE
-                    downloadUpdateButton.isEnabled = newStatus == UpdateStatus.AVAILABLE
-                    
-                    // 控制取消下载按钮
-                    cancelDownloadButton.isVisible = newStatus == UpdateStatus.DOWNLOADING
-                    cancelDownloadButton.isEnabled = newStatus == UpdateStatus.DOWNLOADING
-                    
-                    // 控制安装按钮
-                    installUpdateButton.isVisible = newStatus == UpdateStatus.DOWNLOADED
-                    installUpdateButton.isEnabled = newStatus == UpdateStatus.DOWNLOADED
-
-                    refreshStatusLabelText()
-
-                    // 重新布局以适应按钮的显示/隐藏
-                    revalidate()
-                    repaint()
-                }
-            }
-            
-            override fun onProgressChanged(progress: Int, message: String) {
-                SwingUtilities.invokeLater {
-                    currentProgressMessage = message
-                    currentProgressValue = progress.takeIf { it > 0 }
-                    currentErrorMessage = null
-                    refreshStatusLabelText()
-                }
-            }
-
-            override fun onError(error: String) {
-                SwingUtilities.invokeLater {
-                    currentUpdateStatus = UpdateStatus.ERROR
-                    currentErrorMessage = error
-                    currentProgressMessage = null
-                    currentProgressValue = null
-                    refreshStatusLabelText()
-                    checkUpdateButton.isEnabled = true
-                }
-            }
-        })
+        autoUpdateService.addStatusListener(updateStatusListener)
         
         updateSettingsPanel = panel
         return panel
@@ -849,53 +856,12 @@ class SystemManagementPanel(
         currentErrorMessage = null
         refreshStatusLabelText()
         
-        // 使用协程在后台执行下载
-        downloadJob = coroutineScope.launch {
-            try {
-                val success = autoUpdateService.downloadUpdate(updateInfo) { progress ->
-                    SwingUtilities.invokeLater {
-                        currentProgressMessage = I18n.t("status.downloading")
-                        currentProgressValue = progress
-                        currentErrorMessage = null
-                        refreshStatusLabelText()
-                    }
-                }
-                
-                if (!success) {
-                    SwingUtilities.invokeLater {
-                        Messages.showErrorDialog(this@SystemManagementPanel, I18n.t("update.download.fail.network"), I18n.t("update.download.fail"))
-                        // 下载失败时，恢复按钮状态，允许用户重新尝试
-                        downloadUpdateButton.isEnabled = true
-                        checkUpdateButton.isEnabled = true
-                        currentUpdateStatus = UpdateStatus.ERROR
-                        currentErrorMessage = I18n.t("update.download.fail.status")
-                        currentProgressMessage = null
-                        currentProgressValue = null
-                        refreshStatusLabelText()
-                    }
-                }
-            } catch (e: Exception) {
-                SwingUtilities.invokeLater {
-                    val errorMessage = when (e) {
-                        is java.util.concurrent.CancellationException -> I18n.t("update.download.canceled")
-                        is java.net.UnknownHostException -> I18n.t("network.fail")
-                        is java.net.SocketTimeoutException -> I18n.t("network.timeout")
-                        is java.net.ConnectException -> I18n.t("network.connect.fail")
-                        else -> MessageFormat.format(I18n.t("update.download.fail.msg"), e.message ?: "")
-                    }
-                    
-                    Messages.showErrorDialog(this@SystemManagementPanel, errorMessage, I18n.t("update.download.fail"))
-                    // 下载异常时，恢复按钮状态，允许用户重新尝试
-                    downloadUpdateButton.isEnabled = true
-                    checkUpdateButton.isEnabled = true
-                    currentUpdateStatus = UpdateStatus.ERROR
-                    currentErrorMessage = errorMessage
-                    currentProgressMessage = null
-                    currentProgressValue = null
-                    refreshStatusLabelText()
-                }
-            } finally {
-                downloadJob = null
+        autoUpdateService.downloadUpdateAsync(updateInfo) { progress ->
+            SwingUtilities.invokeLater {
+                currentProgressMessage = I18n.t("status.downloading")
+                currentProgressValue = progress
+                currentErrorMessage = null
+                refreshStatusLabelText()
             }
         }
     }
@@ -931,30 +897,7 @@ class SystemManagementPanel(
         currentErrorMessage = null
         refreshStatusLabelText()
         
-        // 使用协程在后台执行安装
-        coroutineScope.launch {
-            try {
-                val success = autoUpdateService.installUpdate(updateInfo)
-                
-                SwingUtilities.invokeLater {
-                    if (success) {
-                        Messages.showInfoMessage(
-                            this@SystemManagementPanel,
-                            I18n.t("update.install.done.msg"),
-                            I18n.t("update.install.done.title")
-                        )
-                    } else {
-                        Messages.showErrorDialog(this@SystemManagementPanel, I18n.t("update.install.fail.retry"), I18n.t("update.install.fail"))
-                        installUpdateButton.isEnabled = true
-                    }
-                }
-            } catch (e: Exception) {
-                SwingUtilities.invokeLater {
-                    Messages.showErrorDialog(this@SystemManagementPanel, MessageFormat.format(I18n.t("update.install.fail.msg"), e.message ?: ""), I18n.t("update.install.fail"))
-                    installUpdateButton.isEnabled = true
-                }
-            }
-        }
+        autoUpdateService.installUpdateAsync(updateInfo)
     }
     
     /**
@@ -1225,15 +1168,9 @@ class SystemManagementPanel(
         LanguageManager.removeChangeListener(languageChangeListener)
 
         // 如果有正在进行的下载，先取消下载
-        downloadJob?.let { job ->
-            if (job.isActive) {
-                job.cancel()
-                // 取消下载操作
-                autoUpdateService.cancelDownload()
-            }
-        }
-        
         // 取消所有协程
         coroutineScope.cancel()
+
+        autoUpdateService.removeStatusListener(updateStatusListener)
     }
 }

@@ -1,18 +1,22 @@
 package cn.suso.aicodetransformer.service.impl
 
 import cn.suso.aicodetransformer.constants.DownloadState
+import cn.suso.aicodetransformer.constants.NotificationType
 import cn.suso.aicodetransformer.constants.UpdateRecordStatusConstants
 import cn.suso.aicodetransformer.constants.UpdateStatus
 import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.model.BackupInfo
+import cn.suso.aicodetransformer.model.NotificationAction
 import cn.suso.aicodetransformer.model.UpdateInfo
 import cn.suso.aicodetransformer.model.UpdateRecord
 import cn.suso.aicodetransformer.service.AutoUpdateService
 import cn.suso.aicodetransformer.service.LoggingService
 import cn.suso.aicodetransformer.service.UpdateStatusListener
 import cn.suso.aicodetransformer.service.*
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.extensions.PluginId
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
@@ -39,12 +43,23 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     
     companion object {
         private const val UPDATE_CHECK_URL = "https://api.github.com/repos/sualpha/AICodeTransformer/releases/latest"
-        private const val CURRENT_VERSION = "1.0.0" // 从插件配置中读取
         private const val UPDATE_HISTORY_FILE = "update_history.json"
+        private const val PLUGIN_ID = "cn.suso.AICodeTransformer"
+    }
+
+    private val pluginVersion: String by lazy {
+        PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))?.version ?: "unknown"
+    }
+
+    override fun downloadUpdateAsync(updateInfo: UpdateInfo, onProgress: (Int) -> Unit) {
+        updateScope.launch {
+            downloadUpdate(updateInfo, onProgress)
+        }
     }
     
     private val configurationService: ConfigurationService = service()
     private val loggingService: LoggingService = service()
+    private val statusService: StatusService = service()
     
     // Logger instance for this service
     private val logger = com.intellij.openapi.diagnostic.Logger.getInstance(AutoUpdateServiceImpl::class.java)
@@ -61,33 +76,27 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     private var downloadJob: Job? = null
     private val updateScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var updateTimer: Timer? = null
+    private val installLock = Any()
+    private var isInstalling = false
+    
+    private fun localizedErrorMessage(messageKey: String, detail: String? = null): String {
+        val base = I18n.t(messageKey)
+        return if (detail.isNullOrBlank()) base else "$base (${detail})"
+    }
     
     /**
      * 统一的网络异常处理方法
      */
     private fun handleNetworkException(e: Exception, operation: String): String {
-        return when (e) {
-            is SocketTimeoutException -> {
-                logger.error("${operation}超时", e)
-                "${operation}超时，请检查网络连接"
-            }
-            is UnknownHostException -> {
-                logger.error("${operation}失败：无法解析主机", e)
-                "${operation}失败：无法连接到服务器，请检查网络连接"
-            }
-            is ConnectException -> {
-                logger.error("${operation}失败：连接被拒绝", e)
-                "${operation}失败：无法连接到服务器"
-            }
-            is IOException -> {
-                logger.error("${operation}失败：IO异常", e)
-                "${operation}失败：网络IO错误"
-            }
-            else -> {
-                logger.error("${operation}失败：未知错误", e)
-                "${operation}失败：${e.message ?: "未知错误"}"
-            }
+        val messageKey = when (e) {
+            is SocketTimeoutException -> "update.error.network.timeout"
+            is UnknownHostException -> "update.error.network.unreachable"
+            is ConnectException -> "update.error.network.connect_refused"
+            is IOException -> "update.error.network.io"
+            else -> "update.error.network.unknown"
         }
+        logger.error("${operation}失败", e)
+        return localizedErrorMessage(messageKey, e.message)
     }
     
     /**
@@ -148,25 +157,21 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 
                 logger.info("开始检查更新")
                 
-                // 模拟检查更新（实际应该调用真实的API）
                 val updateInfo = checkRemoteVersion()
                 
                 if (updateInfo != null) {
                     val currentVersion = getCurrentVersion()
                     if (isNewerVersion(updateInfo.version, currentVersion)) {
                         updateStatus(UpdateStatus.AVAILABLE, updateInfo)
-                        notifyProgress(100, MessageFormat.format(I18n.t("status.available"), updateInfo.version))
                         logger.info("发现新版本: ${updateInfo.version}")
                         return@withContext updateInfo
                     } else {
                         updateStatus(UpdateStatus.UP_TO_DATE)
-                        notifyProgress(100, I18n.t("status.up_to_date"))
                         logger.info("当前已是最新版本")
                         return@withContext null
                     }
                 } else {
                     updateStatus(UpdateStatus.UP_TO_DATE)
-                    notifyProgress(100, I18n.t("status.up_to_date"))
                     return@withContext null
                 }
                 
@@ -174,7 +179,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 logger.error("检查更新失败", e)
                 loggingService.logError(e, "检查更新失败")
                 updateStatus(UpdateStatus.ERROR)
-                notifyError("检查更新失败: ${e.message}")
+                notifyError(localizedErrorMessage("update.error.check.failed", e.message))
                 null
             }
         }
@@ -265,7 +270,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                         logger.error("文件完整性校验失败")
                         loggingService.logError(Exception("文件完整性校验失败"), "自动更新")
                         updateStatus(UpdateStatus.ERROR)
-                        notifyError("文件完整性校验失败，请重试下载")
+                        notifyError(I18n.t("update.error.download.integrity"))
                         
                         // 删除校验失败的文件
                         try {
@@ -281,7 +286,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 } else {
                     updateDownloadState(DownloadState.FAILED, "下载失败")
                     updateStatus(UpdateStatus.ERROR)
-                    val errorMsg = "下载失败，请检查网络连接或稍后重试"
+                    val errorMsg = I18n.t("update.error.download.failed")
                     logger.error(errorMsg)
                     loggingService.logError(Exception(errorMsg), "自动更新")
                     notifyError(errorMsg)
@@ -290,35 +295,35 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 
             } catch (e: java.net.UnknownHostException) {
                 updateDownloadState(DownloadState.FAILED, "网络连接失败")
-                val errorMsg = "网络连接失败，无法连接到下载服务器"
+                val errorMsg = localizedErrorMessage("update.error.network.unreachable", e.message)
                 logger.error(errorMsg, e)
                 loggingService.logError(e, "网络连接失败")
                 updateStatus(UpdateStatus.ERROR)
-                notifyError("$errorMsg: ${e.message}")
+                notifyError(errorMsg)
                 false
             } catch (e: java.net.SocketTimeoutException) {
                 updateDownloadState(DownloadState.FAILED, "下载超时")
-                val errorMsg = "下载超时，请检查网络连接"
+                val errorMsg = localizedErrorMessage("update.error.network.timeout", e.message)
                 logger.error(errorMsg, e)
                 loggingService.logError(e, "下载超时")
                 updateStatus(UpdateStatus.ERROR)
-                notifyError("$errorMsg: ${e.message}")
+                notifyError(errorMsg)
                 false
             } catch (e: java.io.IOException) {
                 updateDownloadState(DownloadState.FAILED, "文件操作失败")
-                val errorMsg = "文件操作失败"
+                val errorMsg = localizedErrorMessage("update.error.file.io", e.message)
                 logger.error(errorMsg, e)
                 loggingService.logError(e, "文件操作失败")
                 updateStatus(UpdateStatus.ERROR)
-                notifyError("$errorMsg: ${e.message}")
+                notifyError(errorMsg)
                 false
             } catch (e: Exception) {
                 updateDownloadState(DownloadState.FAILED, "下载异常")
-                val errorMsg = "下载更新失败"
+                val errorMsg = localizedErrorMessage("update.error.download.generic", e.message)
                 logger.error(errorMsg, e)
                 loggingService.logError(e, "下载更新失败")
                 updateStatus(UpdateStatus.ERROR)
-                notifyError("$errorMsg: ${e.message}")
+                notifyError(errorMsg)
                 false
             } finally {
                 // 清理下载状态
@@ -338,6 +343,13 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     
     override suspend fun installUpdate(updateInfo: UpdateInfo): Boolean {
         return withContext(Dispatchers.IO) {
+            synchronized(installLock) {
+                if (isInstalling) {
+                    logger.warn("安装任务正在执行中，跳过新的安装请求")
+                    return@withContext false
+                }
+                isInstalling = true
+            }
             try {
                 updateStatus(UpdateStatus.INSTALLING, updateInfo)
                 notifyProgress(0, I18n.t("update.install.preparing"))
@@ -446,9 +458,19 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 loggingService.logError(e, "安装更新失败")
                 recordUpdateHistory(updateInfo, UpdateRecordStatusConstants.FAILED, e.message)
                 updateStatus(UpdateStatus.ERROR)
-                notifyError("安装失败: ${e.message}")
+                notifyError(localizedErrorMessage("update.error.install.failed", e.message))
                 false
+            } finally {
+                synchronized(installLock) {
+                    isInstalling = false
+                }
             }
+        }
+    }
+
+    override fun installUpdateAsync(updateInfo: UpdateInfo) {
+        updateScope.launch {
+            installUpdate(updateInfo)
         }
     }
     
@@ -561,14 +583,14 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 loggingService.logError(e, "自动安装更新失败")
                 recordUpdateHistory(updateInfo, UpdateRecordStatusConstants.FAILED, e.message)
                 updateStatus(UpdateStatus.ERROR)
-                notifyError("自动安装失败: ${e.message}")
+                notifyError(localizedErrorMessage("update.error.auto_install.failed", e.message))
                 false
             }
         }
     }
     
     override fun getCurrentVersion(): String {
-        return CURRENT_VERSION
+        return pluginVersion
     }
     
     override fun getUpdateHistory(): List<UpdateRecord> {
@@ -669,7 +691,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             logger.error("自动更新流程失败", e)
             loggingService.logError(e, "自动更新流程失败")
             updateStatus(UpdateStatus.ERROR)
-            notifyError("自动更新失败: ${e.message}")
+            notifyError(localizedErrorMessage("update.error.auto_update.failed", e.message))
         } finally {
             // 清理自动更新状态
             synchronized(downloadLock) {
@@ -719,9 +741,12 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                 logger.error("通知状态监听器失败", e)
             }
         }
+
+        handleStatusNotification(newStatus, updateInfo)
     }
     
     private fun notifyProgress(progress: Int, message: String) {
+        statusService.showProgress(message, progress)
         listeners.forEach { listener: UpdateStatusListener ->
             try {
                 listener.onProgressChanged(progress, message)
@@ -732,12 +757,70 @@ class AutoUpdateServiceImpl : AutoUpdateService {
     }
     
     private fun notifyError(error: String) {
+        statusService.showErrorNotification(
+            I18n.t("update.notification.error.title"),
+            error
+        )
         listeners.forEach { listener: UpdateStatusListener ->
             try {
                 listener.onError(error)
             } catch (e: Exception) {
                 logger.error("通知错误监听器失败", e)
             }
+        }
+    }
+
+    private fun handleStatusNotification(status: UpdateStatus, updateInfo: UpdateInfo?) {
+        when (status) {
+            UpdateStatus.DOWNLOADING -> {
+                statusService.showStatusMessage(I18n.t("update.notification.downloading.content", updateInfo?.version ?: ""), duration = 5000)
+            }
+            UpdateStatus.DOWNLOADED -> {
+                updateInfo?.let {
+                    statusService.showNotificationWithActions(
+                        I18n.t("update.notification.downloaded.title"),
+                        I18n.t("update.notification.downloaded.content", it.version),
+                        NotificationType.INFORMATION,
+                        actions = listOf(buildInstallAction(it))
+                    )
+                }
+            }
+            UpdateStatus.INSTALLING -> {
+                updateInfo?.let {
+                    statusService.showStatusMessage(I18n.t("update.notification.installing.content", it.version), duration = 5000)
+                }
+            }
+            UpdateStatus.INSTALLED -> {
+                updateInfo?.let {
+                    statusService.showNotificationWithActions(
+                        I18n.t("update.notification.installed.title"),
+                        I18n.t("update.notification.installed.content", it.version),
+                        NotificationType.INFORMATION,
+                        actions = listOf(buildRestartAction())
+                    )
+                }
+            }
+            UpdateStatus.ERROR -> {
+                statusService.showErrorNotification(
+                    I18n.t("update.notification.error.title"),
+                    I18n.t("update.notification.error.content")
+                )
+            }
+            else -> {
+                // ignore
+            }
+        }
+    }
+
+    private fun buildInstallAction(updateInfo: UpdateInfo): NotificationAction {
+        return NotificationAction(I18n.t("update.notification.install.now")) {
+            installUpdateAsync(updateInfo)
+        }
+    }
+
+    private fun buildRestartAction(): NotificationAction {
+        return NotificationAction(I18n.t("update.notification.restart.now")) {
+            restartIDE()
         }
     }
     
@@ -2361,13 +2444,15 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         try {
             // 在EDT线程中显示对话框
             com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                val title = I18n.t("update.restart.dialog.title")
+                val message = I18n.t("update.restart.dialog.content", updateInfo.version)
+                val restartNowText = I18n.t("update.restart.button.now")
+                val restartLaterText = I18n.t("update.restart.button.later")
                 val result = com.intellij.openapi.ui.Messages.showYesNoDialog(
-                    "插件已成功更新到版本 ${updateInfo.version}。\n\n" +
-                    "为了使更新生效，需要重启 IntelliJ IDEA。\n" +
-                    "是否现在重启？",
-                    "更新完成 - 需要重启",
-                    "立即重启",
-                    "稍后重启",
+                    message,
+                    title,
+                    restartNowText,
+                    restartLaterText,
                     com.intellij.openapi.ui.Messages.getQuestionIcon()
                 )
                 
@@ -2391,15 +2476,17 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         try {
             // 在EDT线程中显示通知
             com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                val title = I18n.t("update.auto.restart.notification.title")
+                val content = I18n.t("update.auto.restart.notification.content", updateInfo.version)
                 val notification = com.intellij.notification.Notification(
                     "AICodeTransformer.AutoUpdate",
-                    "自动更新完成",
-                    "插件已自动更新到版本 ${updateInfo.version}。请重启 IntelliJ IDEA 以应用更改。",
+                    title,
+                    content,
                     com.intellij.notification.NotificationType.INFORMATION
                 )
                 
                 // 添加重启动作
-                notification.addAction(object : com.intellij.notification.NotificationAction("立即重启") {
+                notification.addAction(object : com.intellij.notification.NotificationAction(I18n.t("update.notification.restart.now")) {
                     override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent, notification: com.intellij.notification.Notification) {
                         notification.expire()
                         restartIDE()
@@ -2443,15 +2530,17 @@ class AutoUpdateServiceImpl : AutoUpdateService {
         try {
             // 显示状态栏通知
             com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+                val title = I18n.t("update.restart.reminder.title")
+                val content = I18n.t("update.restart.reminder.content")
                 val notification = com.intellij.notification.Notification(
                     "AICodeTransformer.Update",
-                    "插件更新完成",
-                    "插件已更新，请重启 IntelliJ IDEA 以应用更改。",
+                    title,
+                    content,
                     com.intellij.notification.NotificationType.INFORMATION
                 )
                 
                 // 添加重启动作
-                notification.addAction(object : com.intellij.notification.NotificationAction("立即重启") {
+                notification.addAction(object : com.intellij.notification.NotificationAction(I18n.t("update.notification.restart.now")) {
                     override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent, notification: com.intellij.notification.Notification) {
                         notification.expire()
                         restartIDE()
@@ -2538,7 +2627,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                     .error("回滚失败", e)
                 loggingService.logError(e, "回滚失败")
                 updateStatus(UpdateStatus.ERROR)
-                notifyError("回滚失败: ${e.message}")
+                notifyError(localizedErrorMessage("update.error.rollback.failed", e.message))
                 false
             }
         }

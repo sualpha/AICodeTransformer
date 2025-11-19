@@ -26,11 +26,21 @@ interface AutoUpdateService {
     suspend fun downloadUpdate(updateInfo: UpdateInfo, onProgress: (Int) -> Unit = {}): Boolean
     
     /**
+     * 在后台线程启动下载任务
+     */
+    fun downloadUpdateAsync(updateInfo: UpdateInfo, onProgress: (Int) -> Unit = {})
+    
+    /**
      * 安装更新
      * @param updateInfo 更新信息
      * @return 安装是否成功
      */
     suspend fun installUpdate(updateInfo: UpdateInfo): Boolean
+
+    /**
+     * 在后台线程启动安装任务
+     */
+    fun installUpdateAsync(updateInfo: UpdateInfo)
     
     /**
      * 获取当前版本信息
