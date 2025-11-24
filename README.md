@@ -2,7 +2,7 @@
 
 # 🤖 AICodeTransformer
 
-**一个强大的 IntelliJ IDEA 插件，利用 AI 技术帮助开发者进行智能代码转换、优化和生成**
+**一个强大的 JetBrains 系列 IDE 插件，利用 AI 技术帮助开发者进行智能代码转换、优化和生成**
 
 [English](README_EN.md) | 简体中文
 
@@ -10,7 +10,7 @@
 
 ## 📖 简介
 
-AICodeTransformer 是一个功能强大的 IntelliJ IDEA 插件，通过集成多种 AI 模型（OpenAI GPT、Claude、Gemini 等），为开发者提供智能代码格式化、优化和生成功能。通过自定义 Prompt 模板和快捷键绑定，实现一键式 AI 代码处理，大幅提升开发效率。
+AICodeTransformer 是一个功能强大的 JetBrains 系列 IDE 插件，通过集成多种 AI 模型（OpenAI GPT、Claude、Gemini 等），为开发者提供智能代码格式化、优化和生成功能。通过自定义 Prompt 模板和快捷键绑定，实现一键式 AI 代码处理，大幅提升开发效率。
 
 ## ✨ 核心特性
 
@@ -51,7 +51,7 @@ AICodeTransformer 是一个功能强大的 IntelliJ IDEA 插件，通过集成�
 
 #### 方式一：从 JetBrains Marketplace 安装（推荐）
 
-1. 打开 IntelliJ IDEA
+1. 打开你使用的 JetBrains IDE（如 PyCharm、WebStorm 等）
 2. 进入 `File` → `Settings` → `Plugins`
 3. 搜索 "AICodeTransformer"
 4. 点击 `Install` 安装

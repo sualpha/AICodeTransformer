@@ -8,7 +8,7 @@ build/
 # Gradle Wrapper
 gradle-app.setting
 
-### IntelliJ IDEA ###
+### JetBrains IDEs ###
 .idea/
 *.iws
 *.iml

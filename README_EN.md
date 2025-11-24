@@ -2,7 +2,7 @@
 
 # 🤖 AICodeTransformer
 
-**A powerful IntelliJ IDEA plugin that leverages AI technology to help developers with intelligent code transformation, optimization, and generation**
+**A powerful JetBrains IDE plugin that leverages AI technology to help developers with intelligent code transformation, optimization, and generation**
 
 English | [简体中文](README.md)
 
@@ -10,7 +10,7 @@ English | [简体中文](README.md)
 
 ## 📖 Introduction
 
-AICodeTransformer is a powerful IntelliJ IDEA plugin that integrates multiple AI models (OpenAI GPT, Claude, Gemini, etc.) to provide developers with intelligent code transformation, optimization, and generation capabilities. Through custom Prompt templates and shortcut key bindings, it enables one-click AI code processing, significantly improving development efficiency.
+AICodeTransformer is a powerful JetBrains IDE plugin that integrates multiple AI models (OpenAI GPT, Claude, Gemini, etc.) to provide developers with intelligent code transformation, optimization, and generation capabilities. Through custom Prompt templates and shortcut key bindings, it enables one-click AI code processing, significantly improving development efficiency.
 
 ## ✨ Core Features
 
@@ -47,11 +47,11 @@ The AI-generated commit message feature intelligently analyzes your code changes
 
 #### Method 1: Install from JetBrains Marketplace (Recommended)
 
-1. Open IntelliJ IDEA
+1. Open your JetBrains IDE (e.g., PyCharm, WebStorm)
 2. Go to `File` → `Settings` → `Plugins`
 3. Search for "AICodeTransformer"
 4. Click `Install`
-5. Restart IDE
+5. Restart the IDE
 
 #### Method 2: Install from GitHub Releases (Recommended)
 

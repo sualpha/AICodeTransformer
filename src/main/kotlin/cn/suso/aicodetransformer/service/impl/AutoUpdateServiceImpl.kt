@@ -2516,7 +2516,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
             com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
                 com.intellij.openapi.ui.Messages.showWarningDialog(
                     null,
-                    "自动重启失败，请手动重启 IntelliJ IDEA 以应用更新。",
+                    "自动重启失败，请手动重启 JetBrains IDE 以应用更新。",
                     "重启失败"
                 )
             }
@@ -2740,7 +2740,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
              com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
                  val result = com.intellij.openapi.ui.Messages.showYesNoDialog(
                      "插件已成功回滚到上一版本。\n\n" +
-                     "为了使回滚生效，需要重启 IntelliJ IDEA。\n" +
+                     "为了使回滚生效，需要重启 JetBrains IDE。\n" +
                      "是否现在重启？",
                      "回滚完成 - 需要重启",
                      "立即重启",
@@ -2768,7 +2768,7 @@ class AutoUpdateServiceImpl : AutoUpdateService {
                  val notification = com.intellij.notification.Notification(
                      "AICodeTransformer.Update",
                      "插件回滚完成",
-                     "插件已回滚到上一版本，请重启 IntelliJ IDEA 以应用更改。",
+                     "插件已回滚到上一版本，请重启 JetBrains IDE 以应用更改。",
                      com.intellij.notification.NotificationType.INFORMATION
                  )
                  
