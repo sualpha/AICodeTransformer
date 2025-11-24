@@ -97,6 +97,7 @@ class PromptTemplateEditDialog(
             try {
                 templateService.saveTemplate(templateFromFields)
                 result = templateFromFields
+                editPanel.setTemplate(templateFromFields)
                 // 应用后不关闭对话框，只是保存
             } catch (e: Exception) {
                 Messages.showErrorDialog(
@@ -159,6 +160,7 @@ class PromptTemplateEditDialog(
             try {
                 templateService.saveTemplate(templateFromFields)
                 result = templateFromFields
+                editPanel.setTemplate(templateFromFields)
                 super.doOKAction()
             } catch (e: Exception) {
                 Messages.showErrorDialog(

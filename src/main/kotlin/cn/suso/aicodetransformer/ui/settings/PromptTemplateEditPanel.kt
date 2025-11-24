@@ -3,11 +3,19 @@ package cn.suso.aicodetransformer.ui.settings
 import cn.suso.aicodetransformer.constants.TemplateConstants
 import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.i18n.LanguageManager
+import cn.suso.aicodetransformer.model.PromptOptimizationRequest
+import cn.suso.aicodetransformer.model.PromptOptimizationResult
+import cn.suso.aicodetransformer.model.PromptVariableInfo
 import cn.suso.aicodetransformer.model.PromptTemplate
+import cn.suso.aicodetransformer.service.PromptOptimizationService
 import cn.suso.aicodetransformer.service.PromptTemplateService
+import cn.suso.aicodetransformer.service.impl.PromptOptimizationServiceImpl
 import cn.suso.aicodetransformer.service.impl.PromptTemplateServiceImpl
 import cn.suso.aicodetransformer.ui.components.TooltipHelper
 
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.components.JBCheckBox
@@ -31,6 +39,7 @@ import javax.swing.SwingUtilities
 class PromptTemplateEditPanel : JPanel() {
     
     private val templateService: PromptTemplateService = PromptTemplateServiceImpl.getInstance()
+    private val promptOptimizationService: PromptOptimizationService = PromptOptimizationServiceImpl.getInstance()
     
     // 可用变量列表，默认为所有内置变量
     private var availableVariables: List<Pair<String, String>> = TemplateConstants.getBuiltInVariablesMap().toList()
@@ -50,10 +59,17 @@ class PromptTemplateEditPanel : JPanel() {
     private val validateTemplateButton = JButton()
     private val insertVariableButton = JButton()
     private val resetContentButton = JButton()
+    private val resetButtonSpacer = Box.createHorizontalStrut(8)
+    private val aiOptimizeButton = JButton()
     private val contentToolbar = JPanel()
     private val tabbedPane = JBTabbedPane()
     private val languageListener: () -> Unit = {
         SwingUtilities.invokeLater { refreshTexts() }
+    }
+
+    private fun updateResetButtonVisibility(visible: Boolean) {
+        resetContentButton.isVisible = visible
+        resetButtonSpacer.isVisible = visible
     }
     
     private var currentTemplate: PromptTemplate? = null
@@ -80,7 +96,7 @@ class PromptTemplateEditPanel : JPanel() {
         
         // 模板内容标签页
         tabbedPane.addTab(I18n.t("prompt.content.tab"), createContentPanel())
-        
+
         add(tabbedPane, BorderLayout.CENTER)
     }
     
@@ -118,8 +134,10 @@ class PromptTemplateEditPanel : JPanel() {
         contentToolbar.add(insertVariableButton)
         contentToolbar.add(Box.createHorizontalStrut(8))
         contentToolbar.add(validateTemplateButton)
-        contentToolbar.add(Box.createHorizontalStrut(8))
+        contentToolbar.add(resetButtonSpacer)
         contentToolbar.add(resetContentButton)
+        contentToolbar.add(Box.createHorizontalStrut(8))
+        contentToolbar.add(aiOptimizeButton)
         panel.add(contentToolbar, BorderLayout.SOUTH)
         
         return panel
@@ -145,6 +163,7 @@ class PromptTemplateEditPanel : JPanel() {
         validateTemplateButton.addActionListener { validateTemplateAndShowResult() }
         insertVariableButton.addActionListener { showInsertVariableDialog() }
         resetContentButton.addActionListener { resetTemplateContent() }
+        aiOptimizeButton.addActionListener { optimizeTemplateWithAI() }
     }
     
     /**
@@ -177,6 +196,7 @@ class PromptTemplateEditPanel : JPanel() {
             clearFields()
         }
         
+        updateResetButtonVisibility(template != null)
         isModified = false
     }
     
@@ -289,7 +309,6 @@ class PromptTemplateEditPanel : JPanel() {
      */
     private fun resetTemplateContent() {
         val result = Messages.showYesNoDialog(
-            null,
             I18n.t("prompt.reset.confirm.message"),
             I18n.t("prompt.reset.confirm.title"),
             I18n.t("prompt.reset.confirm.ok"),
@@ -305,6 +324,105 @@ class PromptTemplateEditPanel : JPanel() {
             contentArea.requestFocus()
             notifyModification()
         }
+    }
+    private fun optimizeTemplateWithAI() {
+        val currentContent = contentArea.text.trim()
+        if (currentContent.isEmpty()) {
+            Messages.showWarningDialog(
+                this,
+                I18n.t("prompt.aiOptimize.noContent"),
+                I18n.t("prompt.aiOptimize.input.title")
+            )
+            return
+        }
+
+        val originalSnapshot = PromptOptimizationPreviewDialog.TemplateSnapshot(
+            name = nameField.text,
+            description = descriptionField.text,
+            content = contentArea.text
+        )
+
+        runPromptOptimization(
+            userIntent = currentContent,
+            onSuccess = { optimized ->
+                val dialog = PromptOptimizationPreviewDialog(originalSnapshot, optimized)
+                dialog.onRegenerateRequested = {
+                    dialog.setRegenerateEnabled(false)
+                    runPromptOptimization(
+                        userIntent = currentContent,
+                        onSuccess = { newResult ->
+                            dialog.updateOptimizedResult(newResult)
+                            dialog.setRegenerateEnabled(true)
+                        },
+                        onFailure = { error ->
+                            dialog.setRegenerateEnabled(true)
+                            Messages.showErrorDialog(
+                                this,
+                                I18n.t("prompt.aiOptimize.failed", error.message ?: ""),
+                                I18n.t("prompt.aiOptimize.input.title")
+                            )
+                        }
+                    )
+                }
+                dialog.show()
+                if (dialog.decision == PromptOptimizationPreviewDialog.Decision.APPLY) {
+                    val resultToApply = dialog.getCurrentOptimizedResult()
+                    applyOptimizationResult(resultToApply)
+                    Messages.showInfoMessage(
+                        this,
+                        I18n.t("prompt.aiOptimize.success"),
+                        I18n.t("prompt.aiOptimize.input.title")
+                    )
+                }
+            },
+            onFailure = { error ->
+                Messages.showErrorDialog(
+                    this,
+                    I18n.t("prompt.aiOptimize.failed", error.message ?: ""),
+                    I18n.t("prompt.aiOptimize.input.title")
+                )
+            }
+        )
+    }
+
+    private fun runPromptOptimization(
+        userIntent: String,
+        onSuccess: (PromptOptimizationResult) -> Unit,
+        onFailure: (Throwable) -> Unit
+    ) {
+        ProgressManager.getInstance().run(object : Task.Backgroundable(null, I18n.t("prompt.aiOptimize.progress.title"), true) {
+            override fun run(indicator: ProgressIndicator) {
+                indicator.text = I18n.t("prompt.aiOptimize.progress.running")
+                val request = buildOptimizationRequest(userIntent)
+                val result = runCatching { promptOptimizationService.optimizePrompt(request) }
+                SwingUtilities.invokeLater {
+                    result.fold(onSuccess, onFailure)
+                }
+            }
+        })
+    }
+
+    private fun buildOptimizationRequest(userIntent: String): PromptOptimizationRequest {
+        return PromptOptimizationRequest(
+            userPrompt = userIntent,
+            category = categoryField.text.trim().takeIf { it.isNotEmpty() },
+            currentName = nameField.text.trim().takeIf { it.isNotEmpty() },
+            currentDescription = descriptionField.text.trim().takeIf { it.isNotEmpty() },
+            currentContent = contentArea.text.takeIf { it.isNotBlank() },
+            languageCode = LanguageManager.getLanguageCode(),
+            availableVariables = availableVariables.map { (placeholder, description) ->
+                PromptVariableInfo(placeholder, description)
+            }
+        )
+    }
+
+    private fun applyOptimizationResult(result: PromptOptimizationResult) {
+        result.name?.let { nameField.text = it }
+        result.description?.let { descriptionField.text = it }
+        contentArea.text = result.content
+        contentArea.caretPosition = contentArea.document.length
+        contentArea.requestFocus()
+        notifyModification()
     }
     
     /**
@@ -398,6 +516,7 @@ class PromptTemplateEditPanel : JPanel() {
         validateTemplateButton.text = I18n.t("prompt.validate")
         insertVariableButton.text = I18n.t("prompt.insertVariable")
         resetContentButton.text = I18n.t("prompt.resetContent")
+        aiOptimizeButton.text = I18n.t("prompt.aiOptimize.button")
 
         tabbedPane.setTitleAt(0, I18n.t("prompt.basic.tab"))
         tabbedPane.setTitleAt(1, I18n.t("prompt.content.tab"))
