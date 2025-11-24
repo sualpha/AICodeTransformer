@@ -94,7 +94,8 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.vcs</depends>
-    <depends optional="true">com.intellij.modules.java</depends>
+    <depends optional="true" config-file="java.xml">com.intellij.modules.java</depends>
+
     <depends optional="true" config-file="git.xml">Git4Idea</depends>
 
     <!-- Dynamic plugin support - allows installation/uninstallation without IDE restart -->
