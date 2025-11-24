@@ -31,10 +31,10 @@ AICodeTransformer is a powerful IntelliJ IDEA plugin that integrates multiple AI
 - **Category Management**: Organized by function for easy searching and usage
 - **Prompt AI Optimization**: Trigger the in-editor "AI Optimize" button to polish template name/description/content via the built-in preview dialog
 
-### 📝 AI-Generated Commit Message Feature
+### 📝 AI-Generated Commit Message Feature *(Git-enabled IDEs only)*
 
 **Feature Overview**:
-The AI-generated commit message feature intelligently analyzes your code changes and automatically generates standardized Git commit messages, improving development efficiency and code management quality.
+The AI-generated commit message feature intelligently analyzes your code changes and automatically generates standardized Git commit messages, improving development efficiency and code management quality. This module is available only when the JetBrains Git plugin is enabled and an active Git repository is detected.
 - **Intelligent Analysis**: Automatically analyze file changes and code differences
 - **Standardized Format**: Generate commit messages that comply with Git commit conventions
 - **Batch Processing**: Support intelligent summarization of multi-file changes

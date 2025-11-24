@@ -57,6 +57,15 @@ object TemplateConstants {
             supportedLanguages = listOf("json", "javascript", "typescript")
         ),
 
+        SQL_FORMATTER(
+            id = "sql-formatter",
+            displayNameKey = "template.sqlFormatter.name",
+            descriptionKey = "template.sqlFormatter.description",
+            category = TemplateCategory.DATABASE,
+            contentKey = "template.sqlFormatter.content",
+            supportedLanguages = listOf("sql", "java", "kotlin", "python", "go", "csharp")
+        ),
+
         COMMENT_DRIVEN_GENERATOR(
             id = "comment-driven-generator",
             displayNameKey = "template.commentDrivenGenerator.name",

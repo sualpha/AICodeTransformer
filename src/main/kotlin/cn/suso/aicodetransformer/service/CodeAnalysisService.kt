@@ -1,11 +1,9 @@
 package cn.suso.aicodetransformer.service
 
+import cn.suso.aicodetransformer.service.java.JavaPsiHelperLoader
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.application.ReadAction
-import com.intellij.psi.*
-import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.psi.search.PsiShortNamesCache
 import cn.suso.aicodetransformer.model.FieldInfo
 import cn.suso.aicodetransformer.model.ClassInfo
 import cn.suso.aicodetransformer.model.MethodInfo
@@ -345,73 +343,8 @@ class CodeAnalysisService {
      * @return 真实的类信息，如果找不到类则返回null
      */
     fun getRealClassInfo(className: String, project: Project): ClassInfo? {
-        return try {
-            ReadAction.compute<ClassInfo?, Exception> {
-                try {
-                    val javaPsiFacade = JavaPsiFacade.getInstance(project)
-                    val searchScope = GlobalSearchScope.allScope(project)
-                    
-                    // 首先尝试通过完全限定名查找
-                    var psiClass = javaPsiFacade.findClass(className, searchScope)
-                    
-                    // 如果找不到，尝试通过短类名查找
-                    if (psiClass == null) {
-                        val shortNamesCache = PsiShortNamesCache.getInstance(project)
-                        val classes = shortNamesCache.getClassesByName(className, searchScope)
-                        psiClass = classes.firstOrNull()
-                    }
-                    
-                    if (psiClass == null) {
-                        return@compute null
-                    }
-                    
-                    // 提取真实的字段信息
-                    val fields = mutableListOf<FieldInfo>()
-            
-            // 获取所有字段
-            for (psiField in psiClass.allFields) {
-                // 跳过静态字段和常量
-                if (!psiField.hasModifierProperty(PsiModifier.STATIC)) {
-                    val fieldType = psiField.type.presentableText
-                    val fieldName = psiField.name
-                    val annotations = psiField.annotations.map { it.qualifiedName ?: "" }
-                    val isPrivate = psiField.hasModifierProperty(PsiModifier.PRIVATE)
-                    
-                    // 检查是否有getter和setter方法
-                    val hasGetter = psiClass.findMethodsByName("get${fieldName.replaceFirstChar { it.uppercase() }}", false).isNotEmpty() ||
-                                   psiClass.findMethodsByName("is${fieldName.replaceFirstChar { it.uppercase() }}", false).isNotEmpty()
-                    val hasSetter = psiClass.findMethodsByName("set${fieldName.replaceFirstChar { it.uppercase() }}", false).isNotEmpty()
-                    
-                    fields.add(FieldInfo(
-                        name = fieldName,
-                        type = fieldType,
-                        annotations = annotations,
-                        isPrivate = isPrivate,
-                        hasGetter = hasGetter,
-                        hasSetter = hasSetter
-                    ))
-                }
-            }
-            
-                // 获取包名
-                val packageName = psiClass.qualifiedName?.substringBeforeLast('.') ?: ""
-                val simpleClassName = psiClass.name ?: className
-                
-                return@compute ClassInfo(
-                    name = simpleClassName,
-                    packageName = packageName,
-                    fields = fields
-                )
-                
-            } catch (e: Exception) {
-                // 如果发生异常，返回null
-                return@compute null
-            }
-        }
-        } catch (e: Exception) {
-            // 如果 ReadAction 本身失败（比如在测试环境中），返回null
-            return null
-        }
+        val helper = JavaPsiHelperLoader.helper() ?: return null
+        return helper.getRealClassInfo(className, project)
     }
 }
 

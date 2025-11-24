@@ -31,7 +31,7 @@
                 <li>🧩 <strong>Variable Name Generator</strong>: Input Chinese description to generate a single, clean variable name based on language (e.g., Java → camelCase; Python → snake_case)</li>
             </ul>
         </li>
-        <li>🤖 <strong>AI-Generated Commit Messages</strong>: Intelligently analyze code changes and automatically generate standardized Git commit messages</li>
+        <li>🤖 <strong>AI-Generated Commit Messages</strong>: Intelligently analyze code changes and automatically generate standardized Git commit messages (available only when the JetBrains Git plugin is enabled and the project has a Git repository)</li>
         <li>Create custom prompt templates with variables,Template editor embeds an <em>AI Optimize</em> button with preview/regenerate workflow to polish prompt name/description/content</li>
         <li>Bind keyboard shortcuts to AI actions</li>
     </ul>
@@ -70,7 +70,7 @@
                 <li>🧩 <strong>变量命名生成</strong>：输入中文描述，按语言仅生成一种规范、易读的变量名（如 Java → camelCase，Python → snake_case）</li>
             </ul>
         </li>
-        <li>🤖 <strong>AI生成Commit信息</strong>：智能分析代码变更，自动生成规范化的Git提交信息</li>
+        <li>🤖 <strong>AI生成Commit信息</strong>：智能分析代码变更，自动生成规范化的Git提交信息（仅在启用JetBrains Git插件且当前项目存在Git仓库时可用）</li>
         <li>创建带变量的自定义提示模板,模板编辑界面自带“AI优化”按钮，支持预览、重新优化</li>
         <li>绑定键盘快捷键到AI操作</li>
     </ul>
@@ -93,10 +93,10 @@
     <!-- Product and plugin compatibility requirements.
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.java</depends>
     <depends>com.intellij.modules.vcs</depends>
-    <depends>Git4Idea</depends>
-    
+    <depends optional="true">com.intellij.modules.java</depends>
+    <depends optional="true" config-file="git.xml">Git4Idea</depends>
+
     <!-- Dynamic plugin support - allows installation/uninstallation without IDE restart -->
     <!-- Note: Some complex dependencies may still require restart -->
     <idea-version since-build="203.0"/>
@@ -131,40 +131,30 @@
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.AutoUpdateServiceImpl"/>
         <applicationService serviceInterface="cn.suso.aicodetransformer.service.PromptOptimizationService"
                            serviceImplementation="cn.suso.aicodetransformer.service.impl.PromptOptimizationServiceImpl"/>
-        
+
         <!-- Project-level services -->
-        <projectService serviceInterface="cn.suso.aicodetransformer.service.VCSService"
-                       serviceImplementation="cn.suso.aicodetransformer.service.impl.VCSServiceImpl"/>
-        
         <!-- Project startup activity -->
         <postStartupActivity implementation="cn.suso.aicodetransformer.AICodeTransformerProjectActivity"/>
-        
+
         <!-- Settings page -->
         <!-- 将设置页面移动到“Other Settings”分组 -->
         <applicationConfigurable parentId="other.settings" instance="cn.suso.aicodetransformer.ui.settings.AICodeTransformerConfigurable"
                                 id="cn.suso.aicodetransformer.ui.settings.AICodeTransformerConfigurable"
                                 displayName="AI Code Transformer"/>
-        
+
         <!-- Notification groups -->
         <notificationGroup id="AICodeTransformer" displayType="BALLOON" key="notification.group.aicodetransformer"/>
     </extensions>
-    
+
     <!-- Actions -->
     <actions>
 
-        <!-- Git提交对话框中的AI生成按钮 -->
-        <action id="AICodeTransformer.CommitDialogAI" 
-                class="cn.suso.aicodetransformer.action.CommitDialogAIAction"
-                text="🤖 AI生成" 
-                description="使用AI自动生成commit信息并填充到提交框">
-            <add-to-group group-id="Vcs.MessageActionGroup" anchor="last"/>
-        </action>
-        
         <!-- 动态模板菜单组 - 显示所有可用的prompt模板 -->
-        <group id="AICodeTransformer.DynamicTemplates" 
+        <group id="AICodeTransformer.DynamicTemplates"
                class="cn.suso.aicodetransformer.action.DynamicTemplateActionGroup"
-               text="AI代码转换" 
-               description="使用AI转换选中的代码" 
+
+               text="AI代码转换"
+               description="使用AI转换选中的代码"
                popup="true">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
         </group>

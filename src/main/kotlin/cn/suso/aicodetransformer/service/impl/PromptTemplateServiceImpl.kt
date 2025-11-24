@@ -7,6 +7,7 @@ import cn.suso.aicodetransformer.service.ErrorHandlingService
 import cn.suso.aicodetransformer.service.PromptTemplateService
 import cn.suso.aicodetransformer.service.TemplateChangeListener
 import cn.suso.aicodetransformer.service.TemplateVariableResolver
+import cn.suso.aicodetransformer.service.java.JavaPsiHelperLoader
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
@@ -58,6 +59,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
     private val languageListener: () -> Unit = {
         refreshBuiltInTemplatesForCurrentLanguage()
     }
+    private val objectConversionTemplateId = TemplateConstants.TemplateConfig.OBJECT_CONVERT.id
     
 
     
@@ -499,6 +501,9 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
         lock.write {
             val builtInConfigs = TemplateConstants.TemplateConfig.getBuiltInTemplates()
             builtInConfigs.forEach { config ->
+                if (!shouldLoadBuiltIn(config)) {
+                    return@forEach
+                }
                 val existingIndex = state.templates.indexOfFirst { it.id == config.id }
                 if (existingIndex >= 0) {
                     val existing = state.templates[existingIndex]
@@ -527,6 +532,7 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                     listeners.forEach { it.onTemplateAdded(template) }
                 }
             }
+            removeUnsupportedBuiltInTemplatesLocked()
         }
         logger.info("默认模板初始化完成，共加载 ${getDefaultTemplates().size} 个模板")
     }
@@ -540,8 +546,11 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 if (config == null || !template.isBuiltIn) {
                     template
                 } else {
+                    if (!shouldLoadBuiltIn(config)) {
+                        return@replaceAll template
+                    }
                     val matchesName = template.name == config.displayName
-                    val matchesDescription = (template.description ?: "") == (config.description ?: "")
+                    val matchesDescription = (template.description ?: "") == config.description
                     val matchesContent = template.content == config.content
                     if (matchesName && matchesDescription && matchesContent) {
                         template
@@ -556,10 +565,38 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                     }
                 }
             }
+            if (removeUnsupportedBuiltInTemplatesLocked()) {
+                changed = true
+            }
         }
         if (changed) {
             forceSaveState()
         }
+    }
+
+    private fun shouldLoadBuiltIn(config: TemplateConstants.TemplateConfig): Boolean {
+        return config.id != objectConversionTemplateId || supportsObjectConversion()
+    }
+
+    private fun supportsObjectConversion(): Boolean = JavaPsiHelperLoader.helper() != null
+
+    private fun removeUnsupportedBuiltInTemplatesLocked(): Boolean {
+        if (supportsObjectConversion()) {
+            return false
+        }
+        var removed = false
+        val iterator = state.templates.listIterator()
+        while (iterator.hasNext()) {
+            val template = iterator.next()
+            if (template.id == objectConversionTemplateId && template.isBuiltIn) {
+                iterator.remove()
+                usageStats.remove(template.id)
+                state.usageStatistics.remove(template.id)
+                listeners.forEach { it.onTemplateDeleted(template) }
+                removed = true
+            }
+        }
+        return removed
     }
 
     override fun dispose() {

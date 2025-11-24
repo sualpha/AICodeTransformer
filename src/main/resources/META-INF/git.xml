@@ -1,0 +1,16 @@
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceInterface="cn.suso.aicodetransformer.service.VCSService"
+                        serviceImplementation="cn.suso.aicodetransformer.service.impl.VCSServiceImpl"/>
+    </extensions>
+
+    <actions>
+        <!-- Git提交对话框中的AI生成按钮 -->
+        <action id="AICodeTransformer.CommitDialogAI"
+                class="cn.suso.aicodetransformer.action.CommitDialogAIAction"
+                text="🤖 AI生成"
+                description="使用AI自动生成commit信息并填充到提交框">
+            <add-to-group group-id="Vcs.MessageActionGroup" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

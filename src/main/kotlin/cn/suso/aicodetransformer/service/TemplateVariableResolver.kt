@@ -1,17 +1,14 @@
 package cn.suso.aicodetransformer.service
 
-import com.intellij.openapi.components.service
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.editor.Editor
+import cn.suso.aicodetransformer.service.java.JavaPsiHelperLoader
 import com.intellij.openapi.application.ReadAction
-import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.components.service
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiMethod
-import com.intellij.psi.PsiJavaFile
-import com.intellij.psi.util.PsiTreeUtil
 
 /**
  * 模板变量解析器，用于解析和替换模板中的内置变量
@@ -19,6 +16,7 @@ import com.intellij.psi.util.PsiTreeUtil
 class TemplateVariableResolver(private val project: Project) {
     
     private val codeAnalysisService = project.service<CodeAnalysisService>()
+    private val javaPsiHelper = JavaPsiHelperLoader.helper()
     
     /**
      * 解析模板中的变量
@@ -68,21 +66,10 @@ class TemplateVariableResolver(private val project: Project) {
             val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
             if (psiFile != null) {
                 val offset = editor.caretModel.offset
-                
-                // 获取当前类名
-                val psiClass = PsiTreeUtil.getParentOfType(psiFile.findElementAt(offset), PsiClass::class.java)
-                variables["{{className}}"] = psiClass?.name ?: ""
-                
-                // 获取当前方法名
-                val psiMethod = PsiTreeUtil.getParentOfType(psiFile.findElementAt(offset), PsiMethod::class.java)
-                variables["{{methodName}}"] = psiMethod?.name ?: ""
-                
-                // 获取包名
-                val packageName = when (psiFile) {
-                    is PsiJavaFile -> psiFile.packageName
-                    else -> ""
-                }
-                variables["{{packageName}}"] = packageName
+                val contextInfo = javaPsiHelper?.extractContextInfo(psiFile, offset)
+                variables["{{className}}"] = contextInfo?.className ?: ""
+                variables["{{methodName}}"] = contextInfo?.methodName ?: ""
+                variables["{{packageName}}"] = contextInfo?.packageName ?: ""
             }
         }
         

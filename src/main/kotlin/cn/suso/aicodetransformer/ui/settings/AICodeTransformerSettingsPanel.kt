@@ -7,6 +7,8 @@ import cn.suso.aicodetransformer.i18n.I18n
 import cn.suso.aicodetransformer.i18n.LanguageManager
 import cn.suso.aicodetransformer.service.LanguageSettingsService
 
+import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.components.JBTabbedPane
@@ -33,7 +35,12 @@ class AICodeTransformerSettingsPanel(
     private var tabbedPane = JBTabbedPane()
     private val modelConfigPanel: ModelConfigurationPanel
     private val promptTemplatePanel: PromptTemplatePanel
-    private val commitSettingsPanel: CommitSettingsPanel
+    private val gitSupportAvailable = isGitSupportAvailable()
+    private val commitSettingsPanel: CommitSettingsPanel? = if (gitSupportAvailable) {
+        CommitSettingsPanel(project, configurationService)
+    } else {
+        null
+    }
     private val systemManagementPanel: SystemManagementPanel
     
     private var originalConfigurations: List<ModelConfiguration> = emptyList()
@@ -45,7 +52,6 @@ class AICodeTransformerSettingsPanel(
         // 初始化面板
         modelConfigPanel = ModelConfigurationPanel(project, configurationService)
         promptTemplatePanel = PromptTemplatePanel(project, configurationService)
-        commitSettingsPanel = CommitSettingsPanel(project, configurationService)
         systemManagementPanel = SystemManagementPanel(project, configurationService, languageController)
 
         configureTabbedPane(tabbedPane)
@@ -71,20 +77,17 @@ class AICodeTransformerSettingsPanel(
 
     private fun configureTabbedPane(pane: JBTabbedPane, selectedIndex: Int = 0) {
         // 添加标签页 - 使用国际化标题
-        val titles = arrayOf(
-            I18n.t("tab.models"),
-            I18n.t("tab.templates"),
-            I18n.t("tab.commit"),
-            I18n.t("tab.system")
+        val tabEntries = mutableListOf(
+            I18n.t("tab.models") to modelConfigPanel,
+            I18n.t("tab.templates") to promptTemplatePanel
         )
-        val panels = arrayOf(
-            modelConfigPanel,
-            promptTemplatePanel,
-            commitSettingsPanel,
-            systemManagementPanel
-        )
-        for (i in titles.indices) {
-            pane.addTab(titles[i], panels[i])
+        if (gitSupportAvailable && commitSettingsPanel != null) {
+            tabEntries.add(I18n.t("tab.commit") to commitSettingsPanel)
+        }
+        tabEntries.add(I18n.t("tab.system") to systemManagementPanel)
+
+        tabEntries.forEach { (title, panel) ->
+            pane.addTab(title, panel)
         }
 
         // 设置tab页独立性 - 允许每个tab页有独立的高度
@@ -92,8 +95,9 @@ class AICodeTransformerSettingsPanel(
         pane.putClientProperty("JTabbedPane.tabAreaAlignment", "leading")
         pane.putClientProperty("JTabbedPane.hasFullBorder", true)
 
-        if (selectedIndex in 0 until pane.tabCount) {
-            pane.selectedIndex = selectedIndex
+        if (pane.tabCount > 0) {
+            val clampedIndex = selectedIndex.coerceIn(0, pane.tabCount - 1)
+            pane.selectedIndex = clampedIndex
         }
     }
 
@@ -132,7 +136,8 @@ class AICodeTransformerSettingsPanel(
      * 检查是否有修改
      */
     fun isModified(): Boolean {
-        return modelConfigPanel.isModified() || promptTemplatePanel.isModified() || commitSettingsPanel.isModified() || systemManagementPanel.isModified()
+        val commitModified = commitSettingsPanel?.isModified() == true
+        return modelConfigPanel.isModified() || promptTemplatePanel.isModified() || commitModified || systemManagementPanel.isModified()
     }
     
     /**
@@ -143,7 +148,7 @@ class AICodeTransformerSettingsPanel(
             // 检查是否有实际修改
             val hasModelChanges = modelConfigPanel.isModified()
             val hasPromptChanges = promptTemplatePanel.isModified()
-            val hasCommitChanges = commitSettingsPanel.isModified()
+            val hasCommitChanges = commitSettingsPanel?.isModified() == true
             val hasSystemChanges = systemManagementPanel.isModified()
             
             // 只有在有修改时才执行保存操作
@@ -163,7 +168,7 @@ class AICodeTransformerSettingsPanel(
             
             // 应用提交设置更改
             if (hasCommitChanges) {
-                commitSettingsPanel.apply()
+                commitSettingsPanel?.apply()
             }
             
             // 应用系统设置更改
@@ -212,7 +217,7 @@ class AICodeTransformerSettingsPanel(
                 // 重置各个面板
                 modelConfigPanel.reset()
                 promptTemplatePanel.reset()
-                commitSettingsPanel.reset()
+                commitSettingsPanel?.reset()
             } catch (e: Exception) {
                 Messages.showErrorDialog(
                     project,
@@ -229,5 +234,10 @@ class AICodeTransformerSettingsPanel(
     fun dispose() {
         // 调用SystemManagementPanel的dispose方法清理语言监听器
         systemManagementPanel.dispose()
+    }
+
+    private fun isGitSupportAvailable(): Boolean {
+        val plugin = PluginManagerCore.getPlugin(PluginId.getId("Git4Idea"))
+        return plugin?.isEnabled == true
     }
 }

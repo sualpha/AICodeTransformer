@@ -16,6 +16,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
@@ -39,6 +40,7 @@ import git4idea.commands.Git
 import git4idea.commands.GitCommand
 import git4idea.commands.GitLineHandler
 import git4idea.repo.GitRepositoryManager
+import com.intellij.openapi.extensions.PluginId
 
 
 /**
@@ -130,6 +132,14 @@ class CommitDialogAIAction : AnAction(I18n.t("commit.aiAction.text"), I18n.t("co
 
         // 在EDT中安全地获取UI数据
         val commitWorkflowHandler = e.getData(VcsDataKeys.COMMIT_WORKFLOW_HANDLER)
+        val hasCommitUi = e.getData(VcsDataKeys.COMMIT_MESSAGE_CONTROL) != null ||
+            e.getData(VcsDataKeys.COMMIT_WORKFLOW_HANDLER) != null ||
+            e.getData(COMMIT_WORKFLOW_UI_KEY) != null
+        if (!hasCommitUi) {
+            e.presentation.isEnabledAndVisible = false
+            return
+        }
+
         var selectedChanges: Collection<Change>? = null
         
         // 方法1: 尝试通过 VcsDataKeys.CHANGES 获取选中的文件
@@ -379,69 +389,68 @@ class CommitDialogAIAction : AnAction(I18n.t("commit.aiAction.text"), I18n.t("co
 
     override fun update(e: AnActionEvent) {
         val project = e.project
-        
         if (project == null) {
             e.presentation.isEnabledAndVisible = false
             return
         }
-        
-        // 使用VCS管理器检查Git仓库状态，避免EDT线程中的文件系统操作
-        val isGitRepo = try {
-            val vcsManager = ProjectLevelVcsManager.getInstance(project)
-            vcsManager.allVcsRoots.any { it.vcs?.name == "Git" }
-        } catch (e: Exception) {
-            false
-        }
-        
-        if (!isGitRepo) {
+
+        val gitPluginInstalled = PluginManagerCore.getPlugin(PluginId.getId("Git4Idea"))?.isEnabled == true
+        if (!gitPluginInstalled) {
             e.presentation.isEnabledAndVisible = false
             return
         }
-        
-        // 检查是否有选中的文件 - 确保在EDT线程中执行
+
+        val hasGitRepository = try {
+            GitRepositoryManager.getInstance(project).repositories.isNotEmpty()
+        } catch (_: Exception) {
+            false
+        }
+        if (!hasGitRepository) {
+            e.presentation.isEnabledAndVisible = false
+            return
+        }
+
         var selectedChanges: Collection<Change>? = null
-        var hasSelectedFiles = false
-        
-        // 只在EDT线程中尝试获取选中文件
-        if (ApplicationManager.getApplication().isDispatchThread) {
-            // 方法1: 尝试通过 COMMIT_WORKFLOW_HANDLER 获取选中文件
+        try {
+            val changedFiles = VcsDataKeys.CHANGES.getData(e.dataContext)
+            if (!changedFiles.isNullOrEmpty()) {
+                selectedChanges = changedFiles.toList()
+            }
+        } catch (_: Exception) {
+            // ignore, fallback below
+        }
+
+        if (selectedChanges.isNullOrEmpty()) {
             val commitWorkflowHandler = e.getData(VcsDataKeys.COMMIT_WORKFLOW_HANDLER)
             if (commitWorkflowHandler is AbstractCommitWorkflowHandler<*, *>) {
                 try {
-                    val ui = commitWorkflowHandler.ui
-                    selectedChanges = ui.getIncludedChanges()
-                } catch (ex: Exception) {
-                    // 忽略异常，尝试其他方法
+                    selectedChanges = commitWorkflowHandler.ui.getIncludedChanges()
+                } catch (_: Exception) {
+                    // ignore
                 }
             }
-            
-          /*  // 方法2: 备用方案 - 使用传统的VcsDataKeys
-            if (selectedChanges == null || selectedChanges.isEmpty()) {
-                val vcsSelectedChanges = e.getData(VcsDataKeys.SELECTED_CHANGES)
-                selectedChanges = vcsSelectedChanges?.toList()
-            }*/
-            
-            hasSelectedFiles = selectedChanges?.isNotEmpty() == true
         }
-        
-        // 检查是否有任何变更文件
+
+        val hasSelectedFiles = selectedChanges?.isNotEmpty() == true
         val changeListManager = ChangeListManager.getInstance(project)
         val hasAnyChanges = changeListManager.defaultChangeList.changes.isNotEmpty()
-        
+
         e.presentation.isEnabledAndVisible = hasAnyChanges
-        
-        // 根据是否有选中文件更新按钮文本和描述
-        if (hasSelectedFiles && selectedChanges != null) {
-            val changesSize = selectedChanges.size
+
+        if (!hasAnyChanges) {
+            e.presentation.text = tr("commit.aiAction.text")
+            e.presentation.description = tr("commit.aiAction.description")
+            return
+        }
+
+        if (hasSelectedFiles) {
+            val changesSize = selectedChanges!!.size
             e.presentation.text = tr("commit.aiAction.presentation.selected", changesSize)
             e.presentation.description = tr("commit.aiAction.presentation.selected.desc", changesSize)
-        } else if (hasAnyChanges) {
+        } else {
             val allChangesCount = changeListManager.defaultChangeList.changes.size
             e.presentation.text = tr("commit.aiAction.presentation.all", allChangesCount)
             e.presentation.description = tr("commit.aiAction.presentation.all.desc", allChangesCount)
-        } else {
-            e.presentation.text = tr("commit.aiAction.text")
-            e.presentation.description = tr("commit.aiAction.description")
         }
     }
     

@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.Attribute
 import cn.suso.aicodetransformer.constants.TemplateConstants
+import cn.suso.aicodetransformer.service.java.JavaPsiHelperLoader
 import java.time.LocalDateTime
 import java.util.*
 
@@ -146,6 +147,20 @@ data class PromptTemplate(
                 isBuiltIn = config.isBuiltIn
             )
         }
+
+        /** 创建SQL格式化模板 */
+        fun createSqlFormatterTemplate(): PromptTemplate {
+            val config = TemplateConstants.TemplateConfig.SQL_FORMATTER
+            return PromptTemplate(
+                id = config.id,
+                name = config.displayName,
+                content = config.content,
+                description = config.description,
+                category = config.category.displayName,
+                shortcutKey = null,
+                isBuiltIn = config.isBuiltIn
+            )
+        }
         
         /**
          * 创建翻译转换模板
@@ -167,14 +182,20 @@ data class PromptTemplate(
          * 获取所有内置模板
          */
         fun getBuiltInTemplates(): List<PromptTemplate> {
-            return listOf(
+            val templates = mutableListOf(
                 createVariableNameGeneratorTemplate(),
                 createCamelCaseConvertTemplate(),
-                createObjectConvertTemplate(),
                 createJsonFormatterTemplate(),
+                createSqlFormatterTemplate(),
                 createTranslationConverterTemplate()
             )
+            if (supportsObjectConversion()) {
+                templates.add(2, createObjectConvertTemplate())
+            }
+            return templates
         }
+
+        private fun supportsObjectConversion(): Boolean = JavaPsiHelperLoader.helper() != null
     }
     
     /**
