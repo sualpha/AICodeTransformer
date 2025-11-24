@@ -29,6 +29,7 @@ AICodeTransformer is a powerful IntelliJ IDEA plugin that integrates multiple AI
 - **Custom Templates**: Support for creating personalized AI instruction templates
 - **Variable System**: Built-in variables like `{{selectedCode}}`, `{{fileName}}`, `{{language}}`, etc.
 - **Category Management**: Organized by function for easy searching and usage
+- **Prompt AI Optimization**: Trigger the in-editor "AI Optimize" button to polish template name/description/content via the built-in preview dialog
 
 ### 📝 AI-Generated Commit Message Feature
 
