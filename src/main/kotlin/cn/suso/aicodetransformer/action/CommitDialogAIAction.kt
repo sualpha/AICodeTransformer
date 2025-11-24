@@ -52,6 +52,13 @@ class CommitDialogAIAction : AnAction(I18n.t("commit.aiAction.text"), I18n.t("co
         private val COMMIT_WORKFLOW_UI_KEY = DataKey.create<CommitWorkflowUi>("CommitWorkflowUi")
     }
 
+    private fun isPluginEnabled(pluginId: PluginId): Boolean {
+        if (PluginManagerCore.getPlugin(pluginId) == null) {
+            return false
+        }
+        return !PluginManagerCore.isDisabled(pluginId)
+    }
+
     private fun tr(key: String, vararg args: Any): String = I18n.t(key, *args)
 
     private fun showInfo(project: Project, messageKey: String, titleKey: String = "notice", vararg args: Any) {
@@ -394,7 +401,7 @@ class CommitDialogAIAction : AnAction(I18n.t("commit.aiAction.text"), I18n.t("co
             return
         }
 
-        val gitPluginInstalled = PluginManagerCore.getPlugin(PluginId.getId("Git4Idea"))?.isEnabled == true
+        val gitPluginInstalled = isPluginEnabled(PluginId.getId("Git4Idea"))
         if (!gitPluginInstalled) {
             e.presentation.isEnabledAndVisible = false
             return

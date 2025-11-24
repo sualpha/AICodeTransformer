@@ -236,8 +236,12 @@ class AICodeTransformerSettingsPanel(
         systemManagementPanel.dispose()
     }
 
-    private fun isGitSupportAvailable(): Boolean {
-        val plugin = PluginManagerCore.getPlugin(PluginId.getId("Git4Idea"))
-        return plugin?.isEnabled == true
+    private fun isGitSupportAvailable(): Boolean = isPluginEnabled(PluginId.getId("Git4Idea"))
+
+    private fun isPluginEnabled(pluginId: PluginId): Boolean {
+        if (PluginManagerCore.getPlugin(pluginId) == null) {
+            return false
+        }
+        return !PluginManagerCore.isDisabled(pluginId)
     }
 }
