@@ -15,6 +15,7 @@ AICodeTransformer is a powerful JetBrains IDE plugin that integrates multiple AI
 ## ✨ Core Features
 
 ### 🤖 Multi-AI Model Support
+- **Out-of-the-Box**: Built-in **LongCat-Flash-Chat** model, ready to use immediately without API Key configuration
 - **OpenAI GPT Series**: GPT-4, GPT-3.5-turbo
 - **Anthropic Claude**: Claude-3-Sonnet, Claude-3-Haiku
 - **Custom API**: Support for local models compatible with OpenAI API

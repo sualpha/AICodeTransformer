@@ -15,6 +15,7 @@ AICodeTransformer 是一个功能强大的 JetBrains 系列 IDE 插件，通过�
 ## ✨ 核心特性
 
 ### 🤖 多 AI 模型支持
+- **开箱即用**: 内置 **LongCat-Flash-Chat** 模型，安装即用，无需配置 API Key
 - **OpenAI GPT 系列**: GPT-4, GPT-3.5-turbo
 - **Anthropic Claude**: Claude-3-Sonnet, Claude-3-Haiku
 - **自定义 API**: 支持兼容 OpenAI API 的本地模型
