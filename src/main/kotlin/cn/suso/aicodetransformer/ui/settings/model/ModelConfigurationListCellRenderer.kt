@@ -36,6 +36,11 @@ class ModelConfigurationListCellRenderer : ColoredListCellRenderer<ModelConfigur
                 append(" ${tr("model.config.list.defaultTag")}", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
             }
             
+            // 如果是内置模型,添加标记
+            if (value.isBuiltIn) {
+                append(" ${tr("model.builtin.suffix")}", SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+            }
+            
             // 如果配置被禁用，使用灰色显示
             if (!value.enabled) {
                 append(" ${tr("model.config.list.disabledTag")}", SimpleTextAttributes.GRAYED_ATTRIBUTES)

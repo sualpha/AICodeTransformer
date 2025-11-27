@@ -32,7 +32,7 @@ object JavaPsiHelperLoader {
     @Volatile private var attempted = false
 
     fun helper(): JavaPsiHelper? {
-        val descriptor = PluginManagerCore.getPlugin(pluginId)
+        PluginManagerCore.getPlugin(pluginId)
             ?: return null
         if (PluginManagerCore.isDisabled(pluginId)) {
             return null

@@ -8,6 +8,7 @@ import cn.suso.aicodetransformer.model.CommitSettings
 import cn.suso.aicodetransformer.service.ConfigurationChangeListener
 import cn.suso.aicodetransformer.service.ConfigurationService
 import cn.suso.aicodetransformer.service.ErrorHandlingService
+import cn.suso.aicodetransformer.constants.BuiltInModelProvider
 
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
@@ -67,6 +68,9 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
             this.state = state
             logger.info("Configuration state loaded with ${state.modelConfigurations.size} configurations")
             
+            // 初始化内置模型
+            initializeBuiltInModels()
+            
             // 不再自动初始化默认配置，让用户手动添加
             if (this.state.modelConfigurations.isEmpty()) {
                 logger.info("No configurations found, user needs to add configurations manually")
@@ -78,7 +82,11 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
     }
     
     override fun getModelConfigurations(): List<ModelConfiguration> {
-        return lock.read { state.modelConfigurations.toList() }
+        return lock.read { 
+            // 确保内置模型始终存在
+            ensureBuiltInModelsPresent()
+            state.modelConfigurations.toList() 
+        }
     }
     
     override fun getModelConfiguration(id: String): ModelConfiguration? {
@@ -187,9 +195,25 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
         }
     }
     
+    
     override fun getApiKey(configId: String): String? {
         return lock.read {
-            state.modelConfigurations.find { it.id == configId }?.apiKey?.takeIf { it.isNotEmpty() }
+            val config = state.modelConfigurations.find { it.id == configId }
+            val apiKey = config?.apiKey?.takeIf { it.isNotEmpty() }
+            
+            // 如果是内置模型且有API密钥,需要解密
+            if (config?.isBuiltIn == true && !apiKey.isNullOrEmpty()) {
+                try {
+                    val decrypted = cn.suso.aicodetransformer.security.BuiltInModelEncryption.decrypt(apiKey)
+                    logger.info("Decrypted API key for built-in model: ${config.id}")
+                    decrypted
+                } catch (e: Exception) {
+                    logger.error("Failed to decrypt API key for built-in model: ${config.id}", e)
+                    null
+                }
+            } else {
+                apiKey
+            }
         }
     }
     
@@ -404,44 +428,81 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
     }
     
     /**
-     * 批量保存配置
+     * 初始化内置模型
+     * 在插件加载时自动添加内置模型到配置列表
      */
-    fun saveModelConfigurations(configs: List<ModelConfiguration>): List<String> {
-        val errors = mutableListOf<String>()
-        
-        lock.write {
-            try {
-                if (state.autoBackupEnabled) {
-                    createBackup()
-                }
+    private fun initializeBuiltInModels() {
+        try {
+            val builtInModels = BuiltInModelProvider.getBuiltInModels()
+            if (builtInModels.isEmpty()) {
+                logger.info("No built-in models defined")
+                return
+            }
+            
+            builtInModels.forEach { builtInModel ->
+                // 检查是否已存在
+                val existingIndex = state.modelConfigurations.indexOfFirst { it.id == builtInModel.id }
                 
-                configs.forEach { config ->
-                    try {
-                        val validationError = validateModelConfiguration(config)
-                        if (validationError != null) {
-                            errors.add("${config.id}: $validationError")
-                        } else {
-                            val existingIndex = state.modelConfigurations.indexOfFirst { it.id == config.id }
-                            if (existingIndex >= 0) {
-                                state.modelConfigurations[existingIndex] = config
-                            } else {
-                                state.modelConfigurations.add(config)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        errors.add("${config.id}: ${e.message}")
+                if (existingIndex >= 0) {
+                    // 如果已存在,更新为最新的内置模型配置
+                    val existing = state.modelConfigurations[existingIndex]
+                    if (existing.isBuiltIn) {
+                        state.modelConfigurations[existingIndex] = builtInModel
+                        logger.info("Updated built-in model: ${builtInModel.id} (${builtInModel.name})")
+                    } else {
+                        logger.warn("Configuration ID ${builtInModel.id} already exists as user configuration, skipping built-in model")
+                    }
+                } else {
+                    // 添加到列表开头,使其优先显示
+                    state.modelConfigurations.add(0, builtInModel)
+                    logger.info("Added built-in model: ${builtInModel.id} (${builtInModel.name})")
+                }
+            }
+            
+            logger.info("Built-in models initialized: ${builtInModels.size} models")
+        } catch (e: Exception) {
+            logger.error("Failed to initialize built-in models", e)
+            errorHandlingService.handleConfigurationError(e, "BuiltInModelInitialization", null)
+        }
+    }
+    
+    /**
+     * 确保内置模型始终存在于配置列表中
+     * 这个方法会在每次获取配置时被调用,确保内置模型不会丢失
+     */
+    private fun ensureBuiltInModelsPresent() {
+        try {
+            val builtInModels = BuiltInModelProvider.getBuiltInModels()
+            if (builtInModels.isEmpty()) {
+                return
+            }
+            
+            var modified = false
+            builtInModels.forEach { builtInModel ->
+                val existingIndex = state.modelConfigurations.indexOfFirst { it.id == builtInModel.id }
+                
+                if (existingIndex < 0) {
+                    // 内置模型不存在,添加到列表开头
+                    state.modelConfigurations.add(0, builtInModel)
+                    logger.info("Added missing built-in model: ${builtInModel.id} (${builtInModel.name})")
+                    modified = true
+                } else {
+                    // 内置模型存在,检查是否需要更新
+                    val existing = state.modelConfigurations[existingIndex]
+                    if (existing.isBuiltIn && existing.updatedAt < builtInModel.updatedAt) {
+                        state.modelConfigurations[existingIndex] = builtInModel
+                        logger.info("Updated built-in model: ${builtInModel.id} (${builtInModel.name})")
+                        modified = true
                     }
                 }
-                
-                logger.info("Batch saved ${configs.size - errors.size} configurations, ${errors.size} errors")
-            } catch (e: Exception) {
-                // 使用ErrorHandlingService处理异常
-                val handlingResult = errorHandlingService.handleConfigurationError(e, "BatchConfigurationSave", null)
-                errors.add("Batch operation failed: ${handlingResult.userMessage}")
             }
+            
+            if (modified) {
+                logger.info("Built-in models synchronized")
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to ensure built-in models present", e)
         }
-        
-        return errors
     }
     
     /**

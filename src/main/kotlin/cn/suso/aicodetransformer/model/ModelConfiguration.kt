@@ -127,6 +127,12 @@ class ModelConfiguration {
         get() = field
         set(value) { field = value }
     
+    /** 是否为内置模型 */
+    @Attribute("isBuiltIn")
+    var isBuiltIn: Boolean = false
+        get() = field
+        set(value) { field = value }
+    
     // 默认构造函数
     constructor()
     
@@ -150,7 +156,8 @@ class ModelConfiguration {
         updatedAt: Long = System.currentTimeMillis(),
         lastUsedAt: Long? = null,
         usageCount: Int = 0,
-        apiKey: String = ""
+        apiKey: String = "",
+        isBuiltIn: Boolean = false
     ) {
         this.id = id
         this.name = name
@@ -171,6 +178,7 @@ class ModelConfiguration {
         this.lastUsedAt = lastUsedAt
         this.usageCount = usageCount
         this.apiKey = apiKey
+        this.isBuiltIn = isBuiltIn
     }
     
     // 复制方法
@@ -193,12 +201,13 @@ class ModelConfiguration {
         updatedAt: Long = this.updatedAt,
         lastUsedAt: Long? = this.lastUsedAt,
         usageCount: Int = this.usageCount,
-        apiKey: String = this.apiKey
+        apiKey: String = this.apiKey,
+        isBuiltIn: Boolean = this.isBuiltIn
     ): ModelConfiguration {
         return ModelConfiguration(
             id, name, description, apiBaseUrl, modelName, temperature, maxTokens,
             enabled, modelType, connectTimeoutSeconds, readTimeoutSeconds, retryCount,
-            streamResponse, customHeaders, createdAt, updatedAt, lastUsedAt, usageCount, apiKey
+            streamResponse, customHeaders, createdAt, updatedAt, lastUsedAt, usageCount, apiKey, isBuiltIn
         )
     }
     /**

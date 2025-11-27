@@ -213,6 +213,17 @@ class ModelConfigurationPanel(
         val selectedIndex = configList.selectedIndex
         if (selectedIndex >= 0) {
             val config = currentConfigurations[selectedIndex]
+            
+            // 检查是否为内置模型
+            if (config.isBuiltIn) {
+                Messages.showErrorDialog(
+                    project,
+                    I18n.t("model.builtin.cannotDelete"),
+                    I18n.t("model.delete.error.title")
+                )
+                return
+            }
+            
             val message = I18n.t("model.delete.confirm.message", config.name)
             val title = I18n.t("model.delete.confirm.title")
             val result = Messages.showYesNoDialog(
@@ -246,6 +257,17 @@ class ModelConfigurationPanel(
         val selectedIndex = configList.selectedIndex
         if (selectedIndex >= 0) {
             val config = currentConfigurations[selectedIndex]
+            
+            // 检查是否为内置模型
+            if (config.isBuiltIn) {
+                Messages.showErrorDialog(
+                    project,
+                    I18n.t("model.builtin.cannotEdit"),
+                    I18n.t("model.delete.error.title")
+                )
+                return
+            }
+            
             val dialog = ModelConfigurationDialog(project, config)
             if (dialog.showAndGet()) {
                 val updatedConfig = dialog.getConfiguration()

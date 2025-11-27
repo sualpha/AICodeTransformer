@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "cn.suso"
-version = "3.0.0"
+version = "3.1.0"
 
 repositories {
     //mavenCentral()
@@ -69,6 +69,26 @@ tasks {
     // 禁用 buildSearchableOptions 任务以避免 coroutines-javaagent.jar 问题
     named("buildSearchableOptions") {
         enabled = false
+    }
+    
+    // 读取 .env 文件并注入环境变量到 runIde 任务
+    runIde {
+        // 读取 .env 文件
+        val envFile = file(".env")
+        if (envFile.exists()) {
+            envFile.readLines().forEach { line ->
+                val trimmed = line.trim()
+                if (trimmed.isNotEmpty() && !trimmed.startsWith("#")) {
+                    val parts = trimmed.split("=", limit = 2)
+                    if (parts.size == 2) {
+                        val key = parts[0].trim()
+                        val value = parts[1].trim()
+                        // 将环境变量注入到插件运行时
+                        systemProperty(key, value)
+                    }
+                }
+            }
+        }
     }
     
     test {
