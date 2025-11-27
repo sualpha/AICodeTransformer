@@ -57,5 +57,6 @@ mrd.md
 plan.md
 process.md
 
-# Environment variables (contains sensitive API keys)
+
 .env
+**/ApiKeyEncryptionToolLocal.kt
