@@ -23,7 +23,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Future
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 
 /**
  * 执行服务实现类
@@ -365,13 +365,26 @@ class ExecutionServiceImpl : ExecutionService, Disposable {
             }
             
             val aiResult = runBlocking {
-                logger.info("正在调用AI模型服务...")
-                val result = aiModelService.callModel(modelConfig, prompt, apiKey)
-                logger.info("AI模型调用完成，成功: ${result.success}")
-                if (!result.success) {
-                    logger.error("AI模型调用失败: ${result.errorMessage}")
+                val job = async {
+                    logger.info("正在调用AI模型服务...")
+                    val result = aiModelService.callModel(modelConfig, prompt, apiKey)
+                    logger.info("AI模型调用完成，成功: ${result.success}")
+                    if (!result.success) {
+                        logger.error("AI模型调用失败: ${result.errorMessage}")
+                    }
+                    result
                 }
-                result
+
+                // 循环检查取消状态
+                while (!job.isCompleted) {
+                    if (indicator?.isCanceled == true) {
+                        job.cancel()
+                        logger.warn("检测到取消信号，正在取消AI模型调用...")
+                        throw InterruptedException("执行已取消")
+                    }
+                    delay(100) // 每100ms检查一次
+                }
+                job.await()
             }
             
             if (indicator?.isCanceled == true) {

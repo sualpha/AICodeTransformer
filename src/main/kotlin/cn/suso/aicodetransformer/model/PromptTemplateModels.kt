@@ -27,6 +27,11 @@ class PromptTemplateState {
     var usageStatisticsXml: String = ""
         get() = field
         set(value) { field = value }
+
+    @com.intellij.util.xmlb.annotations.Tag("lastPluginVersion")
+    var lastPluginVersion: String = ""
+        get() = field
+        set(value) { field = value }
     
     // 默认构造函数
     constructor()
@@ -36,12 +41,14 @@ class PromptTemplateState {
         templates: MutableList<PromptTemplate> = mutableListOf(),
         usageStatistics: MutableMap<String, Int> = mutableMapOf(),
         templatesXml: String = "",
-        usageStatisticsXml: String = ""
+        usageStatisticsXml: String = "",
+        lastPluginVersion: String = ""
     ) {
         this.templates = templates
         this.usageStatistics = usageStatistics
         this.templatesXml = templatesXml
         this.usageStatisticsXml = usageStatisticsXml
+        this.lastPluginVersion = lastPluginVersion
     }
     
     // 复制方法
@@ -49,9 +56,10 @@ class PromptTemplateState {
         templates: MutableList<PromptTemplate> = this.templates,
         usageStatistics: MutableMap<String, Int> = this.usageStatistics,
         templatesXml: String = this.templatesXml,
-        usageStatisticsXml: String = this.usageStatisticsXml
+        usageStatisticsXml: String = this.usageStatisticsXml,
+        lastPluginVersion: String = this.lastPluginVersion
     ): PromptTemplateState {
-        return PromptTemplateState(templates, usageStatistics, templatesXml, usageStatisticsXml)
+        return PromptTemplateState(templates, usageStatistics, templatesXml, usageStatisticsXml, lastPluginVersion)
     }
 }
 

@@ -18,6 +18,8 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.extensions.PluginId
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -506,19 +508,9 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                 }
                 val existingIndex = state.templates.indexOfFirst { it.id == config.id }
                 if (existingIndex >= 0) {
-                    val existing = state.templates[existingIndex]
-                    if (!existing.isBuiltIn) {
-                        // 用户创建或将内置模板标记为自定义，不强制覆盖
-                        return@forEach
-                    }
-                    val updated = existing.copy(
-                        name = config.displayName,
-                        description = config.description,
-                        content = config.content,
-                        category = config.category.displayName
-                    )
-                    state.templates[existingIndex] = updated
-                    listeners.forEach { it.onTemplateUpdated(existing, updated) }
+                    // 已存在模板，交由 refreshBuiltInTemplatesForCurrentLanguage 处理更新逻辑
+                    // 这里不做任何操作，避免覆盖用户修改
+                    return@forEach
                 } else {
                     val template = PromptTemplate(
                         id = config.id,
@@ -540,6 +532,20 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
     private fun refreshBuiltInTemplatesForCurrentLanguage() {
         var changed = false
         lock.write {
+            // 获取当前插件版本
+            val pluginId = PluginId.getId("cn.suso.AICodeTransformer")
+            val plugin = PluginManagerCore.getPlugin(pluginId)
+            val currentVersion = plugin?.version ?: "1.0.0"
+            
+            // 检查是否需要强制更新（插件版本变更）
+            val shouldForceUpdate = currentVersion != state.lastPluginVersion
+            
+            if (shouldForceUpdate) {
+                logger.info("检测到插件版本变更: ${state.lastPluginVersion} -> $currentVersion，将强制更新内置模板")
+                state.lastPluginVersion = currentVersion
+                changed = true
+            }
+            
             val builtInConfigs = TemplateConstants.TemplateConfig.getBuiltInTemplates().associateBy { it.id }
             state.templates.replaceAll { template ->
                 val config = builtInConfigs[template.id]
@@ -549,12 +555,21 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                     if (!shouldLoadBuiltIn(config)) {
                         return@replaceAll template
                     }
+                    
+                    // 只有在强制更新或内容完全匹配（未修改）时才更新
+                    // 如果版本未变更且内容不匹配，说明用户修改过，保留用户修改
                     val matchesName = template.name == config.displayName
                     val matchesDescription = (template.description ?: "") == config.description
                     val matchesContent = template.content == config.content
-                    if (matchesName && matchesDescription && matchesContent) {
+                    
+                    if (!shouldForceUpdate && !matchesContent) {
+                        // 版本未变更且内容已修改，保留用户修改
+                        template
+                    } else if (matchesName && matchesDescription && matchesContent) {
+                        // 内容一致，无需更新
                         template
                     } else {
+                        // 需要更新（强制更新 或 内容未修改但元数据变更）
                         changed = true
                         template.copy(
                             name = config.displayName,
