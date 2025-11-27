@@ -71,23 +71,30 @@ tasks {
         enabled = false
     }
     
-    // 读取 .env 文件并注入环境变量到 runIde 任务
-    runIde {
-        // 读取 .env 文件
-        val envFile = file(".env")
-        if (envFile.exists()) {
-            envFile.readLines().forEach { line ->
-                val trimmed = line.trim()
-                if (trimmed.isNotEmpty() && !trimmed.startsWith("#")) {
-                    val parts = trimmed.split("=", limit = 2)
-                    if (parts.size == 2) {
-                        val key = parts[0].trim()
-                        val value = parts[1].trim()
-                        // 将环境变量注入到插件运行时
-                        systemProperty(key, value)
-                    }
+    // 读取 .env 文件并注入环境变量
+    val envMap = mutableMapOf<String, String>()
+    val envFile = file(".env")
+    if (envFile.exists()) {
+        envFile.readLines().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.isNotEmpty() && !trimmed.startsWith("#")) {
+                val parts = trimmed.split("=", limit = 2)
+                if (parts.size == 2) {
+                    envMap[parts[0].trim()] = parts[1].trim()
                 }
             }
+        }
+    }
+
+    runIde {
+        envMap.forEach { (k, v) ->
+            systemProperty(k, v)
+        }
+    }
+    
+    processResources {
+        filesMatching("**/builtin-models.properties") {
+            expand(envMap)
         }
     }
     

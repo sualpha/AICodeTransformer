@@ -26,21 +26,27 @@ object BuiltInModelProvider {
         }
         
         return try {
-            // 从系统属性读取配置
-            val apiKey = System.getProperty("BUILTIN_MODEL_API_KEY") ?: return emptyList()
-            if (apiKey.isBlank() || apiKey == "your-encrypted-api-key-here") {
+            // 从资源文件读取配置
+            val properties = java.util.Properties()
+            BuiltInModelProvider::class.java.getResourceAsStream("/builtin-models.properties")?.use {
+                properties.load(it)
+            } ?: return emptyList()
+            
+            val apiKey = properties.getProperty("builtin.model.api.key")
+            // 检查是否包含未替换的占位符或为空
+            if (apiKey.isNullOrBlank() || apiKey.contains("\${")) {
                 return emptyList()
             }
             
             listOf(
                 ModelConfiguration(
-                    id = System.getProperty("BUILTIN_MODEL_ID") ?: "default-model",
-                    name = System.getProperty("BUILTIN_MODEL_NAME") ?: "defaultModel",
-                    description = System.getProperty("BUILTIN_MODEL_DESCRIPTION") ?: "Default model configuration",
-                    apiBaseUrl = System.getProperty("BUILTIN_MODEL_API_URL") ?: "http://api.example.com/v1",
-                    modelName = System.getProperty("BUILTIN_MODEL_NAME_VALUE") ?: "gpt-3.5-turbo",
-                    temperature = System.getProperty("BUILTIN_MODEL_TEMPERATURE")?.toDoubleOrNull() ?: 0.1,
-                    maxTokens = System.getProperty("BUILTIN_MODEL_MAX_TOKENS")?.toIntOrNull() ?: 8000,
+                    id = properties.getProperty("builtin.model.id") ?: "default-model",
+                    name = properties.getProperty("builtin.model.name") ?: "defaultModel",
+                    description = properties.getProperty("builtin.model.description") ?: "Default model configuration",
+                    apiBaseUrl = properties.getProperty("builtin.model.api.url") ?: "http://api.example.com/v1",
+                    modelName = properties.getProperty("builtin.model.name.value") ?: "gpt-3.5-turbo",
+                    temperature = properties.getProperty("builtin.model.temperature")?.toDoubleOrNull() ?: 0.1,
+                    maxTokens = properties.getProperty("builtin.model.max.tokens")?.toIntOrNull() ?: 8000,
                     enabled = true,
                     modelType = ModelType.OPENAI_COMPATIBLE,
                     connectTimeoutSeconds = 30,

@@ -453,8 +453,8 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
                         logger.warn("Configuration ID ${builtInModel.id} already exists as user configuration, skipping built-in model")
                     }
                 } else {
-                    // 添加到列表开头,使其优先显示
-                    state.modelConfigurations.add(0, builtInModel)
+                    // 添加到列表末尾
+                    state.modelConfigurations.add(builtInModel)
                     logger.info("Added built-in model: ${builtInModel.id} (${builtInModel.name})")
                 }
             }
@@ -482,8 +482,8 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
                 val existingIndex = state.modelConfigurations.indexOfFirst { it.id == builtInModel.id }
                 
                 if (existingIndex < 0) {
-                    // 内置模型不存在,添加到列表开头
-                    state.modelConfigurations.add(0, builtInModel)
+                    // 内置模型不存在,添加到列表末尾
+                    state.modelConfigurations.add(builtInModel)
                     logger.info("Added missing built-in model: ${builtInModel.id} (${builtInModel.name})")
                     modified = true
                 } else {
