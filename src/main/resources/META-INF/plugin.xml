@@ -151,7 +151,7 @@
                text="AI代码转换"
                description="使用AI转换选中的代码"
                popup="true">
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
         </group>
     </actions>
 </idea-plugin>
