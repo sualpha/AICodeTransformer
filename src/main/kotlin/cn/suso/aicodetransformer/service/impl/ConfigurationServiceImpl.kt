@@ -173,10 +173,33 @@ class ConfigurationServiceImpl : ConfigurationService, PersistentStateComponent<
     }
     
     override fun setDefaultModelConfiguration(id: String) {
-        val config = getModelConfiguration(id)
-        if (config != null) {
-            state.defaultModelConfigId = id
-            listeners.forEach { it.onDefaultConfigurationChanged(config) }
+        lock.write {
+            val configIndex = state.modelConfigurations.indexOfFirst { it.id == id }
+            if (configIndex >= 0) {
+                val config = state.modelConfigurations[configIndex]
+                var listChanged = false
+                
+                // Move to top if not already there
+                if (configIndex > 0) {
+                    state.modelConfigurations.removeAt(configIndex)
+                    state.modelConfigurations.add(0, config)
+                    listChanged = true
+                }
+                
+                val defaultChanged = state.defaultModelConfigId != id
+                if (defaultChanged) {
+                    state.defaultModelConfigId = id
+                }
+                
+                // Only notify if something actually changed
+                if (listChanged) {
+                    listeners.forEach { it.onConfigurationUpdated(config, config) } // Trigger list refresh
+                }
+                
+                if (defaultChanged) {
+                    listeners.forEach { it.onDefaultConfigurationChanged(config) }
+                }
+            }
         }
     }
     

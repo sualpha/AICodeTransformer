@@ -80,6 +80,7 @@ class TemplateListPanel(
                         label.icon = AllIcons.General.User
                     }
                     addActionListener {
+                        if (isUpdatingModelList) return@addActionListener
                         (selectedItem as? ModelConfiguration)?.let { model ->
                             onModelSelected(model)
                         }
@@ -130,12 +131,19 @@ class TemplateListPanel(
         filterTemplates()
     }
     
+    private var isUpdatingModelList = false
+
     fun setModels(models: List<ModelConfiguration>) {
-        allModels = models
-        modelComboBox.removeAllItems()
-        models.forEach { modelComboBox.addItem(it) }
-        if (models.isNotEmpty()) {
-            modelComboBox.selectedIndex = 0
+        try {
+            isUpdatingModelList = true
+            allModels = models
+            modelComboBox.removeAllItems()
+            models.forEach { modelComboBox.addItem(it) }
+            if (models.isNotEmpty()) {
+                modelComboBox.selectedIndex = 0
+            }
+        } finally {
+            isUpdatingModelList = false
         }
     }
     
