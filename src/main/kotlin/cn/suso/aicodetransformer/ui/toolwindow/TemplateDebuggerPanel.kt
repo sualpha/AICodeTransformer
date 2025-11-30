@@ -29,7 +29,7 @@ import javax.swing.JPanel
  * Main panel for Template Debugger tool window
  * Manages two views: template list view and edit view
  */
-class TemplateDebuggerPanel(private val project: Project) : JPanel(BorderLayout()), Disposable, cn.suso.aicodetransformer.service.TemplateChangeListener {
+class TemplateDebuggerPanel(private val project: Project) : JPanel(BorderLayout()), Disposable, cn.suso.aicodetransformer.service.TemplateChangeListener, cn.suso.aicodetransformer.service.ConfigurationChangeListener {
     
     private val templateService: PromptTemplateService = service()
     private val executionService: ExecutionService = service()
@@ -83,6 +83,7 @@ class TemplateDebuggerPanel(private val project: Project) : JPanel(BorderLayout(
         
         // Register template change listener
         templateService.addTemplateChangeListener(this)
+        configurationService.addConfigurationChangeListener(this)
     }
     
     private fun setupEditorListeners() {
@@ -101,6 +102,26 @@ class TemplateDebuggerPanel(private val project: Project) : JPanel(BorderLayout(
     override fun dispose() {
         // Unregister listener
         templateService.removeTemplateChangeListener(this)
+        configurationService.removeConfigurationChangeListener(this)
+    }
+    
+    // ConfigurationChangeListener implementation
+    override fun onConfigurationAdded(config: ModelConfiguration) {
+        ApplicationManager.getApplication().invokeLater {
+            refreshModelList()
+        }
+    }
+
+    override fun onConfigurationUpdated(oldConfig: ModelConfiguration, newConfig: ModelConfiguration) {
+        ApplicationManager.getApplication().invokeLater {
+            refreshModelList()
+        }
+    }
+
+    override fun onConfigurationDeleted(config: ModelConfiguration) {
+        ApplicationManager.getApplication().invokeLater {
+            refreshModelList()
+        }
     }
     
     // TemplateChangeListener implementation

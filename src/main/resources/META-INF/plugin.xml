@@ -136,7 +136,7 @@
                 id="TemplateDebugger"
                 anchor="right"
                 factoryClass="cn.suso.aicodetransformer.ui.toolwindow.TemplateDebuggerToolWindowFactory"
-                icon="AllIcons.Actions.Lightning"
+                icon="/icons/toolWindowIcon.svg"
                 key="toolwindow.debugger.title"/>
 
         <!-- Settings page -->

@@ -1,0 +1,18 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="8" cy="8" r="8" fill="#4B60D6"/>
+    <g fill="white">
+        <!-- "AI" text approximation using paths for pixel perfection -->
+        <!-- A -->
+        <path d="M4.5 3L6.5 8H5.5L5 6.5H3L2.5 8H1.5L3.5 3H4.5ZM4 4.5L3.5 5.8H4.5L4 4.5Z"/>
+        <!-- I -->
+        <path d="M7.5 3H8.5V8H7.5V3Z"/>
+    </g>
+    <g stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Conversion arrows <-> -->
+        <path d="M10 11L13 11M13 11L12 10M13 11L12 12"/>
+        <path d="M6 13L3 13M3 13L4 12M3 13L4 14"/>
+    </g>
+    <!-- Code brackets style -->
+    <path d="M3 11L1.5 12.5L3 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+    <path d="M13 11L14.5 12.5L13 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+</svg>
