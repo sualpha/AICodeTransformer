@@ -556,27 +556,32 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
                         return@replaceAll template
                     }
                     
-                    // 只有在强制更新或内容完全匹配（未修改）时才更新
-                    // 如果版本未变更且内容不匹配，说明用户修改过，保留用户修改
-                    val matchesName = template.name == config.displayName
-                    val matchesDescription = (template.description ?: "") == config.description
-                    val matchesContent = template.content == config.content
                     
-                    if (!shouldForceUpdate && !matchesContent) {
-                        // 版本未变更且内容已修改，保留用户修改
-                        template
-                    } else if (matchesName && matchesDescription && matchesContent) {
-                        // 内容一致，无需更新
-                        template
-                    } else {
-                        // 需要更新（强制更新 或 内容未修改但元数据变更）
+                    // 对于内置模板，始终更新名称、描述和分类以支持多语言切换
+                    // 检查内容是否是用户修改的：通过比较是否匹配任何语言版本的内置内容
+                    val isUserModified = !isBuiltInTemplateContent(template.id, template.content)
+                    
+                    if (!shouldForceUpdate && isUserModified) {
+                        // 版本未变更且内容已被用户修改，保留用户修改的内容，但更新名称和描述
                         changed = true
-                        template.copy(
+                        val newTemplate = template.copy(
+                            name = config.displayName,
+                            description = config.description,
+                            category = config.category.displayName
+                        )
+                        listeners.forEach { it.onTemplateUpdated(template, newTemplate) }
+                        newTemplate
+                    } else {
+                        // 需要更新所有内容（强制更新 或 内容未被用户修改）
+                        changed = true
+                        val newTemplate = template.copy(
                             name = config.displayName,
                             description = config.description,
                             content = config.content,
                             category = config.category.displayName
                         )
+                        listeners.forEach { it.onTemplateUpdated(template, newTemplate) }
+                        newTemplate
                     }
                 }
             }
@@ -586,6 +591,33 @@ class PromptTemplateServiceImpl : PromptTemplateService, PersistentStateComponen
         }
         if (changed) {
             forceSaveState()
+        }
+    }
+
+    /**
+     * 检查内容是否是内置模板的原始内容（任何语言版本）
+     * 用于区分用户修改和语言切换
+     */
+    private fun isBuiltInTemplateContent(templateId: String, content: String): Boolean {
+        val config = TemplateConstants.TemplateConfig.values().find { it.id == templateId } ?: return false
+        
+        // 获取所有支持的语言版本的内容
+        val supportedLanguages = listOf("zh_CN", "en_US")
+        
+        return supportedLanguages.any { lang ->
+            try {
+                val locale = when (lang) {
+                    "zh_CN" -> java.util.Locale.SIMPLIFIED_CHINESE
+                    "en_US" -> java.util.Locale.US
+                    else -> java.util.Locale.getDefault()
+                }
+                val bundle = java.util.ResourceBundle.getBundle("i18n.messages", locale)
+                val langContent = bundle.getString(config.contentKey)
+                
+                content == langContent
+            } catch (e: Exception) {
+                false
+            }
         }
     }
 

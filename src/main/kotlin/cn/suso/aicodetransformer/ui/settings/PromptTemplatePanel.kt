@@ -12,7 +12,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.*
-import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import kotlinx.serialization.json.Json
@@ -28,8 +27,6 @@ import javax.swing.border.EmptyBorder
 import javax.swing.event.DocumentEvent
 import javax.swing.SwingUtilities
 import javax.swing.event.DocumentListener
-import javax.swing.event.ListSelectionEvent
-import javax.swing.event.ListSelectionListener
 
 /**
  * Prompt模板管理面板
@@ -431,7 +428,9 @@ class PromptTemplatePanel(
     private fun editTemplate() {
         try {
             val selectedTemplate = templateList.selectedValue ?: return
-            val dialog = PromptTemplateEditDialog.showEditDialog(project, selectedTemplate)
+            // Fetch the latest version of the template from service to ensure it has current language content
+            val latestTemplate = promptTemplateService.getTemplate(selectedTemplate.id) ?: selectedTemplate
+            val dialog = PromptTemplateEditDialog.showEditDialog(project, latestTemplate)
             if (dialog != null) {
                 promptTemplateService.saveTemplate(dialog)
                 loadTemplates()
@@ -641,7 +640,12 @@ class PromptTemplatePanel(
     
     override fun onTemplateUpdated(oldTemplate: PromptTemplate, newTemplate: PromptTemplate) {
         SwingUtilities.invokeLater {
+            val currentlyDisplayedId = templateList.selectedValue?.id
             loadTemplates()
+            // If the updated template is currently being displayed, refresh the detail panel
+            if (currentlyDisplayedId == newTemplate.id) {
+                detailPanel.setTemplate(newTemplate)
+            }
         }
     }
     

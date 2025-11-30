@@ -522,6 +522,23 @@ class PromptTemplateEditPanel : JPanel() {
         tabbedPane.setTitleAt(1, I18n.t("prompt.content.tab"))
 
         setupFieldTooltips()
+        
+        // 如果当前模板是内置模板，重新从服务获取最新的模板内容以支持多语言切换
+        currentTemplate?.let { template ->
+            if (template.isBuiltIn) {
+                val updatedTemplate = templateService.getTemplate(template.id)
+                if (updatedTemplate != null) {
+                    // 只更新显示的内容，不改变 currentTemplate 引用（避免影响修改检测）
+                    nameField.text = updatedTemplate.name
+                    descriptionField.text = updatedTemplate.description ?: ""
+                    categoryField.text = updatedTemplate.category
+                    // 只有在内容未被用户修改时才更新内容
+                    if (!isModified) {
+                        contentArea.text = updatedTemplate.content
+                    }
+                }
+            }
+        }
     }
 
     fun dispose() {

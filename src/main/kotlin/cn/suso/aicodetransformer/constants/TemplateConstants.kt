@@ -18,7 +18,7 @@ object TemplateConstants {
         private val displayNameKey: String,
         private val descriptionKey: String,
         val category: TemplateCategory,
-        private val contentKey: String,
+        internal val contentKey: String,
         val supportedLanguages: List<String> = listOf("java", "kotlin", "javascript", "typescript", "python"),
         val version: String = "1.0.0",
         val isBuiltIn: Boolean = true

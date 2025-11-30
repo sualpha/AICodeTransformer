@@ -65,7 +65,7 @@
             </ul>
         </li>
         <li>🤖 <strong>AI生成Commit信息</strong>：智能分析代码变更，自动生成规范化的Git提交信息（仅在启用JetBrains Git插件且当前项目存在Git仓库时可用）</li>
-        <li>创建带变量的自定义提示模板,模板编辑界面自带“AI优化”按钮，支持预览、重新优化</li>
+        <li>创建带变量的自定义提示模板,模板编辑界面自带"AI优化"按钮，支持预览、重新优化</li>
         <li>绑定键盘快捷键到AI操作</li>
     </ul>
     <p><strong>小贴士：</strong>在编辑器选中代码片段后，可在右键菜单直接执行模板：<em>编辑器 → 右键 → AI Code Transformer → 动态模板</em>。</p>
@@ -131,8 +131,16 @@
         <!-- Project startup activity -->
         <postStartupActivity implementation="cn.suso.aicodetransformer.AICodeTransformerProjectActivity"/>
 
+        <!-- Tool Windows -->
+        <toolWindow
+                id="TemplateDebugger"
+                anchor="right"
+                factoryClass="cn.suso.aicodetransformer.ui.toolwindow.TemplateDebuggerToolWindowFactory"
+                icon="AllIcons.Actions.Lightning"
+                key="toolwindow.debugger.title"/>
+
         <!-- Settings page -->
-        <!-- 将设置页面移动到“Other Settings”分组 -->
+        <!-- 将设置页面移动到"Other Settings"分组 -->
         <applicationConfigurable parentId="other.settings" instance="cn.suso.aicodetransformer.ui.settings.AICodeTransformerConfigurable"
                                 id="cn.suso.aicodetransformer.ui.settings.AICodeTransformerConfigurable"
                                 displayName="AI Code Transformer"/>
