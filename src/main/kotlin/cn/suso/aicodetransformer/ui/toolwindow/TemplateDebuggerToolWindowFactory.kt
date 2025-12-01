@@ -11,17 +11,26 @@ import com.intellij.ui.content.ContentFactory
 class TemplateDebuggerToolWindowFactory : ToolWindowFactory {
     
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val debuggerPanel = TemplateDebuggerPanel(project)
         val contentFactory = ContentFactory.getInstance()
-        val content = contentFactory.createContent(debuggerPanel, "", false)
-        toolWindow.contentManager.addContent(content)
+        
+        // Tab 1: Template Debugger
+        val debuggerPanel = TemplateDebuggerPanel(project)
+        val debuggerContent = contentFactory.createContent(debuggerPanel, cn.suso.aicodetransformer.i18n.I18n.t("toolwindow.debugger.title"), false)
+        toolWindow.contentManager.addContent(debuggerContent)
+        
+        // Tab 2: AI Transformation Preview
+        val previewPanel = AIPreviewPanel(project)
+        val previewContent = contentFactory.createContent(previewPanel, cn.suso.aicodetransformer.i18n.I18n.t("toolwindow.preview.title"), false)
+        toolWindow.contentManager.addContent(previewContent)
         
         // Set initial title
-        toolWindow.stripeTitle = cn.suso.aicodetransformer.i18n.I18n.t("toolwindow.debugger.title")
+        toolWindow.stripeTitle = "AI Code Transformer"
         
         // Update title on language change
         cn.suso.aicodetransformer.i18n.LanguageManager.addChangeListener {
-            toolWindow.stripeTitle = cn.suso.aicodetransformer.i18n.I18n.t("toolwindow.debugger.title")
+            // toolWindow.stripeTitle = "AI Code Transformer" // Title is fixed
+            debuggerContent.displayName = cn.suso.aicodetransformer.i18n.I18n.t("toolwindow.debugger.title")
+            previewContent.displayName = cn.suso.aicodetransformer.i18n.I18n.t("toolwindow.preview.title")
         }
     }
     

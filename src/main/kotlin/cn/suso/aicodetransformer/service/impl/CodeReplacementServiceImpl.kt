@@ -13,6 +13,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.codeStyle.CodeStyleManager
+import cn.suso.aicodetransformer.service.ConfigurationService
+import com.intellij.openapi.wm.ToolWindowManager
+import cn.suso.aicodetransformer.ui.toolwindow.AIPreviewPanel
 
 /**
  * 代码替换服务实现类
@@ -26,6 +29,7 @@ class CodeReplacementServiceImpl : CodeReplacementService {
     }
     
     private val errorHandlingService: ErrorHandlingService = service()
+    private val configurationService: ConfigurationService = service()
     
     override fun getSelectedText(editor: Editor): String? {
         val selectionModel = editor.selectionModel
@@ -116,6 +120,45 @@ class CodeReplacementServiceImpl : CodeReplacementService {
             var errorMessage: String? = null
             val newEndOffset = startOffset + newText.length
             val project = editor.project
+            
+            // Check for Preview Window mode
+            val globalSettings = configurationService.getGlobalSettings()
+            if (project != null && globalSettings.transformationOutputMode == "PREVIEW_WINDOW") {
+                ApplicationManager.getApplication().invokeLater {
+                    val toolWindowManager = ToolWindowManager.getInstance(project)
+                    val toolWindow = toolWindowManager.getToolWindow("TemplateDebugger")
+                    
+                    if (toolWindow != null) {
+                        // 显示工具窗口
+                        toolWindow.show()
+                        
+                        // 查找 AI Preview tab (第二个 tab, index = 1)
+                        val contentManager = toolWindow.contentManager
+                        if (contentManager.contentCount > 1) {
+                            val previewContent = contentManager.getContent(1)
+                            if (previewContent != null && previewContent.component is AIPreviewPanel) {
+                                // 切换到 AI Preview tab
+                                contentManager.setSelectedContent(previewContent)
+                                
+                                // 设置内容 (使用 Diff View)
+                                val fileType = PsiDocumentManager.getInstance(project).getPsiFile(document)?.fileType
+                                (previewContent.component as AIPreviewPanel).showDiff(originalText, newText, fileType)
+                            }
+                        }
+                    }
+                }
+                
+                return ReplacementResult(
+                    success = true,
+                    errorMessage = null,
+                    originalText = originalText,
+                    newText = newText,
+                    startOffset = startOffset,
+                    endOffset = endOffset,
+                    newStartOffset = startOffset,
+                    newEndOffset = endOffset
+                )
+            }
             
             if (project != null) {
                 WriteCommandAction.runWriteCommandAction(project, "AI Code Replacement", null, Runnable {

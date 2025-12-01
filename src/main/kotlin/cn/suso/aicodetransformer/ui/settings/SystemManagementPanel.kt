@@ -157,6 +157,7 @@ class SystemManagementPanel(
     private lateinit var logConfigPanel: JPanel
     private lateinit var cacheSettingsPanel: JPanel
     private lateinit var languageSettingsPanel: JPanel
+    private lateinit var transformationSettingsPanel: JPanel
     
     // 静态标签引用，用于语言切换时更新文本
     private lateinit var logPathStaticLabel: JBLabel
@@ -167,6 +168,10 @@ class SystemManagementPanel(
     private lateinit var cacheTtlStaticLabel: JBLabel
     private lateinit var updateFrequencyStaticLabel: JBLabel
     private lateinit var languageDisplayStaticLabel: JBLabel
+    private lateinit var transformationModeStaticLabel: JBLabel
+    
+    // 转换模式下拉框
+    private lateinit var transformationModeComboBox: JComboBox<String>
     
     // 语言变化监听器引用，用于在dispose时移除
     private val languageChangeListener: () -> Unit = {
@@ -209,6 +214,11 @@ class SystemManagementPanel(
         // 缓存配置面板（位于日志配置下面）
         cacheSettingsPanel = createCacheSettingsPanel()
         mainPanel.add(cacheSettingsPanel)
+        mainPanel.add(Box.createVerticalStrut(8))
+        
+        // 转换设置面板
+        transformationSettingsPanel = createTransformationSettingsPanel()
+        mainPanel.add(transformationSettingsPanel)
         mainPanel.add(Box.createVerticalStrut(8))
         
         // 更新设置面板
@@ -350,6 +360,27 @@ class SystemManagementPanel(
         cachePanel.add(clearCacheButton)
 
         panel.add(cachePanel)
+        return panel
+    }
+    
+    private fun createTransformationSettingsPanel(): JPanel {
+        val panel = JBPanel<JBPanel<*>>()
+        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
+        panel.border = TitledBorder(I18n.t("transformation.settings"))
+        
+        val contentPanel = JBPanel<JBPanel<*>>(FlowLayout(FlowLayout.LEFT, 5, 2))
+        
+        transformationModeStaticLabel = JBLabel(I18n.t("transformation.mode.label"))
+        contentPanel.add(transformationModeStaticLabel)
+        
+        transformationModeComboBox = JComboBox(arrayOf(
+            I18n.t("transformation.mode.direct"),
+            I18n.t("transformation.mode.preview")
+        ))
+        transformationModeComboBox.toolTipText = I18n.t("transformation.mode.tooltip")
+        contentPanel.add(transformationModeComboBox)
+        
+        panel.add(contentPanel)
         return panel
     }
     
@@ -662,6 +693,9 @@ class SystemManagementPanel(
             }
             val normalizedLanguage = languageController.normalizeLanguageCode(selectedLanguage)
             
+            // 获取转换模式
+            val transformationMode = if (transformationModeComboBox.selectedIndex == 1) "PREVIEW_WINDOW" else "DIRECT_REPLACEMENT"
+            
             // 创建新的全局设置
             val newSettings = languageController.cloneSettings(currentSettings).apply {
                 enableAutoUpdate = enableAutoUpdateCheckBox.isSelected
@@ -671,11 +705,12 @@ class SystemManagementPanel(
                 enableCache = enableCacheCheckBox.isSelected
                 cacheDefaultTtlMinutes = ttlMinutes
                 displayLanguage = normalizedLanguage
+                transformationOutputMode = transformationMode
             }
             
             // 保存设置
             configurationService.updateGlobalSettings(newSettings)
-            
+
             // 根据设置启动或停止自动更新服务
             if (enableAutoUpdateCheckBox.isSelected) {
                 autoUpdateService.startAutoUpdate("timer")
@@ -739,6 +774,9 @@ class SystemManagementPanel(
 
             // 加载语言选择
             updateLanguageSelection(settings.displayLanguage)
+            
+            // 加载转换模式
+            transformationModeComboBox.selectedIndex = if (settings.transformationOutputMode == "PREVIEW_WINDOW") 1 else 0
             
             // 设置按钮初始状态
             val currentStatus = autoUpdateService.getUpdateStatus()
@@ -974,7 +1012,12 @@ class SystemManagementPanel(
                     currentSettings.enableCache != enableCacheCheckBox.isSelected ||
                     currentSettings.cacheDefaultTtlMinutes != ttlMinutes
             
-            return logConfigModified || updateSettingsModified
+            // 检查转换模式是否有修改
+            val currentMode = currentSettings.transformationOutputMode
+            val selectedMode = if (transformationModeComboBox.selectedIndex == 1) "PREVIEW_WINDOW" else "DIRECT_REPLACEMENT"
+            val transformationModeModified = currentMode != selectedMode
+            
+            return logConfigModified || updateSettingsModified || transformationModeModified
         } catch (e: Exception) {
             return false
         }
@@ -1007,6 +1050,7 @@ class SystemManagementPanel(
         logInfoPanel.border = TitledBorder(I18n.t("log.info"))
         logConfigPanel.border = TitledBorder(I18n.t("log.config"))
         cacheSettingsPanel.border = TitledBorder(I18n.t("cache.settings"))
+        transformationSettingsPanel.border = TitledBorder(I18n.t("transformation.settings"))
         updateSettingsPanel.border = TitledBorder(I18n.t("update.settings"))
         languageSettingsPanel.border = TitledBorder(I18n.t("language.display"))
         
@@ -1036,8 +1080,16 @@ class SystemManagementPanel(
         logRetentionStaticLabel.text = I18n.t("log.retention")
         logDaysStaticLabel.text = I18n.t("log.days")
         cacheTtlStaticLabel.text = I18n.t("cache.ttl")
+        transformationModeStaticLabel.text = I18n.t("transformation.mode.label")
         updateFrequencyStaticLabel.text = I18n.t("update.frequency")
         languageDisplayStaticLabel.text = I18n.t("language.display.label")
+        
+        // 刷新转换模式下拉框
+        val currentTransformModeIndex = transformationModeComboBox.selectedIndex
+        transformationModeComboBox.removeAllItems()
+        transformationModeComboBox.addItem(I18n.t("transformation.mode.direct"))
+        transformationModeComboBox.addItem(I18n.t("transformation.mode.preview"))
+        transformationModeComboBox.selectedIndex = currentTransformModeIndex
         
         // 刷新下拉框选项
         val currentIndex = updateIntervalComboBox.selectedIndex

@@ -42,6 +42,17 @@ The AI-generated commit message feature intelligently analyzes your code changes
 - **Auto Commit**: Configurable to automatically execute commits after generation
 - **Auto Push**: Support automatic push to remote repository after commit
 
+### 🛠️ Template Debugger
+- **Designed for Prompt Optimization**: A dedicated environment for testing and refining Prompt templates
+- **Real-time Preview**: Quickly see how Prompts perform with different inputs
+- **Easy Debugging**: Iterate on Prompts directly in the debugger without repeated undo/redo in the editor
+
+### 👁️ Preview Window / Read Source Code Mode
+- **Safe Preview**: View AI transformation results via a side-by-side Diff View before applying changes
+- **Read Source Code Mode**: Review AI-generated code just like reading source code to ensure logic correctness
+- **Non-destructive**: Original code remains unchanged until you confirm to apply
+- **Configuration**: Enable by switching "Output Mode" to "Preview Window" in settings
+
 ## 🚀 Quick Start
 
 ### Installation Methods

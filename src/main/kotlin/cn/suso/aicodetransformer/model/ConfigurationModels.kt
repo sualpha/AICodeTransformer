@@ -151,6 +151,12 @@ class GlobalSettings {
     var cacheDefaultTtlMinutes: Int = 15
         get() = field
         set(value) { field = value }
+
+    // 转换输出模式：DIRECT_REPLACEMENT / PREVIEW_WINDOW
+    @com.intellij.util.xmlb.annotations.Attribute("transformationOutputMode")
+    var transformationOutputMode: String = "DIRECT_REPLACEMENT"
+        get() = field
+        set(value) { field = value }
     
     // 默认构造函数
     constructor()
@@ -169,7 +175,8 @@ class GlobalSettings {
         lastUpdateCheckTime: Long = 0L,
         enableCache: Boolean = false,
         cacheDefaultTtlMinutes: Int = 15,
-        displayLanguage: String = "system"
+        displayLanguage: String = "system",
+        transformationOutputMode: String = "DIRECT_REPLACEMENT"
     ) {
         this.enableLogging = enableLogging
         this.logLevel = logLevel
@@ -184,6 +191,7 @@ class GlobalSettings {
         this.enableCache = enableCache
         this.cacheDefaultTtlMinutes = cacheDefaultTtlMinutes
         this.displayLanguage = displayLanguage
+        this.transformationOutputMode = transformationOutputMode
     }
 }
 
