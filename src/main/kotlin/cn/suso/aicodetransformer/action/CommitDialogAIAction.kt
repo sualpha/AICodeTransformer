@@ -259,7 +259,8 @@ class CommitDialogAIAction : AnAction(I18n.t("commit.aiAction.text"), I18n.t("co
             val config = configurationService.getDefaultModelConfiguration()
                 ?: return tr("commit.aiAction.error.noDefaultConfig")
             
-            val apiKey = config.apiKey
+            // 使用getApiKey方法获取API密钥,确保内置模型的密钥被正确解密
+            val apiKey = configurationService.getApiKey(config.id) ?: ""
             if (apiKey.isBlank()) {
                 return tr("commit.aiAction.error.apiKeyMissing")
             }
@@ -790,7 +791,8 @@ class CommitDialogAIAction : AnAction(I18n.t("commit.aiAction.text"), I18n.t("co
             return
         }
 
-        val apiKey = config.apiKey
+        // 使用getApiKey方法获取API密钥,确保内置模型的密钥被正确解密
+        val apiKey = configurationService.getApiKey(config.id) ?: ""
         if (apiKey.isBlank()) {
             ApplicationManager.getApplication().invokeLater {
                 showError(project, "commit.aiAction.error.apiKeyRequired")
